@@ -84,6 +84,17 @@ function findByEmail_(email){ const rows=getAll_(sh_(SHEET_USERS)); for (let i=0
 function getConfig_()       { const rows=getAll_(sh_(SHEET_CONFIG)); const m={}; rows.forEach(r=>m[(r[0]||'').toString()]=(r[1]||'').toString()); return m; }
 function setConfig_(k,v)    { const s=sh_(SHEET_CONFIG); const rows=getAll_(s); for (let i=0;i<rows.length;i++){ if (rows[i][0]==k){ s.getRange(i+2,2).setValue(v); return; } } s.appendRow([k,v]); }
 
+function computeLevelInfo_(xpRaw, cfg) {
+  const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
+  const xpPerLevel = (Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0) ? xpPerLevelRaw : 100;
+  const safeXP = Math.max(0, Number(xpRaw || 0));
+  const level = 1 + Math.floor(safeXP / xpPerLevel);
+  const xpIntoLevel = safeXP - xpPerLevel * Math.max(0, level - 1);
+  const xpToNextLevel = Math.max(0, xpPerLevel - xpIntoLevel);
+  const nextLevel = level + 1;
+  return { xpPerLevel, level, xpIntoLevel, xpToNextLevel, nextLevel };
+}
+
 /** Atualiza XP do usuário (soma delta) */
 function addUserXP_(userId, delta) {
   const s = sh_(SHEET_USERS);
@@ -294,11 +305,22 @@ function checkin(payload) {
   const already = rows.some(r => r[0]===userId && r[1]===today);
   if (already) return { ok:false, msg:'Presença já registrada hoje.' };
 
-  const xp = Number(getConfig_().xpCheckin||5);
+  const cfg = getConfig_();
+  const xp = Number(cfg.xpCheckin||5);
   s.appendRow([userId, today, xp]);
   const newXP = addUserXP_(userId, xp);
 
-  return { ok:true, xpGanho: xp, totalXP: newXP };
+  const levelInfo = computeLevelInfo_(newXP, cfg);
+
+  return {
+    ok:true,
+    xpGanho: xp,
+    totalXP: newXP,
+    level: levelInfo.level,
+    xpPerLevel: levelInfo.xpPerLevel,
+    xpToNextLevel: levelInfo.xpToNextLevel,
+    nextLevel: levelInfo.nextLevel
+  };
 }
 
 /** Envia resultado de uma atividade
@@ -343,16 +365,25 @@ function submitActivity(payload) {
     deltaXP = earned;
   }
 
-  let totalXP = null;
-  if (deltaXP>0) totalXP = addUserXP_(userId, deltaXP);
   const cfg = getConfig_();
-  const level = 1 + Math.floor((totalXP!==null? totalXP : getUserById_(userId)?.xp || 0) / Number(cfg.xpPerLevel||100));
+  let finalXP = null;
+  if (deltaXP > 0) {
+    finalXP = addUserXP_(userId, deltaXP);
+  }
+  if (finalXP === null || finalXP === undefined) {
+    const userInfo = getUserById_(userId);
+    finalXP = Number(userInfo?.xp || 0);
+  }
+  const levelInfo = computeLevelInfo_(finalXP, cfg);
 
   return {
     ok:true,
     deltaXP,
-    totalXP: totalXP ?? getUserById_(userId)?.xp,
-    level
+    totalXP: finalXP,
+    level: levelInfo.level,
+    xpPerLevel: levelInfo.xpPerLevel,
+    xpToNextLevel: levelInfo.xpToNextLevel,
+    nextLevel: levelInfo.nextLevel
   };
 }
 
@@ -381,9 +412,14 @@ function getUserState(payload) {
   const prog = getAll_(sh_(SHEET_PROGRESS)).filter(r=>r[0]===userId);
   const concluidos = prog.length;
   const cfg = getConfig_();
+  const levelInfo = computeLevelInfo_(u.xp, cfg);
   return {
     id: u.id, name: u.name, email: u.email, isAdmin: u.isAdmin,
-    xp: u.xp, level: 1 + Math.floor(u.xp / Number(cfg.xpPerLevel||100)),
+    xp: u.xp,
+    level: levelInfo.level,
+    xpPerLevel: levelInfo.xpPerLevel,
+    xpToNextLevel: levelInfo.xpToNextLevel,
+    nextLevel: levelInfo.nextLevel,
     concluidos
   };
 }

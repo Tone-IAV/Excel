@@ -50,6 +50,26 @@
     .input-sm { font-size:.85rem; padding:.35rem .6rem; }
     .history-empty { font-size:.85rem; color:#64748b; background:#f8fafc; padding:1rem; border-radius:1rem; border:1px dashed rgba(148,163,184,.4); text-align:center; }
     .dark .history-empty { color:#cbd5f5; background:rgba(15,23,42,.6); border-color:rgba(148,163,184,.25); }
+    .level-highlight { transition:transform .3s ease, box-shadow .3s ease; }
+    .level-highlight:hover { transform:translateY(-2px); box-shadow:0 18px 32px rgba(249,115,22,.15); }
+    .level-label { color:#92400e; letter-spacing:.08em; }
+    .dark .level-label { color:#fde68a; }
+    .milestone-badge { display:inline-flex; align-items:center; gap:.35rem; padding:.2rem .6rem; border-radius:9999px; font-size:.65rem; font-weight:700; background:rgba(251,191,36,.3); color:#78350f; text-transform:uppercase; letter-spacing:.08em; box-shadow:0 2px 8px rgba(249,115,22,.25); }
+    .dark .milestone-badge { background:rgba(251,191,36,.2); color:#fde68a; box-shadow:0 2px 8px rgba(251,191,36,.25); }
+    .milestone-celebrate { background:linear-gradient(135deg,#fcd34d 0%,#f97316 100%); color:#fff; box-shadow:0 22px 45px rgba(249,115,22,.35); }
+    .milestone-celebrate #lvlBox { color:#fff; }
+    .milestone-celebrate .level-label { color:#fff; }
+    .milestone-celebrate .milestone-badge { background:rgba(255,255,255,.35); color:#7c2d12; box-shadow:0 6px 18px rgba(249,115,22,.35); }
+    .dark .milestone-celebrate { background:linear-gradient(135deg,#92400e 0%,#f59e0b 100%); box-shadow:0 22px 45px rgba(234,179,8,.35); }
+    .dark .milestone-celebrate .milestone-badge { background:rgba(255,255,255,.85); color:#7c2d12; }
+    .milestone-chip { display:inline-flex; align-items:center; gap:.35rem; padding:.35rem .75rem; border-radius:9999px; font-weight:600; font-size:.75rem; background:rgba(226,232,240,.85); color:#1f2937; box-shadow:0 3px 12px rgba(15,23,42,.1); }
+    .milestone-chip span { display:inline-flex; align-items:center; }
+    .milestone-chip-achieved { background:rgba(134,239,172,.45); color:#047857; box-shadow:0 6px 16px rgba(16,185,129,.3); }
+    .milestone-chip-next { background:rgba(253,224,71,.55); color:#92400e; box-shadow:0 6px 16px rgba(251,191,36,.35); }
+    .dark .milestone-chip { background:rgba(30,41,59,.65); color:#e2e8f0; box-shadow:0 3px 12px rgba(15,23,42,.25); }
+    .dark .milestone-chip-achieved { background:rgba(34,197,94,.3); color:#bbf7d0; }
+    .dark .milestone-chip-next { background:rgba(250,204,21,.25); color:#fde68a; }
+    #nextLevelBar { transition:width .45s ease; }
   </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
@@ -115,21 +135,42 @@
         <h3 class="text-lg font-semibold mb-2">Sua evolução</h3>
         <div class="grid sm:grid-cols-3 gap-3">
           <div class="rounded-2xl p-4 bg-primary/10">
-            <div class="text-xs">XP total</div><div id="xpBox" class="text-3xl font-bold">0</div>
+            <div class="text-xs uppercase tracking-wide text-primary/70">XP total</div>
+            <div id="xpBox" class="text-3xl font-bold text-primary">0</div>
           </div>
           <div class="rounded-2xl p-4 bg-emerald-100">
-            <div class="text-xs">Módulos concluídos</div><div id="doneBox" class="text-3xl font-bold">0</div>
+            <div class="text-xs uppercase tracking-wide text-emerald-700/80">Módulos concluídos</div>
+            <div id="doneBox" class="text-3xl font-bold text-emerald-900">0</div>
           </div>
-          <div class="rounded-2xl p-4 bg-amber-100">
-            <div class="text-xs">Nível</div><div id="lvlBox" class="text-3xl font-bold">1</div>
+          <div id="levelCard" class="rounded-2xl p-4 bg-amber-100 level-highlight relative overflow-hidden">
+            <div class="flex items-start justify-between gap-2">
+              <div id="levelLabel" class="level-label text-xs uppercase tracking-wide font-semibold">Nível</div>
+              <span id="levelBadge" class="milestone-badge hidden">🏆 Marco!</span>
+            </div>
+            <div id="lvlBox" class="text-3xl font-bold text-amber-900 mt-1">1</div>
           </div>
         </div>
-        <div class="mt-4">
-          <div class="flex items-center justify-between text-sm mb-1">
-            <span>Progresso nos 24 módulos</span><span id="pctBox">0%</span>
+        <div class="mt-4 space-y-4">
+          <div id="nextLevelCard" class="rounded-2xl border border-amber-200/70 bg-amber-50/80 px-4 py-4 dark:border-amber-500/40 dark:bg-amber-500/10 space-y-3">
+            <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+              <div class="flex items-center gap-2 font-semibold text-amber-700 dark:text-amber-200">
+                <span class="inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-200/80 text-lg shadow-sm dark:bg-amber-500/30">⚡</span>
+                <span id="nextLevelText">Faltam 0 XP para o nível 2</span>
+              </div>
+              <span id="nextLevelPct" class="text-xs font-semibold text-amber-700/80 dark:text-amber-200/80">0% do nível atual</span>
+            </div>
+            <div class="h-2.5 rounded-full bg-amber-200/70 dark:bg-amber-500/30 overflow-hidden">
+              <div id="nextLevelBar" class="h-full rounded-full bg-amber-500 dark:bg-amber-400" style="width:0%"></div>
+            </div>
+            <div id="milestoneWrap" class="flex flex-wrap gap-2 text-xs"></div>
           </div>
-          <div class="h-3 rounded-full bg-slate-200 overflow-hidden">
-            <div id="barBox" class="h-3 bg-primary" style="width:0%"></div>
+          <div>
+            <div class="flex items-center justify-between text-sm mb-1">
+              <span>Progresso nos 24 módulos</span><span id="pctBox">0%</span>
+            </div>
+            <div class="h-3 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
+              <div id="barBox" class="h-3 bg-primary dark:bg-blue-500" style="width:0%"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -413,6 +454,144 @@
       }
     });
   }
+
+  const nextLevelTextEl = $('#nextLevelText');
+  const nextLevelPctEl = $('#nextLevelPct');
+  const nextLevelBarEl = $('#nextLevelBar');
+  const milestoneWrap = $('#milestoneWrap');
+  const levelCardEl = $('#levelCard');
+  const levelBadgeEl = $('#levelBadge');
+
+  function resetLevelIndicator() {
+    if (nextLevelTextEl) nextLevelTextEl.textContent = 'Faça login para acompanhar seus marcos.';
+    if (nextLevelPctEl) nextLevelPctEl.textContent = '0% do nível atual';
+    if (nextLevelBarEl) nextLevelBarEl.style.width = '0%';
+    if (milestoneWrap) milestoneWrap.innerHTML = '';
+    if (levelCardEl) levelCardEl.classList.remove('milestone-celebrate');
+    if (levelBadgeEl) {
+      levelBadgeEl.classList.add('hidden');
+      levelBadgeEl.textContent = '';
+    }
+  }
+
+  function setLevelIndicatorLoading() {
+    if (nextLevelTextEl) nextLevelTextEl.textContent = 'Calculando progresso de nível...';
+    if (nextLevelPctEl) nextLevelPctEl.textContent = '...';
+    if (nextLevelBarEl) nextLevelBarEl.style.width = '0%';
+    if (milestoneWrap) milestoneWrap.innerHTML = '';
+    if (levelCardEl) levelCardEl.classList.remove('milestone-celebrate');
+    if (levelBadgeEl) {
+      levelBadgeEl.classList.add('hidden');
+      levelBadgeEl.textContent = '';
+    }
+  }
+
+  function renderMilestoneBadges(level, nextLevel) {
+    if (!milestoneWrap) return;
+    milestoneWrap.innerHTML = '';
+    const step = 5;
+    const minMilestones = 3;
+    const safeLevel = Number.isFinite(level) ? level : 0;
+    const safeNext = Number.isFinite(nextLevel) ? nextLevel : safeLevel + 1;
+    const target = Math.max(safeLevel, safeNext);
+    const highest = Math.max(step * minMilestones, Math.ceil((target + step) / step) * step);
+    let nextHighlighted = false;
+    for (let milestone = step; milestone <= highest; milestone += step) {
+      const chip = document.createElement('span');
+      chip.className = 'milestone-chip';
+      if (milestone <= safeLevel) {
+        const icon = milestone % 10 === 0 ? '🌟' : '🏆';
+        chip.classList.add('milestone-chip-achieved');
+        chip.innerHTML = `<span>${icon}</span><span>Nível ${milestone}</span>`;
+      } else if (!nextHighlighted) {
+        nextHighlighted = true;
+        const icon = milestone % 10 === 0 ? '🚀' : '🎯';
+        const label = milestone % 10 === 0 ? `Rumo ao ${milestone}` : `Meta: ${milestone}`;
+        chip.classList.add('milestone-chip-next');
+        chip.innerHTML = `<span>${icon}</span><span>${label}</span>`;
+      } else {
+        chip.innerHTML = `<span>Nível ${milestone}</span>`;
+      }
+      milestoneWrap.appendChild(chip);
+    }
+    if (!milestoneWrap.children.length) {
+      const span = document.createElement('span');
+      span.className = 'text-xs text-slate-500 dark:text-slate-300';
+      span.textContent = 'Conquiste níveis para desbloquear marcos!';
+      milestoneWrap.appendChild(span);
+    }
+  }
+
+  function updateLevelIndicator(state) {
+    if (!state) return;
+    const levelValue = Number(state.level || 1);
+    const nextLevelValue = Number.isFinite(Number(state.nextLevel)) ? Number(state.nextLevel) : levelValue + 1;
+    const xpPerLevelRaw = Number(state.xpPerLevel);
+    const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : null;
+    const xpToNextRaw = Number(state.xpToNextLevel);
+    const xpToNext = Number.isFinite(xpToNextRaw) ? Math.max(0, Math.round(xpToNextRaw)) : null;
+    const xpIntoLevel = xpPerLevel !== null && xpToNext !== null ? Math.max(0, xpPerLevel - xpToNext) : 0;
+    const pct = xpPerLevel !== null && xpPerLevel > 0 && xpToNext !== null
+      ? Math.round((xpIntoLevel / xpPerLevel) * 100)
+      : 0;
+    const pctClamped = Math.max(0, Math.min(100, pct));
+
+    if (nextLevelTextEl) {
+      if (xpToNext === null) {
+        nextLevelTextEl.textContent = 'Progresso de nível indisponível no momento.';
+      } else if (xpToNext === 0) {
+        nextLevelTextEl.textContent = `Pronto para alcançar o nível ${nextLevelValue}!`;
+      } else {
+        const xpLabel = xpToNext === 1 ? 'Falta 1 XP' : `Faltam ${xpToNext} XP`;
+        nextLevelTextEl.textContent = `${xpLabel} para o nível ${nextLevelValue}`;
+      }
+    }
+    if (nextLevelPctEl) {
+      nextLevelPctEl.textContent = `${pctClamped}% do nível atual`;
+    }
+    if (nextLevelBarEl) {
+      nextLevelBarEl.style.width = `${pctClamped}%`;
+    }
+
+    if (levelCardEl) {
+      const isMilestone = levelValue > 0 && levelValue % 5 === 0;
+      levelCardEl.classList.toggle('milestone-celebrate', isMilestone);
+    }
+    if (levelBadgeEl) {
+      const isMilestone = levelValue > 0 && levelValue % 5 === 0;
+      if (isMilestone) {
+        const isEpic = levelValue % 10 === 0;
+        levelBadgeEl.classList.remove('hidden');
+        levelBadgeEl.textContent = isEpic ? '🌟 Nível épico!' : '🏆 Marco!';
+      } else {
+        levelBadgeEl.classList.add('hidden');
+        levelBadgeEl.textContent = '';
+      }
+    }
+
+    renderMilestoneBadges(levelValue, nextLevelValue);
+  }
+
+  function formatLevelProgressMessage(info) {
+    if (!info) return '';
+    const xpToNextRaw = Number(info.xpToNextLevel ?? info.remainingXP);
+    const nextLevelRaw = Number(info.nextLevel);
+    const levelRaw = Number(info.level);
+    const nextLevelValue = Number.isFinite(nextLevelRaw)
+      ? nextLevelRaw
+      : (Number.isFinite(levelRaw) ? levelRaw + 1 : null);
+    if (!Number.isFinite(xpToNextRaw) || xpToNextRaw < 0 || !Number.isFinite(nextLevelValue)) {
+      return '';
+    }
+    const xpToNext = Math.max(0, Math.round(xpToNextRaw));
+    if (xpToNext === 0) {
+      return ` Você está pronto(a) para alcançar o nível ${nextLevelValue}!`;
+    }
+    const xpLabel = xpToNext === 1 ? 'Falta 1 XP' : `Faltam ${xpToNext} XP`;
+    return ` ${xpLabel} para o nível ${nextLevelValue}.`;
+  }
+
+  resetLevelIndicator();
 
   const historyTabs = Array.from(document.querySelectorAll('[data-history-tab]'));
   const historyListEl = $('#historyList');
@@ -944,13 +1123,15 @@
   });
 
   // UI switches
-  function updateUI() {
+  function updateUI(options = {}) {
+    const keepLevelIndicator = !!(options && options.keepLevelIndicator);
     if (!currentUser) {
       $('#authSection').classList.remove('hidden');
       $('#dashSection').classList.add('hidden');
       $('#userInfo').textContent = 'Visitante';
       $('#btnLogout').classList.add('hidden');
       resetHistorySection();
+      resetLevelIndicator();
       return;
     }
     $('#authSection').classList.add('hidden');
@@ -958,15 +1139,27 @@
     $('#btnLogout').classList.remove('hidden');
     $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
     loadHistoryForCurrentUser();
+    if (!keepLevelIndicator) {
+      setLevelIndicatorLoading();
+    }
     // estado
-    google.script.run.withSuccessHandler(s=>{
-      $('#xpBox').textContent  = s.xp;
-      $('#lvlBox').textContent = s.level;
-      $('#doneBox').textContent = s.concluidos;
-      const pct = Math.round((s.concluidos/24)*100);
-      $('#pctBox').textContent = pct + '%';
-      $('#barBox').style.width = pct + '%';
-    }).getUserState({ userId: currentUser.id });
+    google.script.run
+      .withFailureHandler(err => {
+        console.error('Falha ao obter estado do usuário:', err);
+        if (!keepLevelIndicator) {
+          if (nextLevelTextEl) nextLevelTextEl.textContent = 'Não foi possível carregar o progresso agora.';
+          if (nextLevelPctEl) nextLevelPctEl.textContent = '—';
+        }
+      })
+      .withSuccessHandler(s=>{
+        $('#xpBox').textContent  = s.xp;
+        $('#lvlBox').textContent = s.level;
+        $('#doneBox').textContent = s.concluidos;
+        const pct = Math.round((s.concluidos/24)*100);
+        $('#pctBox').textContent = pct + '%';
+        $('#barBox').style.width = pct + '%';
+        updateLevelIndicator(s);
+      }).getUserState({ userId: currentUser.id });
 
     // ranking
     refreshRanking();
@@ -1108,10 +1301,17 @@
     google.script.run
       .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
       .withSuccessHandler(res=>{
-        $('#checkinMsg').textContent = res.ok
-          ? `Presença registrada (+${res.xpGanho} XP). Total: ${res.totalXP} XP.`
-          : res.msg;
-        updateUI();
+        if (res && res.ok) {
+          const extra = formatLevelProgressMessage(res);
+          const totalXP = Number.isFinite(Number(res.totalXP)) ? Number(res.totalXP) : res.totalXP;
+          $('#checkinMsg').textContent = `Presença registrada (+${res.xpGanho} XP). Total: ${totalXP} XP.${extra}`;
+          if (Number.isFinite(Number(totalXP))) $('#xpBox').textContent = totalXP;
+          if (Number.isFinite(Number(res.level))) $('#lvlBox').textContent = res.level;
+          updateLevelIndicator(res);
+          updateUI({ keepLevelIndicator: true });
+        } else {
+          $('#checkinMsg').textContent = res?.msg || 'Não foi possível registrar o check-in.';
+        }
         setTimeout(()=> $('#checkinMsg').textContent='', 3000);
       })
       .checkin({ userId: currentUser.id });
@@ -1129,8 +1329,21 @@
     google.script.run
       .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
       .withSuccessHandler(res=>{
-        $('#activityMsg').textContent = `Enviado! Você ganhou +${res.deltaXP} XP. Total: ${res.totalXP} XP (Nível ${res.level}).`;
-        updateUI();
+        if (!res || !res.ok) {
+          $('#activityMsg').textContent = 'Não foi possível registrar a atividade agora.';
+          setTimeout(()=> $('#activityMsg').textContent='', 4000);
+          return;
+        }
+        const deltaXP = Number.isFinite(Number(res.deltaXP)) ? Number(res.deltaXP) : 0;
+        const deltaText = deltaXP > 0 ? `Você ganhou +${deltaXP} XP.` : 'Sem XP adicional desta vez.';
+        const totalXP = Number.isFinite(Number(res.totalXP)) ? Number(res.totalXP) : res.totalXP;
+        const levelInfo = Number.isFinite(Number(res.level)) ? ` (Nível ${res.level})` : '';
+        const extra = formatLevelProgressMessage(res);
+        $('#activityMsg').textContent = `Enviado! ${deltaText} Total: ${totalXP} XP${levelInfo}.${extra}`;
+        if (Number.isFinite(Number(totalXP))) $('#xpBox').textContent = totalXP;
+        if (Number.isFinite(Number(res.level))) $('#lvlBox').textContent = res.level;
+        updateLevelIndicator(res);
+        updateUI({ keepLevelIndicator: true });
         setTimeout(()=> $('#activityMsg').textContent='', 4000);
       })
       .submitActivity(payload);
