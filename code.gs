@@ -95,14 +95,46 @@ function getUserById_(userId) {
 /** =================== API PÚBLICA (chamada pelo HTML) =================== **/
 function registerUser(payload) {
   setup_();
-  const name  = (payload.name || '').trim();
-  const email = (payload.email||'').trim().toLowerCase();
-  const pass  = (payload.password||'').trim();
+  const nameRaw  = (payload.name || '');
+  const emailRaw = (payload.email||'');
+  const passRaw  = (payload.password||'');
   const adminCode = (payload.adminCode||'').trim();
 
-  if (!name || !email || !pass) throw new Error('Preencha nome, e-mail e senha.');
+  const name  = nameRaw.trim();
+  const email = emailRaw.trim().toLowerCase();
+  const pass  = passRaw.trim();
 
-  if (findByEmail_(email)) throw new Error('E-mail já cadastrado.');
+  const errors = {};
+  if (!name) {
+    errors.name = 'Informe o nome completo.';
+  } else if (name.length < 3) {
+    errors.name = 'O nome deve ter pelo menos 3 caracteres.';
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email) {
+    errors.email = 'Informe o e-mail.';
+  } else if (!emailPattern.test(email)) {
+    errors.email = 'Formato de e-mail inválido.';
+  } else if (findByEmail_(email)) {
+    errors.email = 'E-mail já cadastrado.';
+  }
+
+  const missing = [];
+  if (pass.length < 8) missing.push('no mínimo 8 caracteres');
+  if (!/[A-Z]/.test(pass)) missing.push('uma letra maiúscula');
+  if (!/[a-z]/.test(pass)) missing.push('uma letra minúscula');
+  if (!/\d/.test(pass)) missing.push('um número');
+  if (!/[^A-Za-z0-9]/.test(pass)) missing.push('um símbolo');
+  if (missing.length) {
+    const last = missing.pop();
+    const msg = missing.length ? `A senha deve conter ${missing.join(', ')} e ${last}.` : `A senha deve conter ${last}.`;
+    errors.password = msg;
+  }
+
+  if (Object.keys(errors).length) {
+    return { ok:false, errors, message:'Revise os campos destacados.' };
+  }
 
   const passHash = sha256_(pass);
   const isAdmin  = adminCode === ADMIN_SECURITY_CODE;
@@ -111,8 +143,11 @@ function registerUser(payload) {
   sh_(SHEET_USERS).appendRow([id, name, email, passHash, isAdmin, 0, nowISO_()]);
 
   return {
-    id, name, email, isAdmin, xp: 0,
-    level: 1,
+    ok: true,
+    user: {
+      id, name, email, isAdmin, xp: 0,
+      level: 1,
+    }
   };
 }
 
