@@ -195,6 +195,44 @@
 <script>
   // Estado simples no front
   let currentUser = null;
+  const STORAGE_KEY = 'excelPlatformSession';
+
+  function persistSession(token, user) {
+    if (!token || !user || !user.id) return;
+    const payload = {
+      token,
+      userId: user.id,
+      name: user.name,
+      isAdmin: !!user.isAdmin,
+    };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      console.warn('Não foi possível salvar sessão local:', err);
+    }
+  }
+
+  function clearStoredSession() {
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (err) {
+      console.warn('Não foi possível limpar sessão local:', err);
+    }
+  }
+
+  function getStoredSession() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      if (!parsed.token) return null;
+      return parsed;
+    } catch (err) {
+      console.warn('Não foi possível ler sessão local:', err);
+      return null;
+    }
+  }
 
   // Helpers
   const $ = s => document.querySelector(s);
@@ -410,9 +448,10 @@
         .withSuccessHandler(res => {
           isSignupSubmitting = false;
 
-          if (res && res.ok) {
+          if (res && res.ok && res.user && res.token) {
             clearCardMessage(signupMessageEl);
             currentUser = res.user;
+            persistSession(res.token, res.user);
             updateUI();
             updateSignupButton();
             return;
@@ -456,10 +495,13 @@
         .withFailureHandler(err => {
           renderCardMessage(loginMessageEl, 'error', err.message || err);
         })
-        .withSuccessHandler(user => {
-          if (user && user.id) {
+        .withSuccessHandler(res => {
+          const user = res && res.user;
+          const token = res && res.token;
+          if (user && user.id && token) {
             clearCardMessage(loginMessageEl);
             currentUser = user;
+            persistSession(token, user);
             updateUI();
           } else {
             renderCardMessage(loginMessageEl, 'error', 'Não foi possível entrar. Tente novamente.');
@@ -469,7 +511,23 @@
     });
   }
 
-  $('#btnLogout').onclick = ()=>{ currentUser=null; updateUI(); };
+  $('#btnLogout').onclick = () => {
+    const finish = () => {
+      clearStoredSession();
+      currentUser = null;
+      updateUI();
+    };
+    const stored = getStoredSession();
+    const token = stored && stored.token;
+    if (!token) {
+      finish();
+      return;
+    }
+    google.script.run
+      .withFailureHandler(() => finish())
+      .withSuccessHandler(() => finish())
+      .logout(token);
+  };
 
   // Check-in
   $('#btnCheckin').onclick = ()=>{
@@ -524,8 +582,30 @@
 
   // Boot
   (function init(){
-    updateUI(); // começa como visitante
     loadEmbeds();
+    const stored = getStoredSession();
+    const authSection = $('#authSection');
+    if (authSection) authSection.classList.add('hidden');
+
+    if (stored && stored.token) {
+      google.script.run
+        .withFailureHandler(() => {
+          clearStoredSession();
+          updateUI();
+        })
+        .withSuccessHandler(user => {
+          if (user && user.id) {
+            currentUser = user;
+            persistSession(stored.token, user);
+          } else {
+            clearStoredSession();
+          }
+          updateUI();
+        })
+        .resumeSession(stored.token);
+    } else {
+      updateUI();
+    }
   })();
 </script>
 </body>
