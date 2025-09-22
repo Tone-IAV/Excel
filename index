@@ -94,6 +94,34 @@
     .achievement-progress-bar { height:100%; border-radius:9999px; background:linear-gradient(135deg,#38bdf8,#2563eb); transition:width .35s ease; }
     .dark .achievement-progress-track { background:rgba(71,85,105,.55); }
     .dark .achievement-progress-bar { background:linear-gradient(135deg,#38bdf8,#1d4ed8); }
+    .student-nav { display:flex; flex-wrap:wrap; gap:.5rem; }
+    .student-nav-btn { display:inline-flex; align-items:center; gap:.4rem; padding:.45rem .95rem; border-radius:9999px; border:1px solid rgba(148,163,184,.45); background:rgba(248,250,252,.75); color:#1e293b; font-weight:600; font-size:.85rem; transition:background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease; }
+    .student-nav-btn:hover { background:#e2e8f0; }
+    .student-nav-btn-active { background:#007BFF; border-color:#007BFF; color:#fff; box-shadow:0 10px 24px rgba(0,123,255,.25); }
+    .dark .student-nav-btn { background:rgba(15,23,42,.75); border-color:rgba(71,85,105,.6); color:#e2e8f0; }
+    .dark .student-nav-btn:hover { background:rgba(51,65,85,.65); }
+    .dark .student-nav-btn-active { background:#2563eb; border-color:#2563eb; box-shadow:0 12px 26px rgba(37,99,235,.35); }
+    .mission-list { list-style:none; margin:0; padding:0; display:grid; gap:.75rem; }
+    .mission-item { display:flex; gap:.85rem; align-items:flex-start; border:1px solid rgba(148,163,184,.35); border-radius:1rem; padding:.75rem .95rem; background:#fff; box-shadow:0 4px 12px rgba(15,23,42,.04); transition:border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
+    .mission-item:hover { box-shadow:0 10px 24px rgba(15,23,42,.08); }
+    .mission-item-complete { border-color:rgba(34,197,94,.45); background:rgba(236,253,245,.8); box-shadow:0 14px 30px rgba(16,185,129,.25); }
+    .mission-icon { flex:none; display:inline-flex; align-items:center; justify-content:center; width:2.5rem; height:2.5rem; border-radius:9999px; background:rgba(148,163,184,.2); font-size:1.25rem; color:#0f172a; box-shadow:inset 0 0 0 1px rgba(148,163,184,.3); }
+    .mission-item-complete .mission-icon { background:rgba(16,185,129,.15); color:#047857; box-shadow:inset 0 0 0 1px rgba(16,185,129,.3); }
+    .mission-content { flex:1; display:flex; flex-direction:column; gap:.35rem; }
+    .mission-title { font-weight:600; font-size:.95rem; color:#0f172a; }
+    .mission-description { font-size:.85rem; color:#475569; line-height:1.4; }
+    .mission-status { font-size:.75rem; font-weight:600; color:#0f172a; display:inline-flex; align-items:center; gap:.35rem; text-transform:uppercase; letter-spacing:.04em; }
+    .mission-item-complete .mission-status { color:#047857; }
+    .mission-action-btn { align-self:flex-start; font-size:.8rem; padding:.35rem .75rem; border-radius:.6rem; }
+    .dark .mission-item { background:rgba(15,23,42,.75); border-color:rgba(71,85,105,.5); box-shadow:0 4px 16px rgba(15,23,42,.35); }
+    .dark .mission-item:hover { box-shadow:0 12px 28px rgba(15,23,42,.45); }
+    .dark .mission-item-complete { background:rgba(22,163,74,.22); border-color:rgba(34,197,94,.45); box-shadow:0 18px 34px rgba(34,197,94,.3); }
+    .dark .mission-icon { background:rgba(30,41,59,.85); color:#e2e8f0; box-shadow:inset 0 0 0 1px rgba(71,85,105,.6); }
+    .dark .mission-item-complete .mission-icon { background:rgba(34,197,94,.2); color:#bbf7d0; box-shadow:inset 0 0 0 1px rgba(34,197,94,.45); }
+    .dark .mission-title { color:#e2e8f0; }
+    .dark .mission-description { color:#cbd5f5; }
+    .dark .mission-status { color:#cbd5f5; }
+    .dark .mission-item-complete .mission-status { color:#6ee7b7; }
   </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
@@ -117,6 +145,10 @@
         </li>
         <li id="breadcrumbDashboard" class="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-100">
           Dashboard
+        </li>
+        <li id="breadcrumbSubPage" class="hidden items-center gap-2 font-semibold text-slate-700 dark:text-slate-100">
+          <span aria-hidden="true" class="text-slate-300">/</span>
+          <span id="breadcrumbSubPageLabel"></span>
         </li>
         <li id="breadcrumbAdmin" class="hidden flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-100">
           <span aria-hidden="true" class="text-slate-300">/</span>
@@ -170,13 +202,58 @@
   </section>
 
   <!-- DASHBOARD -->
-  <section id="dashSection" class="hidden grid gap-6 lg:grid-cols-12 auto-rows-max">
-    <div class="lg:col-span-8 space-y-6">
-      <div class="card card-flat">
-        <h3 class="text-lg font-semibold mb-2">Sua evolução</h3>
-        <div class="grid sm:grid-cols-3 gap-3">
-          <div class="rounded-2xl p-4 bg-primary/10">
-            <div class="text-xs uppercase tracking-wide text-primary/70">XP total</div>
+  <section id="dashSection" class="hidden space-y-6">
+    <div id="studentHeroCard" class="card card-transparent space-y-6">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div class="space-y-3 flex-1">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="pill">Jornada do aluno</span>
+            <div class="student-nav" role="tablist" aria-label="Menu da jornada">
+              <button type="button" class="student-nav-btn student-nav-btn-active" data-nav-target="home">Início</button>
+              <button type="button" class="student-nav-btn" data-nav-target="next-lesson">Próxima aula</button>
+              <button type="button" class="student-nav-btn" data-nav-target="achievements-catalog">Conquistas</button>
+            </div>
+          </div>
+          <h2 class="text-2xl font-semibold" id="studentHeroGreeting">Bem-vindo!</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed" id="studentNarrative">
+            Faça login para acompanhar seu progresso diário.
+          </p>
+          <div class="flex flex-wrap items-center gap-2 text-xs" id="studentHeroStats"></div>
+        </div>
+        <div class="w-full max-w-sm lg:max-w-xs bg-primary/10 border border-primary/20 rounded-2xl p-4 text-primary shadow-sm">
+          <p class="text-xs uppercase tracking-wide font-semibold opacity-80">Próxima parada</p>
+          <p class="text-lg font-bold mt-1" id="nextLessonPreview">Faça login para liberar sua próxima aula.</p>
+          <p class="text-xs mt-2 opacity-80" id="nextLessonProgressHint"></p>
+        </div>
+      </div>
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div>
+          <div class="flex items-center justify-between gap-2 mb-3">
+            <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-200">Missões do dia</h3>
+            <span class="pill">1 check-in por dia</span>
+          </div>
+          <ul id="dailyMissionList" class="mission-list"></ul>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-200 mb-3">Continue avançando</h3>
+          <p class="text-sm text-slate-500 dark:text-slate-300" id="studentHeroGuidance">
+            Mantenha o ritmo com pequenas ações diárias e abra o próximo módulo quando estiver pronto.
+          </p>
+          <div class="mt-4 space-y-2 sm:flex sm:items-center sm:gap-3 sm:space-y-0">
+            <button type="button" class="btn btn-primary sm:w-auto w-full" data-nav-target="next-lesson">Ir para a próxima aula</button>
+            <button type="button" class="btn btn-ghost sm:w-auto w-full" data-nav-target="achievements-catalog">Ver todas as conquistas</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="studentHomeWrap" class="grid gap-6 lg:grid-cols-12 auto-rows-max">
+      <div class="lg:col-span-8 space-y-6">
+        <div class="card card-flat">
+          <h3 class="text-lg font-semibold mb-2">Sua evolução</h3>
+          <div class="grid sm:grid-cols-3 gap-3">
+            <div class="rounded-2xl p-4 bg-primary/10">
+              <div class="text-xs uppercase tracking-wide text-primary/70">XP total</div>
             <div id="xpBox" class="text-3xl font-bold text-primary">0</div>
           </div>
           <div class="rounded-2xl p-4 bg-emerald-100">
@@ -324,14 +401,14 @@
       </div>
     </div>
 
-    <div class="lg:col-span-4 space-y-6">
-      <div class="card">
-        <h3 class="text-lg font-semibold mb-2">Check-in diário</h3>
-        <p class="text-sm text-slate-500 mb-2">Ganhe +XP 1x ao dia.</p>
-        <button id="btnCheckin" class="btn btn-primary">Confirmar presença</button>
-        <div id="checkinStreakInfo" class="mt-3 text-xs text-slate-500 dark:text-slate-300 leading-relaxed"></div>
-        <div id="checkinMsg" class="text-xs text-emerald-600 mt-2"></div>
-      </div>
+      <div class="lg:col-span-4 space-y-6">
+        <div class="card">
+          <h3 class="text-lg font-semibold mb-2">Check-in diário</h3>
+          <p class="text-sm text-slate-500 mb-2">Ganhe +XP 1x ao dia.</p>
+          <button id="btnCheckin" class="btn btn-primary">Confirmar presença</button>
+          <div id="checkinStreakInfo" class="mt-3 text-xs text-slate-500 dark:text-slate-300 leading-relaxed"></div>
+          <div id="checkinMsg" class="text-xs text-emerald-600 mt-2"></div>
+        </div>
 
       <div class="card" id="historyCard">
         <div class="flex flex-wrap items-center gap-3 mb-3">
@@ -397,7 +474,26 @@
         <p class="text-sm text-slate-500 mb-2">Ranking consolidado (apenas alunos). Use para premiações.</p>
         <div id="adminRank" class="space-y-2 text-sm"></div>
       </div>
+      </div>
     </div>
+
+    <section id="studentSubPageSection" class="space-y-4 hidden">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="pill">Explorar</p>
+          <h2 class="text-xl font-semibold" id="studentSubPageTitle">Conteúdo complementar</h2>
+          <p class="text-sm text-slate-500 dark:text-slate-300" id="studentSubPageSubtitle">
+            Escolha uma opção para continuar sua jornada.
+          </p>
+        </div>
+        <button type="button" class="btn btn-ghost" data-nav-target="home">Voltar ao início</button>
+      </div>
+      <div id="studentSubPageLoading" class="card card-flat text-sm text-slate-500 dark:text-slate-300 hidden">
+        Carregando conteúdo...
+      </div>
+      <div id="studentSubPageError" class="feedback feedback-error hidden"></div>
+      <div id="studentSubPageContainer" class="space-y-4"></div>
+    </section>
   </section>
 </main>
 
@@ -494,6 +590,21 @@
   const communityLimitBadge = $('#communityLimitBadge');
   const headerBreadcrumbs = $('#headerBreadcrumbs');
   const breadcrumbAdminItem = $('#breadcrumbAdmin');
+  const breadcrumbSubPageItem = $('#breadcrumbSubPage');
+  const breadcrumbSubPageLabel = $('#breadcrumbSubPageLabel');
+  const studentHeroGreetingEl = $('#studentHeroGreeting');
+  const studentNarrativeEl = $('#studentNarrative');
+  const studentHeroStatsEl = $('#studentHeroStats');
+  const nextLessonPreviewEl = $('#nextLessonPreview');
+  const nextLessonProgressHintEl = $('#nextLessonProgressHint');
+  const studentHeroGuidanceEl = $('#studentHeroGuidance');
+  const dailyMissionListEl = $('#dailyMissionList');
+  const studentSubPageSection = $('#studentSubPageSection');
+  const studentSubPageTitleEl = $('#studentSubPageTitle');
+  const studentSubPageSubtitleEl = $('#studentSubPageSubtitle');
+  const studentSubPageLoadingEl = $('#studentSubPageLoading');
+  const studentSubPageErrorEl = $('#studentSubPageError');
+  const studentSubPageContainer = $('#studentSubPageContainer');
   let communityCharLimit = 240;
   let isPublishingCommunity = false;
   const communityDateFormatter = typeof Intl !== 'undefined'
@@ -516,6 +627,69 @@
     }
   };
 
+  const TOTAL_MODULES = 24;
+  const moduleCatalog = [
+    { number: 1, title: 'Boas-vindas ao Excel', tagline: 'Explore a interface e prepare sua primeira planilha.', focus: 'Interface e navegação básicas', xpTarget: 30, keySkills: ['Interface do Excel', 'Faixas de opções', 'Atalhos essenciais'] },
+    { number: 2, title: 'Formatação Essencial', tagline: 'Deixe as planilhas legíveis e profissionais.', focus: 'Formatação de células e estilos', xpTarget: 35, keySkills: ['Formatos numéricos', 'Estilos e temas', 'Formatação condicional'] },
+    { number: 3, title: 'Fórmulas Fundamentais', tagline: 'Crie cálculos com as funções básicas.', focus: 'Funções SOMA, MÉDIA e contagens', xpTarget: 35, keySkills: ['SOMA', 'MÉDIA', 'CONT.SE'] },
+    { number: 4, title: 'Funções Condicionais', tagline: 'Tome decisões com SE e comparações.', focus: 'Funções SE, E e OU', xpTarget: 40, keySkills: ['SE', 'SE aninhado', 'E/OU'] },
+    { number: 5, title: 'Funções de Texto', tagline: 'Manipule informações textuais.', focus: 'Combinação e limpeza de textos', xpTarget: 35, keySkills: ['CONCAT', 'ESQUERDA/DIREITA', 'PROCURAR'] },
+    { number: 6, title: 'Funções de Data e Hora', tagline: 'Controle prazos e agendas com precisão.', focus: 'Cálculos com datas e horas', xpTarget: 35, keySkills: ['HOJE', 'DIASÚTEIS', 'DATEDIF'] },
+    { number: 7, title: 'Funções de Pesquisa', tagline: 'Localize dados em tabelas grandes.', focus: 'PROCV, PROCX e CORRESP', xpTarget: 40, keySkills: ['PROCV', 'PROCX', 'ÍNDICE + CORRESP'] },
+    { number: 8, title: 'Tabelas Inteligentes', tagline: 'Organize dados com tabelas formatadas.', focus: 'Tabelas estruturadas e filtros dinâmicos', xpTarget: 35, keySkills: ['Formatar como tabela', 'Referências estruturadas', 'Totalizadores automáticos'] },
+    { number: 9, title: 'Tabelas Dinâmicas Essenciais', tagline: 'Resuma grandes volumes rapidamente.', focus: 'Construção e análise com tabelas dinâmicas', xpTarget: 45, keySkills: ['Montagem de pivô', 'Segmentações', 'Atualizações e layout'] },
+    { number: 10, title: 'Gráficos que Contam Histórias', tagline: 'Transforme números em visualizações impactantes.', focus: 'Gráficos de colunas, linhas e combinação', xpTarget: 40, keySkills: ['Tipos de gráfico', 'Formatar série', 'Linhas de tendência'] },
+    { number: 11, title: 'Validação e Proteção', tagline: 'Garanta a qualidade das informações registradas.', focus: 'Validação de dados e proteção de planilhas', xpTarget: 35, keySkills: ['Validação de dados', 'Listas suspensas', 'Proteção de planilhas'] },
+    { number: 12, title: 'Filtros Avançados', tagline: 'Crie filtros poderosos e personalizados.', focus: 'Filtros avançados e critérios com fórmulas', xpTarget: 35, keySkills: ['Filtros personalizados', 'Remover duplicatas', 'Segmentações avançadas'] },
+    { number: 13, title: 'Análise de Cenários', tagline: 'Projete diferentes cenários de negócio.', focus: 'Tabela de dados e gerente de cenários', xpTarget: 40, keySkills: ['Tabela de dados', 'Gerenciador de cenários', 'Atingir meta'] },
+    { number: 14, title: 'Solver e Otimização', tagline: 'Tome decisões ótimas com restrições reais.', focus: 'Solver e análise de sensibilidade', xpTarget: 45, keySkills: ['Solver', 'Restrições', 'Relatórios de resposta'] },
+    { number: 15, title: 'Funções Estatísticas', tagline: 'Descubra padrões com estatística aplicada.', focus: 'Indicadores estatísticos no Excel', xpTarget: 40, keySkills: ['MÉDIASES', 'DESVPAD', 'CORREL'] },
+    { number: 16, title: 'Dashboards Básicos', tagline: 'Monte painéis limpos e objetivos.', focus: 'Layout e indicadores visuais', xpTarget: 45, keySkills: ['Layout de dashboard', 'Cartões de indicador', 'Gráficos combinados'] },
+    { number: 17, title: 'Dashboards Interativos', tagline: 'Dê vida aos seus painéis com interação.', focus: 'Segmentações e controles dinâmicos', xpTarget: 50, keySkills: ['Segmentações', 'Botões', 'Painéis dinâmicos'] },
+    { number: 18, title: 'Automação com Macros', tagline: 'Grave rotinas para ganhar tempo todos os dias.', focus: 'Gravação e execução de macros', xpTarget: 45, keySkills: ['Gravar macros', 'Executar macros', 'Botões com macros'] },
+    { number: 19, title: 'Introdução ao VBA', tagline: 'Edite código e personalize automações.', focus: 'Estruturas básicas no VBA', xpTarget: 50, keySkills: ['Editor VBA', 'Variáveis', 'Estruturas condicionais'] },
+    { number: 20, title: 'Integrações com Office', tagline: 'Conecte o Excel com outras ferramentas da suíte.', focus: 'Integração com PowerPoint e Word', xpTarget: 35, keySkills: ['Copiar especial', 'Atualizar gráficos no PowerPoint', 'Publicar relatórios em PDF'] },
+    { number: 21, title: 'Power Query Essencial', tagline: 'Importe e transforme dados rapidamente.', focus: 'ETL com Power Query', xpTarget: 50, keySkills: ['Importar dados', 'Transformações', 'Mesclar consultas'] },
+    { number: 22, title: 'Power Pivot e Modelagem', tagline: 'Crie modelos com múltiplas tabelas conectadas.', focus: 'Modelagem relacional e medidas DAX básicas', xpTarget: 55, keySkills: ['Modelagem relacional', 'Medidas DAX', 'KPIs'] },
+    { number: 23, title: 'Análise Avançada com DAX', tagline: 'Aprofunde os cálculos do Power Pivot.', focus: 'Funções DAX intermediárias', xpTarget: 60, keySkills: ['CALCULATE', 'Inteligência de tempo', 'Medidas compostas'] },
+    { number: 24, title: 'Projeto Final', tagline: 'Consolide tudo em um projeto completo.', focus: 'Projeto integrador e apresentação de insights', xpTarget: 80, keySkills: ['Planejamento do projeto', 'Apresentação final', 'Feedback da turma'] }
+  ];
+
+  const weeklySideQuests = [
+    { title: 'Planejar a semana', description: 'Revise sua agenda e defina quando você fará o próximo módulo.' },
+    { title: 'Revisar anotações recentes', description: 'Leia as notas do último módulo concluído e destaque um aprendizado para aplicar hoje.' },
+    { title: 'Praticar atalhos de teclado', description: 'Escolha três atalhos para usar durante o dia e ganhar agilidade nas planilhas.' },
+    { title: 'Compartilhar no mural', description: 'Publique uma dica rápida ou insight no mural da comunidade.' },
+    { title: 'Atualizar uma planilha real', description: 'Aplique os conceitos do curso em uma planilha do seu cotidiano profissional.' },
+    { title: 'Checar conquistas pendentes', description: 'Veja quais conquistas estão próximas e planeje os próximos passos.' },
+    { title: 'Organizar materiais de estudo', description: 'Separe arquivos e recursos que serão úteis para o próximo módulo.' }
+  ];
+
+  const SUBPAGE_META = {
+    'next-lesson': {
+      title: 'Próxima aula',
+      subtitle: 'Visualize o roteiro completo do próximo módulo e as atividades avaliativas.'
+    },
+    'achievements-catalog': {
+      title: 'Conquistas do curso',
+      subtitle: 'Confira todas as medalhas disponíveis e o que falta para desbloqueá-las.'
+    }
+  };
+
+  const studentStoryState = {
+    xp: 0,
+    level: 1,
+    modulesCompleted: 0,
+    totalModules: TOTAL_MODULES,
+    achievementsUnlocked: 0,
+    totalAchievements: 0,
+    metrics: {},
+    checkinToday: false,
+    nextModuleNumber: 1
+  };
+
+  let activeSubPage = 'home';
+
   function syncAdminVisibility() {
     const isAdmin = !!(currentUser && currentUser.isAdmin);
     adminOnlyElements.forEach(el => {
@@ -537,6 +711,711 @@
     if (breadcrumbAdminItem) {
       breadcrumbAdminItem.classList.toggle('hidden', !(currentUser && currentUser.isAdmin));
     }
+    if (!isLogged) {
+      updateBreadcrumbSubPage(null);
+    }
+  }
+
+  function getFirstName(name) {
+    const text = (name || '').toString().trim();
+    if (!text) return '';
+    const parts = text.split(/\s+/);
+    return parts.length ? parts[0] : text;
+  }
+
+  function computeNextModuleNumber() {
+    const scores = studentStoryState.metrics && studentStoryState.metrics.moduleBestScores
+      ? studentStoryState.metrics.moduleBestScores
+      : {};
+    for (let i = 1; i <= TOTAL_MODULES; i += 1) {
+      const key = String(i);
+      const score = Number(scores[key] || 0);
+      if (!Number.isFinite(score) || score < 70) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  function getModuleInfo(moduleNumber) {
+    const number = Number(moduleNumber);
+    if (!Number.isFinite(number)) {
+      return { number: null, title: 'Módulo em construção', tagline: '', focus: '', xpTarget: 40, keySkills: [] };
+    }
+    const found = moduleCatalog.find(item => Number(item.number) === number);
+    if (found) return found;
+    return {
+      number,
+      title: `Módulo ${number}`,
+      tagline: 'Conteúdo em desenvolvimento.',
+      focus: 'Fundamentos do Excel',
+      xpTarget: 40,
+      keySkills: []
+    };
+  }
+
+  function buildLessonActivities(moduleData) {
+    const focusText = (moduleData && moduleData.focus) ? moduleData.focus.toLowerCase() : 'o conteúdo do módulo';
+    const totalXP = Math.max(15, Number(moduleData && moduleData.xpTarget ? moduleData.xpTarget : 40));
+    let xpIntro = Math.max(5, Math.round(totalXP * 0.3));
+    let xpQuiz = Math.max(5, Math.round(totalXP * 0.2));
+    let xpPractice = totalXP - xpIntro - xpQuiz;
+    if (xpPractice < 10) {
+      xpPractice = 10;
+      const remaining = totalXP - xpPractice;
+      xpIntro = Math.max(5, Math.round(remaining * 0.6));
+      xpQuiz = Math.max(5, remaining - xpIntro);
+    }
+    let xpReview = totalXP - xpIntro - xpPractice;
+    if (xpReview < 5) {
+      xpReview = 5;
+      xpPractice = Math.max(10, totalXP - xpIntro - xpReview);
+    }
+    const diff = totalXP - (xpIntro + xpPractice + xpReview);
+    if (diff !== 0) {
+      xpPractice += diff;
+    }
+    return [
+      { icon: '📘', title: 'Aquecimento guiado', xp: xpIntro, description: `Revise as aulas rápidas sobre ${focusText}.` },
+      { icon: '💻', title: 'Projeto aplicado', xp: xpPractice, description: `Replique o passo a passo em uma planilha real envolvendo ${focusText}.` },
+      { icon: '🎯', title: 'Desafio relâmpago', xp: Math.max(5, xpReview), description: `Responda ao quiz para validar os conceitos de ${focusText}.` }
+    ];
+  }
+
+  function formatShortDate(value) {
+    const parsed = parseDateValue(value);
+    if (!parsed) return '';
+    try {
+      return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
+    } catch (err) {
+      return parsed.toLocaleDateString('pt-BR');
+    }
+  }
+
+  function hasCheckinToday() {
+    if (!Array.isArray(historyState.checkins)) return false;
+    const today = new Date();
+    const todayIso = today.toISOString().slice(0, 10);
+    return historyState.checkins.some(item => {
+      if (!item) return false;
+      const day = (item.day || '').toString().slice(0, 10);
+      return day === todayIso;
+    });
+  }
+
+  function setActiveSubPageButtons(target) {
+    const buttons = Array.from(document.querySelectorAll('.student-nav-btn[data-nav-target]'));
+    buttons.forEach(btn => {
+      const key = btn.getAttribute('data-nav-target');
+      const isActive = key === target;
+      btn.classList.toggle('student-nav-btn-active', isActive);
+      btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  }
+
+  function updateBreadcrumbSubPage(pageKey) {
+    if (!breadcrumbSubPageItem || !breadcrumbSubPageLabel) return;
+    if (!currentUser || !pageKey || pageKey === 'home') {
+      breadcrumbSubPageItem.classList.add('hidden');
+      breadcrumbSubPageLabel.textContent = '';
+      return;
+    }
+    const meta = SUBPAGE_META[pageKey];
+    breadcrumbSubPageLabel.textContent = meta && meta.title ? meta.title : 'Explorar';
+    breadcrumbSubPageItem.classList.remove('hidden');
+  }
+
+  function setSubPageHeader(pageKey) {
+    if (!studentSubPageTitleEl || !studentSubPageSubtitleEl) return;
+    if (!pageKey || pageKey === 'home') {
+      studentSubPageTitleEl.textContent = 'Conteúdo complementar';
+      studentSubPageSubtitleEl.textContent = 'Escolha uma opção para continuar sua jornada.';
+      return;
+    }
+    const meta = SUBPAGE_META[pageKey] || {};
+    studentSubPageTitleEl.textContent = meta.title || 'Conteúdo complementar';
+    studentSubPageSubtitleEl.textContent = meta.subtitle || 'Selecione uma opção para continuar evoluindo.';
+  }
+
+  function buildDailyMissions() {
+    if (!currentUser) {
+      return [
+        {
+          id: 'login',
+          icon: '🔐',
+          title: 'Entre na plataforma',
+          description: 'Crie uma conta ou faça login para liberar as missões do dia.',
+          status: 'pending',
+          statusLabel: 'Aguardando login',
+          actionLabel: 'Fazer login',
+          action: () => {
+            const input = $('#lEmail');
+            if (input) {
+              input.focus({ preventScroll: true });
+            }
+          }
+        }
+      ];
+    }
+
+    const missions = [];
+    missions.push({
+      id: 'checkin',
+      icon: '✅',
+      title: 'Registrar o check-in diário',
+      description: studentStoryState.checkinToday
+        ? 'Presença confirmada. Volte amanhã para manter a sequência ativa!'
+        : 'Confirme sua presença de hoje para garantir XP e manter a sequência de estudos.',
+      status: studentStoryState.checkinToday ? 'done' : 'pending',
+      statusLabel: studentStoryState.checkinToday ? 'Concluído' : 'Disponível',
+      actionLabel: studentStoryState.checkinToday ? null : 'Fazer check-in',
+      action: studentStoryState.checkinToday
+        ? null
+        : () => {
+            const btn = $('#btnCheckin');
+            if (btn) {
+              btn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              btn.focus({ preventScroll: true });
+            }
+          }
+    });
+
+    const dayIndex = (new Date()).getDay();
+    const quest = weeklySideQuests[dayIndex] || weeklySideQuests[0];
+    missions.push({
+      id: 'weekly',
+      icon: '🗓️',
+      title: quest.title,
+      description: quest.description,
+      status: 'pending',
+      statusLabel: 'Sugestão do dia'
+    });
+
+    const nextModuleNumber = computeNextModuleNumber();
+    if (nextModuleNumber) {
+      const moduleData = getModuleInfo(nextModuleNumber);
+      missions.push({
+        id: 'module-preview',
+        icon: '🎯',
+        title: `Preparar módulo ${nextModuleNumber}`,
+        description: `Reserve um tempo para avançar em “${moduleData.title}” e registrar seu desempenho.`,
+        status: 'pending',
+        statusLabel: 'Vale XP',
+        actionLabel: 'Ver roteiro',
+        action: () => openStudentSubPage('next-lesson')
+      });
+    } else {
+      missions.push({
+        id: 'review',
+        icon: '🌟',
+        title: 'Revisar conquistas',
+        description: 'Você concluiu todos os módulos! Revise as conquistas e celebre os resultados com a turma.',
+        status: 'done',
+        statusLabel: 'Curso completo'
+      });
+    }
+
+    return missions;
+  }
+
+  function renderDailyMissions() {
+    if (!dailyMissionListEl) return;
+    const missions = buildDailyMissions();
+    dailyMissionListEl.innerHTML = '';
+    if (!missions.length) {
+      const empty = document.createElement('li');
+      empty.className = 'text-xs text-slate-500 dark:text-slate-400';
+      empty.textContent = 'Sem missões disponíveis no momento.';
+      dailyMissionListEl.appendChild(empty);
+      return;
+    }
+    missions.forEach(mission => {
+      const li = document.createElement('li');
+      li.className = 'mission-item' + (mission.status === 'done' ? ' mission-item-complete' : '');
+      const icon = document.createElement('div');
+      icon.className = 'mission-icon';
+      icon.textContent = mission.icon || '⭐';
+      const content = document.createElement('div');
+      content.className = 'mission-content';
+      const title = document.createElement('div');
+      title.className = 'mission-title';
+      title.textContent = mission.title;
+      const description = document.createElement('p');
+      description.className = 'mission-description';
+      description.textContent = mission.description;
+      const status = document.createElement('span');
+      status.className = 'mission-status';
+      status.textContent = mission.statusLabel || (mission.status === 'done' ? 'Concluído' : 'Disponível');
+      content.appendChild(title);
+      content.appendChild(description);
+      content.appendChild(status);
+      if (typeof mission.action === 'function' && mission.status !== 'done' && mission.actionLabel) {
+        const actionBtn = document.createElement('button');
+        actionBtn.type = 'button';
+        actionBtn.className = 'btn btn-primary mission-action-btn';
+        actionBtn.textContent = mission.actionLabel;
+        actionBtn.addEventListener('click', event => {
+          event.preventDefault();
+          mission.action();
+        });
+        content.appendChild(actionBtn);
+      }
+      li.appendChild(icon);
+      li.appendChild(content);
+      dailyMissionListEl.appendChild(li);
+    });
+  }
+
+  function renderStudentHero() {
+    const firstName = currentUser ? getFirstName(currentUser.name) : '';
+    if (studentHeroGreetingEl) {
+      studentHeroGreetingEl.textContent = currentUser ? `Olá, ${firstName}!` : 'Bem-vindo!';
+    }
+
+    if (studentNarrativeEl) {
+      if (!currentUser) {
+        studentNarrativeEl.textContent = 'Crie uma conta ou faça login para acompanhar sua história de evolução no Excel.';
+      } else {
+        const xpText = `${formatNumber(studentStoryState.xp)} XP`;
+        const modulesText = `${studentStoryState.modulesCompleted}/${studentStoryState.totalModules} módulos concluídos`;
+        const achievementsTotal = studentStoryState.totalAchievements || 0;
+        const achievementsText = achievementsTotal > 0
+          ? `${studentStoryState.achievementsUnlocked}/${achievementsTotal} conquistas desbloqueadas`
+          : 'Conquistas aguardando seus primeiros desbloqueios';
+        const streak = Number(studentStoryState.metrics.checkinCurrentStreak || 0);
+        const streakText = streak > 0
+          ? `Sua sequência de check-ins está em ${streak} dia${streak > 1 ? 's' : ''}.`
+          : 'Comece agora com o check-in diário para criar sua sequência.';
+        studentNarrativeEl.textContent = `Você já acumulou ${xpText} e concluiu ${modulesText}. ${achievementsText}. ${streakText}`;
+      }
+    }
+
+    if (studentHeroStatsEl) {
+      studentHeroStatsEl.innerHTML = '';
+      if (!currentUser) {
+        const chip = document.createElement('span');
+        chip.className = 'pill';
+        chip.textContent = 'Missões personalizadas liberadas após o login.';
+        studentHeroStatsEl.appendChild(chip);
+      } else {
+        const stats = [];
+        stats.push(`${formatNumber(studentStoryState.xp)} XP`);
+        stats.push(`${studentStoryState.modulesCompleted}/${studentStoryState.totalModules} módulos`);
+        if (studentStoryState.totalAchievements > 0) {
+          stats.push(`${studentStoryState.achievementsUnlocked}/${studentStoryState.totalAchievements} conquistas`);
+        }
+        const streak = Number(studentStoryState.metrics.checkinCurrentStreak || 0);
+        if (streak > 0) {
+          stats.push(`Streak: ${streak} dia${streak > 1 ? 's' : ''}`);
+        }
+        stats.forEach(text => {
+          const chip = document.createElement('span');
+          chip.className = 'milestone-chip';
+          chip.textContent = text;
+          studentHeroStatsEl.appendChild(chip);
+        });
+      }
+    }
+
+    const nextModuleNumber = computeNextModuleNumber();
+    if (nextLessonPreviewEl) {
+      if (!currentUser) {
+        nextLessonPreviewEl.textContent = 'Faça login para liberar sua próxima aula.';
+      } else if (!nextModuleNumber) {
+        nextLessonPreviewEl.textContent = 'Trilha concluída! Revise o projeto final e celebre seus resultados.';
+      } else {
+        const moduleData = getModuleInfo(nextModuleNumber);
+        nextLessonPreviewEl.textContent = `Módulo ${nextModuleNumber} · ${moduleData.title}`;
+      }
+    }
+
+    if (nextLessonProgressHintEl) {
+      if (!currentUser) {
+        nextLessonProgressHintEl.textContent = '';
+      } else if (!nextModuleNumber) {
+        nextLessonProgressHintEl.textContent = 'Aproveite para compartilhar aprendizados e apoiar colegas no mural.';
+      } else {
+        const moduleData = getModuleInfo(nextModuleNumber);
+        const scores = studentStoryState.metrics && studentStoryState.metrics.moduleBestScores
+          ? studentStoryState.metrics.moduleBestScores
+          : {};
+        const bestScore = Number(scores[String(nextModuleNumber)] || 0);
+        if (bestScore > 0 && bestScore < 70) {
+          nextLessonProgressHintEl.textContent = `Você já tentou este módulo e alcançou ${bestScore}%. Revise a aula e tente novamente para conquistar a pontuação cheia.`;
+        } else {
+          nextLessonProgressHintEl.textContent = moduleData.tagline || 'Prepare-se para avançar ao próximo nível.';
+        }
+      }
+    }
+
+    if (studentHeroGuidanceEl) {
+      if (!currentUser) {
+        studentHeroGuidanceEl.textContent = 'Acompanhe aqui as missões do dia e libere a próxima aula após o login.';
+      } else if (!nextModuleNumber) {
+        studentHeroGuidanceEl.textContent = 'Continue praticando, revise conquistas e compartilhe dicas com a turma.';
+      } else {
+        studentHeroGuidanceEl.textContent = `Reserve um momento hoje para avançar no módulo ${nextModuleNumber} e registrar o resultado em "Enviar atividade".`;
+      }
+    }
+
+    renderDailyMissions();
+  }
+
+  function updateStudentStoryState(partial = {}) {
+    if (!partial || typeof partial !== 'object') return;
+    if (partial.xp !== undefined) {
+      studentStoryState.xp = Math.max(0, Number(partial.xp) || 0);
+    }
+    if (partial.level !== undefined) {
+      studentStoryState.level = Math.max(1, Number(partial.level) || 1);
+    }
+    if (partial.modulesCompleted !== undefined) {
+      studentStoryState.modulesCompleted = Math.max(0, Number(partial.modulesCompleted) || 0);
+    }
+    if (partial.achievementsUnlocked !== undefined) {
+      studentStoryState.achievementsUnlocked = Math.max(0, Number(partial.achievementsUnlocked) || 0);
+    }
+    if (partial.totalAchievements !== undefined) {
+      studentStoryState.totalAchievements = Math.max(0, Number(partial.totalAchievements) || 0);
+    }
+    if (partial.checkinToday !== undefined) {
+      studentStoryState.checkinToday = !!partial.checkinToday;
+    }
+    if (partial.metrics) {
+      const nextMetrics = Object.assign({}, studentStoryState.metrics, partial.metrics);
+      if (partial.metrics.moduleBestScores) {
+        nextMetrics.moduleBestScores = Object.assign(
+          {},
+          studentStoryState.metrics.moduleBestScores || {},
+          partial.metrics.moduleBestScores
+        );
+      }
+      studentStoryState.metrics = nextMetrics;
+      if (partial.metrics.modulesCompleted !== undefined) {
+        studentStoryState.modulesCompleted = Math.max(0, Number(partial.metrics.modulesCompleted) || 0);
+      }
+      if (partial.metrics.xpTotal !== undefined && Number.isFinite(Number(partial.metrics.xpTotal))) {
+        studentStoryState.xp = Math.max(0, Number(partial.metrics.xpTotal));
+      }
+    }
+    studentStoryState.nextModuleNumber = computeNextModuleNumber();
+    renderStudentHero();
+    if (activeSubPage === 'next-lesson') {
+      populateNextLessonPage();
+    }
+    if (activeSubPage === 'achievements-catalog') {
+      populateAchievementsCatalog();
+    }
+  }
+
+  function resetStudentStoryState() {
+    studentStoryState.xp = 0;
+    studentStoryState.level = 1;
+    studentStoryState.modulesCompleted = 0;
+    studentStoryState.achievementsUnlocked = 0;
+    studentStoryState.totalAchievements = 0;
+    studentStoryState.metrics = {};
+    studentStoryState.checkinToday = false;
+    studentStoryState.nextModuleNumber = 1;
+    renderStudentHero();
+  }
+
+  function populateNextLessonPage() {
+    if (!studentSubPageContainer) return;
+    const container = studentSubPageContainer.querySelector('[data-subpage="next-lesson"]');
+    if (!container) return;
+    const moduleNumber = computeNextModuleNumber();
+    const mainSection = container.querySelector('[data-role="lesson-main"]');
+    const completeSection = container.querySelector('[data-role="lesson-complete"]');
+
+    if (!moduleNumber) {
+      if (mainSection) mainSection.classList.add('hidden');
+      if (completeSection) {
+        completeSection.classList.remove('hidden');
+        const completeTitle = completeSection.querySelector('[data-role="lesson-complete-title"]');
+        if (completeTitle) completeTitle.textContent = 'Parabéns! Você concluiu todos os módulos principais.';
+      }
+      return;
+    }
+
+    if (mainSection) mainSection.classList.remove('hidden');
+    if (completeSection) completeSection.classList.add('hidden');
+
+    const moduleData = getModuleInfo(moduleNumber);
+    const titleEl = container.querySelector('[data-role="lesson-title"]');
+    if (titleEl) titleEl.textContent = `Módulo ${moduleNumber} · ${moduleData.title}`;
+    const summaryEl = container.querySelector('[data-role="lesson-summary"]');
+    if (summaryEl) summaryEl.textContent = moduleData.tagline || '';
+    const focusEl = container.querySelector('[data-role="lesson-focus"]');
+    if (focusEl) focusEl.textContent = moduleData.focus || '';
+    const xpEl = container.querySelector('[data-role="lesson-xp"]');
+    if (xpEl) xpEl.textContent = `${moduleData.xpTarget || 40} XP em jogo`;
+    const statusEl = container.querySelector('[data-role="lesson-status"]');
+    if (statusEl) {
+      const scores = studentStoryState.metrics.moduleBestScores || {};
+      const bestScore = Number(scores[String(moduleNumber)] || 0);
+      statusEl.textContent = bestScore >= 70
+        ? `Melhor nota registrada: ${Math.round(bestScore)}%`
+        : 'Ainda sem envio de atividade — prepare-se para registrar seu resultado.';
+    }
+    const planIntroEl = container.querySelector('[data-role="lesson-plan-intro"]');
+    if (planIntroEl) {
+      planIntroEl.textContent = `Use este roteiro para dominar ${moduleData.focus.toLowerCase()} e somar XP na plataforma.`;
+    }
+    const skillsList = container.querySelector('[data-role="lesson-skills"]');
+    if (skillsList) {
+      skillsList.innerHTML = '';
+      const skills = Array.isArray(moduleData.keySkills) ? moduleData.keySkills : [];
+      if (!skills.length) {
+        const li = document.createElement('li');
+        li.className = 'text-xs text-slate-500 dark:text-slate-400';
+        li.textContent = 'Habilidades serão disponibilizadas em breve.';
+        skillsList.appendChild(li);
+      } else {
+        skills.forEach(skill => {
+          const li = document.createElement('li');
+          li.className = 'milestone-chip';
+          li.textContent = skill;
+          skillsList.appendChild(li);
+        });
+      }
+    }
+
+    const planHighlights = container.querySelector('[data-role="lesson-plan-highlights"]');
+    if (planHighlights) {
+      planHighlights.innerHTML = '';
+      const highlights = [
+        {
+          icon: '🧭',
+          title: 'Preparação rápida',
+          description: 'Reserve 10 minutos para revisar as notas do módulo anterior e montar uma lista de dúvidas.'
+        },
+        {
+          icon: '🚀',
+          title: 'Aplicação imediata',
+          description: 'Replique o exemplo da aula em uma planilha real e registre o resultado em “Enviar atividade”.'
+        }
+      ];
+      highlights.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'rounded-2xl border border-slate-200 dark:border-slate-700/70 bg-white/80 dark:bg-slate-900/60 p-4 shadow-sm';
+        card.innerHTML = `
+          <div class="text-2xl mb-2">${item.icon}</div>
+          <h4 class="text-sm font-semibold mb-1">${item.title}</h4>
+          <p class="text-sm text-slate-500 dark:text-slate-300">${item.description}</p>
+        `;
+        planHighlights.appendChild(card);
+      });
+    }
+
+    const activitiesList = container.querySelector('[data-role="lesson-activities"]');
+    const activitiesPointsEl = container.querySelector('[data-role="lesson-activities-points"]');
+    if (activitiesPointsEl) {
+      activitiesPointsEl.textContent = `${moduleData.xpTarget || 40} XP distribuídos`;
+    }
+    if (activitiesList) {
+      activitiesList.innerHTML = '';
+      const activities = buildLessonActivities(moduleData);
+      activities.forEach((activity, index) => {
+        const li = document.createElement('li');
+        li.className = 'mission-item';
+        const icon = document.createElement('div');
+        icon.className = 'mission-icon';
+        icon.textContent = activity.icon || '📚';
+        const content = document.createElement('div');
+        content.className = 'mission-content';
+        const title = document.createElement('div');
+        title.className = 'mission-title';
+        title.textContent = `${index + 1}. ${activity.title}`;
+        const description = document.createElement('p');
+        description.className = 'mission-description';
+        description.textContent = activity.description;
+        const status = document.createElement('span');
+        status.className = 'mission-status';
+        status.textContent = `+${formatNumber(activity.xp || 0)} XP`;
+        content.appendChild(title);
+        content.appendChild(description);
+        content.appendChild(status);
+        li.appendChild(icon);
+        li.appendChild(content);
+        activitiesList.appendChild(li);
+      });
+    }
+  }
+
+  function populateAchievementsCatalog() {
+    if (!studentSubPageContainer) return;
+    const container = studentSubPageContainer.querySelector('[data-subpage="achievements-catalog"]');
+    if (!container) return;
+    const loadingEl = container.querySelector('[data-role="achievement-loading"]');
+    const errorEl = container.querySelector('[data-role="achievement-error"]');
+    const listEl = container.querySelector('[data-role="achievement-list"]');
+    const emptyEl = container.querySelector('[data-role="achievement-empty"]');
+    const summaryEl = container.querySelector('[data-role="achievement-summary"]');
+
+    if (summaryEl) {
+      const unlockedNow = achievementsState.summary && achievementsState.summary.unlocked
+        ? achievementsState.summary.unlocked
+        : 0;
+      const totalNow = achievementsState.summary && achievementsState.summary.total
+        ? achievementsState.summary.total
+        : 0;
+      summaryEl.textContent = `${formatNumber(unlockedNow)}/${formatNumber(totalNow)} desbloqueadas`;
+    }
+
+    if (achievementsState.loading) {
+      if (loadingEl) loadingEl.classList.remove('hidden');
+      if (errorEl) errorEl.classList.add('hidden');
+      if (listEl) listEl.classList.add('hidden');
+      if (emptyEl) emptyEl.classList.add('hidden');
+      return;
+    }
+
+    if (loadingEl) loadingEl.classList.add('hidden');
+
+    if (achievementsState.error) {
+      if (errorEl) {
+        errorEl.textContent = achievementsState.error;
+        errorEl.classList.remove('hidden');
+      }
+      if (listEl) listEl.classList.add('hidden');
+      if (emptyEl) emptyEl.classList.add('hidden');
+      return;
+    }
+
+    if (errorEl) errorEl.classList.add('hidden');
+
+    const achievements = achievementsState.achievements || [];
+    if (!achievements.length) {
+      if (listEl) listEl.classList.add('hidden');
+      if (emptyEl) {
+        emptyEl.textContent = currentUser
+          ? 'Nenhuma conquista cadastrada ainda.'
+          : 'Faça login para visualizar as conquistas disponíveis.';
+        emptyEl.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (listEl) {
+      listEl.innerHTML = '';
+      listEl.classList.remove('hidden');
+      achievements.forEach(item => {
+        const card = document.createElement('article');
+        const classes = ['achievement-card'];
+        classes.push(item.unlocked ? 'achievement-card-unlocked' : 'achievement-card-locked');
+        if (!item.unlocked && item.readyToUnlock) {
+          classes.push('achievement-card-ready');
+        }
+        card.className = classes.join(' ');
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between mb-3';
+        header.innerHTML = `
+          <span class="achievement-icon">${item.icon || '🏆'}</span>
+          <span class="achievement-xp">${formatNumber(item.rewardXP || 0)} XP</span>
+        `;
+        const title = document.createElement('h4');
+        title.className = 'text-base font-semibold';
+        title.textContent = item.title || 'Conquista';
+        const description = document.createElement('p');
+        description.className = 'text-sm text-slate-500 dark:text-slate-300 mb-3';
+        description.textContent = item.description || '';
+        const status = document.createElement('p');
+        status.className = 'text-xs font-semibold text-slate-500 dark:text-slate-300 mb-2';
+        if (item.unlocked) {
+          const unlockedAt = item.unlockedAt ? formatShortDate(item.unlockedAt) : '';
+          status.textContent = unlockedAt ? `Desbloqueada em ${unlockedAt}` : 'Conquista desbloqueada';
+        } else if (item.readyToUnlock) {
+          status.textContent = 'Pronto para resgatar — finalize o requisito e atualize o painel.';
+        } else {
+          status.textContent = item.progressLabel || 'Em andamento';
+        }
+        const track = document.createElement('div');
+        track.className = 'achievement-progress-track';
+        const progress = document.createElement('div');
+        progress.className = 'achievement-progress-bar';
+        const pct = Math.max(0, Math.min(100, Number(item.progressPct || 0)));
+        progress.style.width = `${pct}%`;
+        track.appendChild(progress);
+        card.appendChild(header);
+        card.appendChild(title);
+        card.appendChild(description);
+        card.appendChild(status);
+        card.appendChild(track);
+        listEl.appendChild(card);
+      });
+    }
+
+    if (emptyEl) emptyEl.classList.add('hidden');
+  }
+
+  function attachNavListeners(scope = document) {
+    if (!scope) return;
+    const nodes = Array.from(scope.querySelectorAll('[data-nav-target]'));
+    nodes.forEach(node => {
+      if (node.dataset.navBound === 'true') return;
+      node.dataset.navBound = 'true';
+      node.addEventListener('click', event => {
+        event.preventDefault();
+        const target = node.getAttribute('data-nav-target') || 'home';
+        openStudentSubPage(target);
+      });
+    });
+  }
+
+  function openStudentSubPage(target) {
+    const normalized = (target || 'home').toString();
+    if (normalized !== 'home' && !currentUser) {
+      showToast({ message: 'Faça login para acessar esta área.', type: 'warning' });
+      return;
+    }
+
+    if (normalized === 'home') {
+      activeSubPage = 'home';
+      setActiveSubPageButtons('home');
+      updateBreadcrumbSubPage(null);
+      setSubPageHeader(null);
+      if (studentSubPageSection) studentSubPageSection.classList.add('hidden');
+      if (studentSubPageLoadingEl) studentSubPageLoadingEl.classList.add('hidden');
+      if (studentSubPageErrorEl) studentSubPageErrorEl.classList.add('hidden');
+      if (studentSubPageContainer) studentSubPageContainer.innerHTML = '';
+      return;
+    }
+
+    activeSubPage = normalized;
+    setActiveSubPageButtons(normalized);
+    updateBreadcrumbSubPage(normalized);
+    setSubPageHeader(normalized);
+    if (studentSubPageSection) studentSubPageSection.classList.remove('hidden');
+    if (studentSubPageLoadingEl) studentSubPageLoadingEl.classList.remove('hidden');
+    if (studentSubPageErrorEl) studentSubPageErrorEl.classList.add('hidden');
+    if (studentSubPageContainer) studentSubPageContainer.innerHTML = '';
+
+    const expectedPage = normalized;
+    google.script.run
+      .withFailureHandler(err => {
+        if (activeSubPage !== expectedPage) return;
+        if (studentSubPageLoadingEl) studentSubPageLoadingEl.classList.add('hidden');
+        if (studentSubPageErrorEl) {
+          studentSubPageErrorEl.textContent = err?.message || 'Não foi possível carregar a página agora.';
+          studentSubPageErrorEl.classList.remove('hidden');
+        }
+      })
+      .withSuccessHandler(html => {
+        if (activeSubPage !== expectedPage) return;
+        if (studentSubPageLoadingEl) studentSubPageLoadingEl.classList.add('hidden');
+        if (studentSubPageErrorEl) studentSubPageErrorEl.classList.add('hidden');
+        if (studentSubPageContainer) {
+          studentSubPageContainer.innerHTML = html || '';
+          attachNavListeners(studentSubPageContainer);
+        }
+        if (expectedPage === 'next-lesson') {
+          populateNextLessonPage();
+        } else if (expectedPage === 'achievements-catalog') {
+          populateAchievementsCatalog();
+        }
+      })
+      .renderStudentSubPage({ page: normalized, userId: currentUser ? currentUser.id : null });
   }
 
   function renderHighlightList(listEl, items, emptyEl) {
@@ -1147,6 +2026,12 @@
     achievementsState.summary = normalized.summary;
     achievementsState.metrics = normalized.metrics || {};
     renderAchievements();
+    const summaryInfo = normalized.summary || { total: 0, unlocked: 0 };
+    updateStudentStoryState({
+      achievementsUnlocked: summaryInfo.unlocked || 0,
+      totalAchievements: summaryInfo.total || 0,
+      metrics: normalized.metrics || {}
+    });
     if (!options?.silent && Array.isArray(unlockedList) && unlockedList.length) {
       handleAchievementToasts(unlockedList);
     }
@@ -1159,6 +2044,7 @@
     achievementsState.summary = { total: 0, unlocked: 0 };
     achievementsState.metrics = {};
     renderAchievements();
+    updateStudentStoryState({ achievementsUnlocked: 0, totalAchievements: 0, metrics: {} });
   }
 
   function loadAchievementsOverview() {
@@ -1648,6 +2534,14 @@
           checkinBestStreak: historyState.streak.best,
           totalCheckins: historyState.checkins.length
         });
+        updateStudentStoryState({
+          checkinToday: hasCheckinToday(),
+          metrics: {
+            checkinCurrentStreak: historyState.streak.current,
+            checkinBestStreak: historyState.streak.best,
+            totalCheckins: historyState.checkins.length
+          }
+        });
         renderHistory();
       })
       .getCheckinHistory(currentUser.id);
@@ -1888,6 +2782,9 @@
     });
   }
 
+  attachNavListeners(document);
+  setActiveSubPageButtons(activeSubPage);
+  renderStudentHero();
   updateCommunityCounter();
 
   // UI switches
@@ -1902,30 +2799,36 @@
       $('#authSection').classList.remove('hidden');
       $('#dashSection').classList.add('hidden');
       $('#userInfo').textContent = 'Visitante';
-    $('#btnLogout').classList.add('hidden');
-    resetHistorySection();
-    resetLevelIndicator();
-     resetAchievementsUI();
-    syncAdminVisibility();
-    updateCommunityAccess();
-    if (!skipCommunity) refreshCommunityWall();
+      $('#btnLogout').classList.add('hidden');
+      resetStudentStoryState();
+      openStudentSubPage('home');
+      resetHistorySection();
+      resetLevelIndicator();
+      resetAchievementsUI();
+      syncAdminVisibility();
+      updateCommunityAccess();
+      if (!skipCommunity) refreshCommunityWall();
+      syncHeaderContext();
+      return;
+    }
+
+    $('#authSection').classList.add('hidden');
+    $('#dashSection').classList.remove('hidden');
+    $('#btnLogout').classList.remove('hidden');
+    $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
+    setActiveSubPageButtons(activeSubPage);
     syncHeaderContext();
-    return;
-  }
-  $('#authSection').classList.add('hidden');
-  $('#dashSection').classList.remove('hidden');
-  $('#btnLogout').classList.remove('hidden');
-  $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
-  loadHistoryForCurrentUser();
+
     if (!keepLevelIndicator) {
       setLevelIndicatorLoading();
     }
+
     if (achievementsData) {
       applyAchievementsUpdate(achievementsData, achievementsUnlocked || [], { silent: achievementsSilent });
     } else if (!skipAchievements) {
       loadAchievementsOverview();
     }
-    // estado
+
     google.script.run
       .withFailureHandler(err => {
         console.error('Falha ao obter estado do usuário:', err);
@@ -1934,25 +2837,30 @@
           if (nextLevelPctEl) nextLevelPctEl.textContent = '—';
         }
       })
-      .withSuccessHandler(s=>{
-        $('#xpBox').textContent  = s.xp;
+      .withSuccessHandler(s => {
+        $('#xpBox').textContent = s.xp;
         $('#lvlBox').textContent = s.level;
         $('#doneBox').textContent = s.concluidos;
-        const pct = Math.round((s.concluidos/24)*100);
+        const pct = Math.round((s.concluidos / TOTAL_MODULES) * 100);
         $('#pctBox').textContent = pct + '%';
         $('#barBox').style.width = pct + '%';
         updateLevelIndicator(s);
-      }).getUserState({ userId: currentUser.id });
+        updateStudentStoryState({
+          xp: s.xp,
+          level: s.level,
+          modulesCompleted: s.concluidos,
+          metrics: { xpTotal: s.xp, modulesCompleted: s.concluidos }
+        });
+      })
+      .getUserState({ userId: currentUser.id });
 
-    // ranking
-  refreshRanking();
-  // admin panel
-  $('#adminPanel').classList.toggle('hidden', !currentUser.isAdmin);
-  syncAdminVisibility();
-  updateCommunityAccess();
-  if (!skipCommunity) refreshCommunityWall();
-  syncHeaderContext();
-}
+    loadHistoryForCurrentUser();
+    refreshRanking();
+    $('#adminPanel').classList.toggle('hidden', !currentUser.isAdmin);
+    syncAdminVisibility();
+    updateCommunityAccess();
+    if (!skipCommunity) refreshCommunityWall();
+  }
 
   function refreshRanking() {
     google.script.run.withSuccessHandler(list=>{
@@ -2096,6 +3004,7 @@
           } else if (unlockedAchievements.length) {
             handleAchievementToasts(unlockedAchievements);
           }
+          updateStudentStoryState({ checkinToday: true });
           const extra = formatLevelProgressMessage(res);
           const totalXP = Number.isFinite(Number(res.totalXP)) ? Number(res.totalXP) : res.totalXP;
           const bonusText = bonusXP > 0 ? ` Bônus de conquistas: +${bonusXP} XP.` : '';

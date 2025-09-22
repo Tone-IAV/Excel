@@ -1,0 +1,30 @@
+<div class="space-y-4" data-subpage="achievements-catalog">
+  <div class="card card-flat">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <p class="pill mb-2">Conquistas</p>
+        <h2 class="text-xl font-semibold">Todas as medalhas do curso</h2>
+        <p class="text-sm text-slate-500 dark:text-slate-300">
+          Descubra o que falta para completar sua coleção e ganhar XP extra.
+        </p>
+      </div>
+      <div class="text-right text-sm text-slate-500 dark:text-slate-300">
+        <p class="text-xs uppercase tracking-wide">Status atual</p>
+        <p class="text-lg font-semibold text-primary" data-role="achievement-summary">0/0 desbloqueadas</p>
+      </div>
+    </div>
+  </div>
+  <div class="card card-flat">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <h3 class="text-lg font-semibold">Lista de conquistas</h3>
+      <button type="button" class="btn btn-ghost text-sm" data-nav-target="home">Voltar ao painel</button>
+    </div>
+    <p class="text-sm text-slate-500 dark:text-slate-300 mb-4">
+      Cada medalha indica hábitos importantes do curso. Complete check-ins e atividades para desbloquear novas recompensas.
+    </p>
+    <div data-role="achievement-error" class="feedback feedback-error hidden"></div>
+    <div data-role="achievement-loading" class="text-sm text-slate-500 dark:text-slate-300">Carregando conquistas...</div>
+    <div data-role="achievement-list" class="achievements-grid hidden"></div>
+    <p data-role="achievement-empty" class="text-sm text-slate-500 dark:text-slate-300 hidden"></p>
+  </div>
+</div>
