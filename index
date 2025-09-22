@@ -18,8 +18,12 @@
     }
   </script>
   <style>
-    .card { border-radius:1rem; box-shadow:0 10px 30px rgba(0,0,0,.08); background:#fff; padding:1rem; }
-    .dark .card { background:#0f172a; }
+    .card { --card-bg:#fff; --card-border:transparent; --card-shadow:0 10px 30px rgba(0,0,0,.08); border-radius:1rem; padding:1.25rem; background:var(--card-bg); border:1px solid var(--card-border); box-shadow:var(--card-shadow); }
+    .dark .card { --card-bg:#0f172a; --card-border:rgba(71,85,105,.45); --card-shadow:0 10px 30px rgba(15,23,42,.45); }
+    .card-flat { --card-bg:rgba(248,250,252,.95); --card-border:rgba(148,163,184,.35); --card-shadow:none; }
+    .dark .card-flat { --card-bg:rgba(15,23,42,.85); --card-border:rgba(148,163,184,.25); }
+    .card-transparent { --card-bg:rgba(255,255,255,.65); --card-border:rgba(148,163,184,.25); --card-shadow:none; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+    .dark .card-transparent { --card-bg:rgba(15,23,42,.6); --card-border:rgba(148,163,184,.3); }
     .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .9rem; border-radius:.7rem; border:1px solid transparent; font-weight:600; }
     .btn-primary { background:#007BFF; color:#fff; }
     .btn-ghost { background:transparent; color:#334155; }
@@ -94,21 +98,38 @@
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
 
-  <div id="toastContainer" class="fixed top-4 right-4 z-50 flex w-full max-w-sm flex-col gap-3"></div>
+  <div id="toastContainer" class="fixed top-4 inset-x-4 sm:inset-x-6 lg:inset-x-auto lg:right-12 lg:left-auto z-50 flex w-full max-w-sm flex-col gap-3 mx-auto lg:mx-0"></div>
 
 <header class="sticky top-0 z-20 bg-white/70 dark:bg-slate-900/70 backdrop-blur border-b border-slate-200 dark:border-slate-700">
-  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
-    <h1 class="text-lg font-bold">Plataforma — Curso de Excel</h1>
-    <div class="ml-auto flex items-center gap-2">
-      <span id="userInfo" class="pill">Visitante</span>
-      <button id="btnLogout" class="btn btn-ghost hidden">Sair</button>
+  <div class="w-full px-6 lg:px-12 py-3">
+    <div class="flex items-center gap-3">
+      <h1 class="text-lg font-bold">Plataforma — Curso de Excel</h1>
+      <div class="ml-auto flex items-center gap-2">
+        <span id="userInfo" class="pill">Visitante</span>
+        <button id="btnLogout" class="btn btn-ghost hidden">Sair</button>
+      </div>
     </div>
+    <nav id="headerBreadcrumbs" class="hidden mt-3 text-xs sm:text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-2">
+        <li class="flex items-center gap-2">
+          <span class="opacity-75">Início</span>
+          <span aria-hidden="true" class="text-slate-300">/</span>
+        </li>
+        <li id="breadcrumbDashboard" class="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-100">
+          Dashboard
+        </li>
+        <li id="breadcrumbAdmin" class="hidden flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-100">
+          <span aria-hidden="true" class="text-slate-300">/</span>
+          Administração
+        </li>
+      </ol>
+    </nav>
   </div>
 </header>
 
-<main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+<main class="px-6 lg:px-12 py-6 space-y-8">
   <!-- AUTH -->
-  <section id="authSection" class="grid md:grid-cols-2 gap-4">
+  <section id="authSection" class="grid md:grid-cols-2 gap-4 max-w-4xl mx-auto">
     <div class="card" id="signupCard">
       <h2 class="text-xl font-semibold mb-2">Criar conta</h2>
       <div id="signupMsg" class="feedback hidden"></div>
@@ -149,9 +170,9 @@
   </section>
 
   <!-- DASHBOARD -->
-  <section id="dashSection" class="hidden">
-    <div class="grid md:grid-cols-3 gap-4">
-      <div class="card md:col-span-2">
+  <section id="dashSection" class="hidden grid gap-6 lg:grid-cols-12 auto-rows-max">
+    <div class="lg:col-span-8 space-y-6">
+      <div class="card card-flat">
         <h3 class="text-lg font-semibold mb-2">Sua evolução</h3>
         <div class="grid sm:grid-cols-3 gap-3">
           <div class="rounded-2xl p-4 bg-primary/10">
@@ -195,100 +216,33 @@
         </div>
       </div>
 
-      <div class="card">
-        <h3 class="text-lg font-semibold mb-2">Check-in diário</h3>
-        <p class="text-sm text-slate-500 mb-2">Ganhe +XP 1x ao dia.</p>
-        <button id="btnCheckin" class="btn btn-primary">Confirmar presença</button>
-        <div id="checkinStreakInfo" class="mt-3 text-xs text-slate-500 dark:text-slate-300 leading-relaxed"></div>
-        <div id="checkinMsg" class="text-xs text-emerald-600 mt-2"></div>
-      </div>
-    </div>
-
-    <div id="achievementsCard" class="card">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h3 class="text-lg font-semibold">Conquistas</h3>
-        <span id="achievementsSummary" class="text-xs text-slate-500 dark:text-slate-400"></span>
-      </div>
-      <div id="achievementsLoading" class="text-sm text-slate-500 dark:text-slate-300">Carregando conquistas...</div>
-      <div id="achievementsError" class="text-sm text-rose-600 dark:text-rose-300 hidden"></div>
-      <div id="achievementsContent" class="space-y-5 hidden">
-        <div>
-          <div class="flex items-center justify-between text-sm mb-2">
-            <span class="font-semibold">Desbloqueadas</span>
-            <span class="text-xs text-slate-500 dark:text-slate-400">Celebre suas conquistas recentes</span>
+      <div id="achievementsCard" class="card card-flat">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h3 class="text-lg font-semibold">Conquistas</h3>
+          <span id="achievementsSummary" class="text-xs text-slate-500 dark:text-slate-400"></span>
+        </div>
+        <div id="achievementsLoading" class="text-sm text-slate-500 dark:text-slate-300">Carregando conquistas...</div>
+        <div id="achievementsError" class="text-sm text-rose-600 dark:text-rose-300 hidden"></div>
+        <div id="achievementsContent" class="space-y-5 hidden">
+          <div>
+            <div class="flex items-center justify-between text-sm mb-2">
+              <span class="font-semibold">Desbloqueadas</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">Celebre suas conquistas recentes</span>
+            </div>
+            <div id="achievementsUnlocked" class="achievements-scroll"></div>
+            <p id="achievementsUnlockedEmpty" class="text-xs text-slate-500 dark:text-slate-300">Faça login para desbloquear suas primeiras conquistas.</p>
           </div>
-          <div id="achievementsUnlocked" class="achievements-scroll"></div>
-          <p id="achievementsUnlockedEmpty" class="text-xs text-slate-500 dark:text-slate-300">Faça login para desbloquear suas primeiras conquistas.</p>
-        </div>
-        <div>
-          <div class="flex items-center justify-between text-sm mb-2">
-            <span class="font-semibold">Próximas metas</span>
-            <span class="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso e continue evoluindo</span>
+          <div>
+            <div class="flex items-center justify-between text-sm mb-2">
+              <span class="font-semibold">Próximas metas</span>
+              <span class="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso e continue evoluindo</span>
+            </div>
+            <div id="achievementsUpcoming" class="achievements-grid"></div>
+            <p id="achievementsUpcomingEmpty" class="text-xs text-slate-500 dark:text-slate-300">Participe de check-ins e atividades para liberar novas medalhas.</p>
           </div>
-          <div id="achievementsUpcoming" class="achievements-grid"></div>
-          <p id="achievementsUpcomingEmpty" class="text-xs text-slate-500 dark:text-slate-300">Participe de check-ins e atividades para liberar novas medalhas.</p>
         </div>
       </div>
-    </div>
 
-    <div class="card" id="historyCard">
-      <div class="flex flex-wrap items-center gap-3 mb-3">
-        <h3 class="text-lg font-semibold">Histórico de XP</h3>
-        <div id="historyStreakWrap" class="flex flex-wrap items-center gap-2 text-xs hidden">
-          <span id="historyStreakCurrent" class="pill"></span>
-          <span id="historyStreakBest" class="pill"></span>
-        </div>
-      </div>
-      <div class="flex flex-wrap items-center gap-3 mb-4">
-        <div class="inline-flex gap-2 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-full">
-          <button type="button" class="history-tab history-tab-active" data-history-tab="checkins">Check-ins</button>
-          <button type="button" class="history-tab" data-history-tab="activities">Atividades</button>
-        </div>
-        <div class="ml-auto flex flex-wrap items-center gap-2 text-xs">
-          <label for="historyPeriodFilter" class="uppercase tracking-wide text-slate-500 dark:text-slate-400">Período</label>
-          <select id="historyPeriodFilter" class="input input-sm">
-            <option value="7">7 dias</option>
-            <option value="30" selected>30 dias</option>
-            <option value="90">90 dias</option>
-            <option value="365">1 ano</option>
-            <option value="all">Todo o período</option>
-          </select>
-        </div>
-        <div id="historyModuleFilterWrap" class="flex flex-wrap items-center gap-2 text-xs hidden">
-          <label for="historyModuleFilter" class="uppercase tracking-wide text-slate-500 dark:text-slate-400">Módulo</label>
-          <select id="historyModuleFilter" class="input input-sm">
-            <option value="all" selected>Todos os módulos</option>
-          </select>
-        </div>
-      </div>
-      <div id="historyList" class="grid gap-2 text-sm"></div>
-    </div>
-
-    <div class="card">
-      <h3 class="text-lg font-semibold mb-2">Enviar atividade (exemplo)</h3>
-      <div class="grid md:grid-cols-4 gap-2 items-end">
-        <div>
-          <label class="text-xs">Módulo</label>
-          <input id="aModule" class="input" type="number" min="1" max="24" value="1"/>
-        </div>
-        <div>
-          <label class="text-xs">% de acerto</label>
-          <input id="aScore" class="input" type="number" min="0" max="100" value="80"/>
-        </div>
-        <div>
-          <label class="text-xs">XP máximo do módulo</label>
-          <input id="aMaxXP" class="input" type="number" min="0" value="40"/>
-        </div>
-        <button id="btnSubmitActivity" class="btn btn-ghost">Enviar resultado</button>
-      </div>
-      <div id="activityMsg" class="text-xs mt-2"></div>
-    </div>
-
-    <div class="grid md:grid-cols-2 gap-4">
-      <div class="card">
-        <h3 class="text-lg font-semibold mb-2">Ranking</h3>
-        <div id="rankWrap" class="space-y-2 text-sm"></div>
-      </div>
       <div class="card">
         <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
           <h3 class="text-lg font-semibold">Central de materiais</h3>
@@ -345,36 +299,104 @@
           </div>
         </div>
       </div>
+
+      <div class="card card-transparent" id="communityWallCard">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <div>
+            <h3 class="text-lg font-semibold">Mural da comunidade</h3>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Compartilhe dicas rápidas e conquistas com a turma.</p>
+          </div>
+          <span id="communityLimitBadge" class="pill">Até 240 caracteres</span>
+        </div>
+        <div id="communityFormWrap" class="space-y-2 mb-4 hidden">
+          <textarea id="communityMessage" class="input min-h-[96px] resize-y" maxlength="240" placeholder="Escreva uma dica ou atualização rápida..."></textarea>
+          <div class="flex items-center justify-between gap-3 text-xs text-slate-500">
+            <span id="communityFormFeedback" class="text-rose-500 hidden" aria-live="polite"></span>
+            <span id="communityCounter">0/240</span>
+          </div>
+          <div class="flex justify-end">
+            <button id="btnCommunityPublish" class="btn btn-primary">Publicar no mural</button>
+          </div>
+        </div>
+        <p id="communityGuestNotice" class="text-sm text-slate-500 mb-4 hidden">Entre com sua conta para participar do mural.</p>
+        <div id="communityWallList" class="grid gap-3 text-sm"></div>
+        <p id="communityWallEmpty" class="history-empty hidden">Ainda não há recados por aqui. Seja o primeiro a compartilhar!</p>
+      </div>
     </div>
 
-    <div class="card" id="communityWallCard">
-      <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
-        <div>
-          <h3 class="text-lg font-semibold">Mural da comunidade</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Compartilhe dicas rápidas e conquistas com a turma.</p>
-        </div>
-        <span id="communityLimitBadge" class="pill">Até 240 caracteres</span>
+    <div class="lg:col-span-4 space-y-6">
+      <div class="card">
+        <h3 class="text-lg font-semibold mb-2">Check-in diário</h3>
+        <p class="text-sm text-slate-500 mb-2">Ganhe +XP 1x ao dia.</p>
+        <button id="btnCheckin" class="btn btn-primary">Confirmar presença</button>
+        <div id="checkinStreakInfo" class="mt-3 text-xs text-slate-500 dark:text-slate-300 leading-relaxed"></div>
+        <div id="checkinMsg" class="text-xs text-emerald-600 mt-2"></div>
       </div>
-      <div id="communityFormWrap" class="space-y-2 mb-4 hidden">
-        <textarea id="communityMessage" class="input min-h-[96px] resize-y" maxlength="240" placeholder="Escreva uma dica ou atualização rápida..."></textarea>
-        <div class="flex items-center justify-between gap-3 text-xs text-slate-500">
-          <span id="communityFormFeedback" class="text-rose-500 hidden" aria-live="polite"></span>
-          <span id="communityCounter">0/240</span>
-        </div>
-        <div class="flex justify-end">
-          <button id="btnCommunityPublish" class="btn btn-primary">Publicar no mural</button>
-        </div>
-      </div>
-      <p id="communityGuestNotice" class="text-sm text-slate-500 mb-4 hidden">Entre com sua conta para participar do mural.</p>
-      <div id="communityWallList" class="grid gap-3 text-sm"></div>
-      <p id="communityWallEmpty" class="history-empty hidden">Ainda não há recados por aqui. Seja o primeiro a compartilhar!</p>
-    </div>
 
-    <!-- Admin -->
-    <div id="adminPanel" class="card hidden">
-      <h3 class="text-lg font-semibold mb-2">Painel do Administrador</h3>
-      <p class="text-sm text-slate-500 mb-2">Ranking consolidado (apenas alunos). Use para premiações.</p>
-      <div id="adminRank" class="space-y-2 text-sm"></div>
+      <div class="card" id="historyCard">
+        <div class="flex flex-wrap items-center gap-3 mb-3">
+          <h3 class="text-lg font-semibold">Histórico de XP</h3>
+          <div id="historyStreakWrap" class="flex flex-wrap items-center gap-2 text-xs hidden">
+            <span id="historyStreakCurrent" class="pill"></span>
+            <span id="historyStreakBest" class="pill"></span>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-3 mb-4">
+          <div class="inline-flex gap-2 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-full">
+            <button type="button" class="history-tab history-tab-active" data-history-tab="checkins">Check-ins</button>
+            <button type="button" class="history-tab" data-history-tab="activities">Atividades</button>
+          </div>
+          <div class="ml-auto flex flex-wrap items-center gap-2 text-xs">
+            <label for="historyPeriodFilter" class="uppercase tracking-wide text-slate-500 dark:text-slate-400">Período</label>
+            <select id="historyPeriodFilter" class="input input-sm">
+              <option value="7">7 dias</option>
+              <option value="30" selected>30 dias</option>
+              <option value="90">90 dias</option>
+              <option value="365">1 ano</option>
+              <option value="all">Todo o período</option>
+            </select>
+          </div>
+          <div id="historyModuleFilterWrap" class="flex flex-wrap items-center gap-2 text-xs hidden">
+            <label for="historyModuleFilter" class="uppercase tracking-wide text-slate-500 dark:text-slate-400">Módulo</label>
+            <select id="historyModuleFilter" class="input input-sm">
+              <option value="all" selected>Todos os módulos</option>
+            </select>
+          </div>
+        </div>
+        <div id="historyList" class="grid gap-2 text-sm"></div>
+      </div>
+
+      <div class="card" id="activityCard">
+        <h3 class="text-lg font-semibold mb-2">Enviar atividade (exemplo)</h3>
+        <div class="grid md:grid-cols-4 gap-2 items-end">
+          <div>
+            <label class="text-xs">Módulo</label>
+            <input id="aModule" class="input" type="number" min="1" max="24" value="1"/>
+          </div>
+          <div>
+            <label class="text-xs">% de acerto</label>
+            <input id="aScore" class="input" type="number" min="0" max="100" value="80"/>
+          </div>
+          <div>
+            <label class="text-xs">XP máximo do módulo</label>
+            <input id="aMaxXP" class="input" type="number" min="0" value="40"/>
+          </div>
+          <button id="btnSubmitActivity" class="btn btn-ghost">Enviar resultado</button>
+        </div>
+        <div id="activityMsg" class="text-xs mt-2"></div>
+      </div>
+
+      <div class="card">
+        <h3 class="text-lg font-semibold mb-2">Ranking</h3>
+        <div id="rankWrap" class="space-y-2 text-sm"></div>
+      </div>
+
+      <!-- Admin -->
+      <div id="adminPanel" class="card hidden">
+        <h3 class="text-lg font-semibold mb-2">Painel do Administrador</h3>
+        <p class="text-sm text-slate-500 mb-2">Ranking consolidado (apenas alunos). Use para premiações.</p>
+        <div id="adminRank" class="space-y-2 text-sm"></div>
+      </div>
     </div>
   </section>
 </main>
@@ -470,6 +492,8 @@
   const communityListEl = $('#communityWallList');
   const communityEmptyEl = $('#communityWallEmpty');
   const communityLimitBadge = $('#communityLimitBadge');
+  const headerBreadcrumbs = $('#headerBreadcrumbs');
+  const breadcrumbAdminItem = $('#breadcrumbAdmin');
   let communityCharLimit = 240;
   let isPublishingCommunity = false;
   const communityDateFormatter = typeof Intl !== 'undefined'
@@ -503,6 +527,16 @@
         el.setAttribute('aria-hidden', 'true');
       }
     });
+  }
+
+  function syncHeaderContext() {
+    const isLogged = !!currentUser;
+    if (headerBreadcrumbs) {
+      headerBreadcrumbs.classList.toggle('hidden', !isLogged);
+    }
+    if (breadcrumbAdminItem) {
+      breadcrumbAdminItem.classList.toggle('hidden', !(currentUser && currentUser.isAdmin));
+    }
   }
 
   function renderHighlightList(listEl, items, emptyEl) {
@@ -1868,20 +1902,21 @@
       $('#authSection').classList.remove('hidden');
       $('#dashSection').classList.add('hidden');
       $('#userInfo').textContent = 'Visitante';
-      $('#btnLogout').classList.add('hidden');
-      resetHistorySection();
-      resetLevelIndicator();
-       resetAchievementsUI();
-      syncAdminVisibility();
-      updateCommunityAccess();
-      if (!skipCommunity) refreshCommunityWall();
-      return;
-    }
-    $('#authSection').classList.add('hidden');
-    $('#dashSection').classList.remove('hidden');
-    $('#btnLogout').classList.remove('hidden');
-    $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
-    loadHistoryForCurrentUser();
+    $('#btnLogout').classList.add('hidden');
+    resetHistorySection();
+    resetLevelIndicator();
+     resetAchievementsUI();
+    syncAdminVisibility();
+    updateCommunityAccess();
+    if (!skipCommunity) refreshCommunityWall();
+    syncHeaderContext();
+    return;
+  }
+  $('#authSection').classList.add('hidden');
+  $('#dashSection').classList.remove('hidden');
+  $('#btnLogout').classList.remove('hidden');
+  $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
+  loadHistoryForCurrentUser();
     if (!keepLevelIndicator) {
       setLevelIndicatorLoading();
     }
@@ -1910,13 +1945,14 @@
       }).getUserState({ userId: currentUser.id });
 
     // ranking
-    refreshRanking();
-    // admin panel
-    $('#adminPanel').classList.toggle('hidden', !currentUser.isAdmin);
-    syncAdminVisibility();
-    updateCommunityAccess();
-    if (!skipCommunity) refreshCommunityWall();
-  }
+  refreshRanking();
+  // admin panel
+  $('#adminPanel').classList.toggle('hidden', !currentUser.isAdmin);
+  syncAdminVisibility();
+  updateCommunityAccess();
+  if (!skipCommunity) refreshCommunityWall();
+  syncHeaderContext();
+}
 
   function refreshRanking() {
     google.script.run.withSuccessHandler(list=>{
