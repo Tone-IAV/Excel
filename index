@@ -45,6 +45,8 @@
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
 
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 flex w-full max-w-sm flex-col gap-3"></div>
+
 <header class="sticky top-0 z-20 bg-white/70 dark:bg-slate-900/70 backdrop-blur border-b border-slate-200 dark:border-slate-700">
   <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
     <h1 class="text-lg font-bold">Plataforma — Curso de Excel</h1>
@@ -247,6 +249,128 @@
     }
     return url;
   };
+
+  const toastContainer = $('#toastContainer');
+  const toastVariants = {
+    success: {
+      toast: 'bg-emerald-600 text-white focus-visible:ring-emerald-200',
+      close: 'bg-white/20 text-white hover:bg-white/30 focus-visible:ring-white'
+    },
+    error: {
+      toast: 'bg-rose-600 text-white focus-visible:ring-rose-200',
+      close: 'bg-white/20 text-white hover:bg-white/30 focus-visible:ring-white'
+    },
+    warning: {
+      toast: 'bg-amber-500 text-slate-900 focus-visible:ring-amber-200',
+      close: 'bg-black/10 text-slate-900 hover:bg-black/20 focus-visible:ring-amber-700'
+    }
+  };
+
+  function showToast({ message, type = 'success', duration = 4000 } = {}) {
+    const text = (message ?? '').toString().trim();
+    if (!toastContainer || !text) return;
+
+    const variant = toastVariants[type] ? type : 'success';
+    const activeElement = document.activeElement;
+    const returnFocusTo = activeElement instanceof HTMLElement
+      && activeElement !== document.body
+      && !toastContainer.contains(activeElement)
+      ? activeElement
+      : null;
+    const toast = document.createElement('div');
+    toast.setAttribute('role', variant === 'error' ? 'alert' : 'status');
+    toast.setAttribute('aria-live', variant === 'error' ? 'assertive' : 'polite');
+    toast.setAttribute('aria-atomic', 'true');
+    toast.setAttribute('tabindex', '-1');
+    toast.className = [
+      'pointer-events-auto',
+      'flex items-start gap-3 rounded-xl px-4 py-3 text-sm shadow-lg ring-1 ring-slate-900/10 transition duration-200 ease-out',
+      'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+      'dark:ring-white/10',
+      'dark:focus-visible:ring-offset-slate-900',
+      toastVariants[variant].toast
+    ].join(' ');
+    toast.classList.add('opacity-0');
+
+    const textWrapper = document.createElement('div');
+    textWrapper.className = 'flex-1 leading-snug';
+    textWrapper.textContent = text;
+    toast.appendChild(textWrapper);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.type = 'button';
+    closeBtn.setAttribute('aria-label', 'Fechar notificação');
+    closeBtn.className = [
+      'flex h-7 w-7 flex-none items-center justify-center rounded-full text-base transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+      toastVariants[variant].close
+    ].join(' ');
+    closeBtn.innerHTML = '<span aria-hidden="true">&times;</span>';
+    toast.appendChild(closeBtn);
+
+    toastContainer.appendChild(toast);
+
+    const removeToast = () => {
+      if (!toast.isConnected) return;
+      if (hideTimer) {
+        window.clearTimeout(hideTimer);
+        hideTimer = null;
+      }
+      let fallbackTimer = null;
+      const handleTransitionEnd = () => {
+        toast.removeEventListener('transitionend', handleTransitionEnd);
+        if (fallbackTimer) {
+          window.clearTimeout(fallbackTimer);
+          fallbackTimer = null;
+        }
+        if (toast.parentElement) toast.parentElement.removeChild(toast);
+        if (returnFocusTo && returnFocusTo.isConnected) {
+          try {
+            returnFocusTo.focus({ preventScroll: true });
+          } catch (err) {
+            returnFocusTo.focus();
+          }
+        }
+      };
+      const wasVisible = toast.classList.contains('opacity-100');
+      toast.classList.remove('opacity-100');
+      toast.classList.add('opacity-0');
+      if (!wasVisible) {
+        handleTransitionEnd();
+        return;
+      }
+      fallbackTimer = window.setTimeout(handleTransitionEnd, 250);
+      toast.addEventListener('transitionend', handleTransitionEnd);
+    };
+
+    let hideTimer = null;
+    const durationMs = Number(duration);
+    if (!Number.isNaN(durationMs) && durationMs > 0) {
+      hideTimer = window.setTimeout(() => removeToast(), durationMs);
+    }
+
+    closeBtn.addEventListener('click', () => {
+      if (hideTimer) window.clearTimeout(hideTimer);
+      removeToast();
+    });
+
+    toast.addEventListener('keydown', event => {
+      if (event.key === 'Escape' || event.key === 'Esc') {
+        event.preventDefault();
+        if (hideTimer) window.clearTimeout(hideTimer);
+        removeToast();
+      }
+    });
+
+    requestAnimationFrame(() => {
+      toast.classList.remove('opacity-0');
+      toast.classList.add('opacity-100');
+      try {
+        toast.focus({ preventScroll: true });
+      } catch (err) {
+        toast.focus();
+      }
+    });
+  }
 
   const signupMessageEl = $('#signupMsg');
   const loginMessageEl  = $('#loginMsg');
@@ -531,9 +655,9 @@
 
   // Check-in
   $('#btnCheckin').onclick = ()=>{
-    if (!currentUser) return alert('Faça login primeiro.');
+    if (!currentUser) return showToast({ message: 'Faça login primeiro.', type: 'warning' });
     google.script.run
-      .withFailureHandler(err=> alert(err.message || err))
+      .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
       .withSuccessHandler(res=>{
         $('#checkinMsg').textContent = res.ok
           ? `Presença registrada (+${res.xpGanho} XP). Total: ${res.totalXP} XP.`
@@ -546,7 +670,7 @@
 
   // Submit activity (exemplo)
   $('#btnSubmitActivity').onclick = ()=>{
-    if (!currentUser) return alert('Faça login primeiro.');
+    if (!currentUser) return showToast({ message: 'Faça login primeiro.', type: 'warning' });
     const payload = {
       userId: currentUser.id,
       moduleId: Number($('#aModule').value||1),
@@ -554,7 +678,7 @@
       maxXP: Number($('#aMaxXP').value||0)
     };
     google.script.run
-      .withFailureHandler(err=> alert(err.message || err))
+      .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
       .withSuccessHandler(res=>{
         $('#activityMsg').textContent = `Enviado! Você ganhou +${res.deltaXP} XP. Total: ${res.totalXP} XP (Nível ${res.level}).`;
         updateUI();
@@ -568,7 +692,7 @@
     const excel = $('#excelLink').value.trim();
     const ppt   = $('#pptLink').value.trim();
     google.script.run
-      .withFailureHandler(err=> alert(err.message || err))
+      .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
       .withSuccessHandler(()=> loadEmbeds())
       .saveEmbeds({ excel, ppt });
   };
