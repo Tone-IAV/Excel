@@ -206,27 +206,31 @@
     </section>
   </main>
 
-  <footer class="max-w-7xl mx-auto px-4 pb-10 text-center text-xs text-slate-500">Plataforma local-first (LocalStorage). Para produção, conectar a um backend/Sheets/Firestore.</footer>
+  <footer class="max-w-7xl mx-auto px-4 pb-10 text-center text-xs text-slate-500">Plataforma conectada ao Google Sheets via Apps Script. </footer>
 
   <script>
-    // ===== Persitência & Estruturas =====
-    const SKEY = 'excelPlatform_v2';
+    // ===== Integração com Apps Script & Estado =====
+    const API_URL = 'https://script.google.com/macros/s/SEU_DEPLOYMENT_ID/exec'; // substitua pelo URL do Web App publicado
+    const TOKEN_KEY = 'excelPlatform_token';
+    let authToken = localStorage.getItem(TOKEN_KEY) || '';
     const state = {
-      users: [], // {id,nome,email,senhaHash,admin:boolean, xp, progresso:{[modId]:{done:boolean, score:number}}, checkins:string[]}
-      embeds: {excel:'',ppt:''},
+      modules: [],
+      embeds: { excel:'', ppt:'' },
       cfg: { xpCheckin:5, xpPorNivel:100, ciclo:'Turma Excel — 2025' },
-      modules: [] // preenchido abaixo
+      ranking: [],
+      adminUsers: []
     };
+    let currentUser = null;
 
     // 24 módulos — exemplos de perguntas (Dia 1 com questões reais, demais com placeholders)
-    const MODULES = Array.from({length:24}).map((_,i)=>({
+    const FALLBACK_MODULES = Array.from({length:24}).map((_,i)=>({
       id: i+1,
       titulo: `${i+1}. Módulo ${i+1}`,
       desc: 'Atividade prática do módulo.',
       xp: 30,
       perguntas: []
     }));
-    MODULES[0] = {
+    FALLBACK_MODULES[0] = {
       id:1,
       titulo:'1. Boas‑vindas, interface e fundamentos',
       desc:'Crie sua primeira planilha com cabeçalhos e formate os dados. Responda as perguntas para validar o aprendizado.',
@@ -240,17 +244,72 @@
       ]
     };
 
-    state.modules = MODULES;
+    state.modules = JSON.parse(JSON.stringify(FALLBACK_MODULES));
 
     // ===== Helpers =====
     const $ = s => document.querySelector(s);
     const el = (t,c) => { const x=document.createElement(t); if(c) x.className=c; return x; };
     const todayStr = () => new Date().toISOString().slice(0,10);
     const levelOf = xp => 1 + Math.floor((xp||0) / (state.cfg.xpPorNivel||100));
-    const hash = s => s; // demo (não seguro)
 
-    function load(){ const raw = localStorage.getItem(SKEY); if(raw){ try{const data=JSON.parse(raw); Object.assign(state,data);}catch(e){console.error(e)} } }
-    function save(){ localStorage.setItem(SKEY, JSON.stringify(state)); refreshAll(); }
+    function setToken(token){
+      authToken = token || '';
+      if(authToken){ localStorage.setItem(TOKEN_KEY, authToken); }
+      else { localStorage.removeItem(TOKEN_KEY); }
+    }
+
+    async function callApi(action, payload={}, opts={}){
+      try {
+        const res = await fetch(API_URL, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ action, token: authToken, payload })
+        });
+        if(!res.ok){ throw new Error(`Erro HTTP ${res.status}`); }
+        const json = await res.json();
+        if(json.token !== undefined) setToken(json.token);
+        if(json.success === false) throw new Error(json.message || 'Erro ao processar a solicitação.');
+        return json;
+      } catch(err){
+        console.error(err);
+        if(!opts.silent){
+          alert(err.message || 'Falha ao comunicar com o servidor.');
+        }
+        throw err;
+      }
+    }
+
+    function applyServerState(data){
+      if(Array.isArray(data?.modules) && data.modules.length){
+        state.modules = data.modules;
+      } else if(!state.modules.length){
+        state.modules = JSON.parse(JSON.stringify(FALLBACK_MODULES));
+      }
+      if(data?.cfg){ state.cfg = Object.assign({}, state.cfg, data.cfg); }
+      if(data?.embeds){ state.embeds = Object.assign({}, state.embeds, data.embeds); }
+      if(Array.isArray(data?.ranking)) state.ranking = data.ranking;
+      if(Array.isArray(data?.adminUsers)) state.adminUsers = data.adminUsers;
+      currentUser = data?.user || null;
+      if($('#inputExcel')) $('#inputExcel').value = state.embeds.excel || '';
+      if($('#inputPPT')) $('#inputPPT').value = state.embeds.ppt || '';
+      updateUserInfo();
+      refreshAll();
+    }
+
+    async function bootstrap(showAuthModal=true){
+      try {
+        const data = await callApi('bootstrap', {}, { silent:true });
+        applyServerState(data);
+        if(showAuthModal){ showAuth(!currentUser); }
+      } catch(err){
+        console.warn('Falha ao carregar do Apps Script, usando dados locais.', err);
+        if(!state.modules.length){ state.modules = JSON.parse(JSON.stringify(FALLBACK_MODULES)); }
+        state.ranking = state.ranking || [];
+        state.adminUsers = state.adminUsers || [];
+        refreshAll();
+        if(showAuthModal) showAuth(true);
+      }
+    }
 
     // ===== Tema
     function setTheme(dark){ document.documentElement.classList.toggle('dark',dark); localStorage.setItem('theme_dark',dark?'1':'0'); }
@@ -258,69 +317,194 @@
     setTheme(localStorage.getItem('theme_dark')==='1');
 
     // ===== Auth =====
-    let currentUser = null; // {id, ...}
     function showAuth(show){ $('#authModal').classList.toggle('hidden', !show); }
-    function updateUserInfo(){ $('#userInfo').textContent = currentUser? `${currentUser.nome} (${currentUser.admin?'Admin':'Aluno'})` : 'Visitante'; $('#btnLogout').classList.toggle('hidden', !currentUser); $('#tabAdminBtn').classList.toggle('hidden', !(currentUser?.admin)); }
+    function updateUserInfo(){
+      $('#userInfo').textContent = currentUser? `${currentUser.nome} (${currentUser.admin?'Admin':'Aluno'})` : 'Visitante';
+      $('#btnLogout').classList.toggle('hidden', !currentUser);
+      $('#tabAdminBtn').classList.toggle('hidden', !(currentUser?.admin));
+    }
 
-    $('#btnSignup').onclick = ()=>{
-      const nome=$('#authNome').value.trim(); const email=$('#authEmail').value.trim().toLowerCase(); const senha=$('#authSenha').value.trim(); const admin=$('#authAdmin').checked;
+    $('#btnSignup').onclick = async ()=>{
+      const nome=$('#authNome').value.trim();
+      const email=$('#authEmail').value.trim().toLowerCase();
+      const senha=$('#authSenha').value.trim();
+      const admin=$('#authAdmin').checked;
       if(!nome||!email||!senha) return alert('Preencha nome, e-mail e senha.');
-      if(state.users.some(u=>u.email===email)) return alert('E-mail já cadastrado.');
-      const user={ id:crypto.randomUUID(), nome,email,senhaHash:hash(senha),admin, xp:0, progresso:{}, checkins:[] };
-      state.users.push(user); save(); currentUser=user; showAuth(false); updateUserInfo(); refreshAll();
+      try{
+        const data = await callApi('signup', { nome,email,senha,admin });
+        applyServerState(data);
+        showAuth(false);
+        $('#authSenha').value='';
+      }catch(err){ /* feedback já tratado em callApi */ }
     };
-    $('#btnLogin').onclick = ()=>{
-      const email=$('#authEmail').value.trim().toLowerCase(); const senha=$('#authSenha').value.trim();
-      const u = state.users.find(x=>x.email===email && x.senhaHash===hash(senha));
-      if(!u) return alert('Credenciais inválidas.');
-      currentUser=u; showAuth(false); updateUserInfo(); refreshAll();
+
+    $('#btnLogin').onclick = async ()=>{
+      const email=$('#authEmail').value.trim().toLowerCase();
+      const senha=$('#authSenha').value.trim();
+      if(!email||!senha) return alert('Informe e-mail e senha.');
+      try{
+        const data = await callApi('login', { email,senha });
+        applyServerState(data);
+        showAuth(false);
+        $('#authSenha').value='';
+      }catch(err){ /* já exibido */ }
     };
-    $('#btnLogout').onclick = ()=>{ currentUser=null; updateUserInfo(); showAuth(true); };
+
+    $('#btnLogout').onclick = async ()=>{
+      try{ await callApi('logout', {}, { silent:true }); }catch(err){ console.warn(err); }
+      setToken('');
+      currentUser=null;
+      state.adminUsers=[];
+      updateUserInfo();
+      refreshAll();
+      showAuth(true);
+    };
 
     // ===== Dashboard KPIs =====
     function renderDashboard(){ if(!currentUser){ $('#kpiXP').textContent='0'; $('#kpiAtv').textContent='0'; $('#kpiNivel').textContent='1'; $('#progressBar').style.width='0%'; $('#progressPct').textContent='0%'; return; }
-      $('#kpiXP').textContent = currentUser.xp||0; const concl = Object.values(currentUser.progresso||{}).filter(p=>p.done).length; $('#kpiAtv').textContent = concl; $('#kpiNivel').textContent = levelOf(currentUser.xp); const pct = Math.round((concl/state.modules.length)*100); $('#progressBar').style.width=pct+'%'; $('#progressPct').textContent=pct+'%'; }
+      $('#kpiXP').textContent = currentUser.xp||0; const concl = Object.values(currentUser.progresso||{}).filter(p=>p.done).length; $('#kpiAtv').textContent = concl; $('#kpiNivel').textContent = levelOf(currentUser.xp); const total = state.modules.length || 1; const pct = Math.round((concl/total)*100); $('#progressBar').style.width=pct+'%'; $('#progressPct').textContent=pct+'%'; }
 
     // Check-in diário
-    $('#btnCheckin').onclick = ()=>{ if(!currentUser) return showAuth(true); const today=todayStr(); if(!(currentUser.checkins||[]).includes(today)){ currentUser.checkins.push(today); currentUser.xp=(currentUser.xp||0)+ (state.cfg.xpCheckin||5); $('#checkinMsg').textContent=`Presença registrada. +${state.cfg.xpCheckin} XP!`; } else { $('#checkinMsg').textContent='Presença de hoje já registrada.'; } save(); setTimeout(()=>$('#checkinMsg').textContent='',3000); };
+    $('#btnCheckin').onclick = async ()=>{
+      if(!currentUser) return showAuth(true);
+      try {
+        const data = await callApi('checkin');
+        $('#checkinMsg').textContent = data.message || 'Presença registrada!';
+        if(data.user) currentUser = data.user;
+        if(Array.isArray(data.ranking)) state.ranking = data.ranking;
+        if(Array.isArray(data.adminUsers)) state.adminUsers = data.adminUsers;
+        refreshAll();
+      } catch(err) {
+        $('#checkinMsg').textContent = err.message || 'Não foi possível registrar o check-in.';
+      }
+      setTimeout(()=>$('#checkinMsg').textContent='',3000);
+    };
 
     // ===== Módulos & Atividades =====
     function renderModulos(){ const grid=$('#gridModulos'); grid.innerHTML=''; state.modules.forEach(m=>{ const prog=currentUser?.progresso?.[m.id]||{done:false,score:0}; const card=el('div','card'); card.innerHTML=`<div class="flex items-start justify-between"><div><h4 class="font-semibold">${m.titulo}</h4><p class="text-sm text-slate-500">${m.desc}</p></div><span class="pill">${prog.done? 'Concluído' : m.xp+' XP'}</span></div><div class="mt-3 flex items-center justify-between"><div class="text-xs text-slate-500">Score: ${prog.score||0}</div><button class="btn btn-primary" data-open="${m.id}"><i data-lucide="play"></i> ${prog.done? 'Refazer' : 'Começar'}</button></div>`; grid.appendChild(card); }); lucide.createIcons(); grid.querySelectorAll('button[data-open]').forEach(b=> b.onclick=()=> openAtividade(parseInt(b.getAttribute('data-open')))); }
 
     let atvAtual = null;
-    function openAtividade(modId){ if(!currentUser) return showAuth(true); const m = state.modules.find(x=>x.id===modId); atvAtual=m; $('#panelAtividade').classList.remove('hidden'); $('#atvTitulo').textContent=m.titulo; $('#atvDesc').textContent=m.desc+` • Vale ${m.xp} XP`; const wrap=$('#atvPerguntas'); wrap.innerHTML=''; m.perguntas.forEach((q,idx)=>{ const block=el('div'); block.innerHTML=`<div class="font-medium">${idx+1}) ${q.enunciado}</div>`; if(q.tipo==='mc'){ const list=el('div','mt-2 grid gap-2'); q.opcoes.forEach((opt,i)=>{ const id=`${m.id}_${q.id}_${i}`; list.innerHTML += `<label class="flex items-center gap-2 text-sm"><input type="radio" name="${m.id}_${q.id}" value="${i}" class="scale-110"/> ${opt}</label>`; }); block.appendChild(list); } else if(q.tipo==='text'){ const ta=el('textarea','input mt-2'); ta.rows=3; ta.placeholder='Sua resposta...'; ta.setAttribute('data-text', `${m.id}_${q.id}`); block.appendChild(ta); } wrap.appendChild(block); }); $('#atvFeedback').textContent=''; }
+    function openAtividade(modId){ if(!currentUser) return showAuth(true); const m = state.modules.find(x=>x.id===modId); if(!m) return; atvAtual=m; $('#panelAtividade').classList.remove('hidden'); $('#atvTitulo').textContent=m.titulo||`Módulo ${modId}`; $('#atvDesc').textContent=`${m.desc||''} • Vale ${m.xp||0} XP`; const wrap=$('#atvPerguntas'); wrap.innerHTML=''; (m.perguntas||[]).forEach((q,idx)=>{ const block=el('div'); block.innerHTML=`<div class="font-medium">${idx+1}) ${q.enunciado||''}</div>`; if(q.tipo==='mc'){ const list=el('div','mt-2 grid gap-2'); (q.opcoes||[]).forEach((opt,i)=>{ list.innerHTML += `<label class="flex items-center gap-2 text-sm"><input type="radio" name="${m.id}_${q.id}" value="${i}" class="scale-110"/> ${opt}</label>`; }); block.appendChild(list); } else { const ta=el('textarea','input mt-2'); ta.rows=3; ta.placeholder='Sua resposta...'; ta.setAttribute('data-text', `${m.id}_${q.id}`); block.appendChild(ta); } wrap.appendChild(block); }); $('#atvFeedback').textContent=''; }
     $('#btnFecharAtv').onclick = ()=> { $('#panelAtividade').classList.add('hidden'); };
 
-    $('#btnEnviarAtv').onclick = ()=>{ if(!currentUser || !atvAtual) return; // avaliação simples
-      let score=0; let total=0; atvAtual.perguntas.forEach(q=>{ if(q.tipo==='mc'){ total++; const sel = document.querySelector(`input[name="${atvAtual.id}_${q.id}"]:checked`); if(sel && parseInt(sel.value,10)===q.correta) score++; } else if(q.tipo==='text'){ const tx = document.querySelector(`textarea[data-text="${atvAtual.id}_${q.id}"]`); if(tx && tx.value.trim().length>=10){ score++; } total++; });
-      const pct = Math.round((score/total)*100);
-      const earned = Math.round(atvAtual.xp * (pct/100));
-      // registrar progresso
-      currentUser.progresso[atvAtual.id] = { done:true, score:pct };
-      currentUser.xp = (currentUser.xp||0) + earned;
-      $('#atvFeedback').textContent = `Você acertou ${score}/${total} (${pct}%). +${earned} XP!`;
-      save();
+    $('#btnEnviarAtv').onclick = async ()=>{
+      if(!currentUser || !atvAtual) return;
+      const answers = atvAtual.perguntas.map(q=>{
+        if(q.tipo==='mc'){
+          const sel = document.querySelector(`input[name="${atvAtual.id}_${q.id}"]:checked`);
+          return { questionId:q.id, answer: sel? parseInt(sel.value,10) : null };
+        }
+        const tx = document.querySelector(`textarea[data-text="${atvAtual.id}_${q.id}"]`);
+        return { questionId:q.id, answer: tx? tx.value.trim() : '' };
+      });
+      try{
+        const data = await callApi('submitProgress', { moduleId: atvAtual.id, answers });
+        $('#atvFeedback').textContent = data.message || 'Respostas registradas com sucesso!';
+        if(data.user) currentUser = data.user;
+        if(Array.isArray(data.ranking)) state.ranking = data.ranking;
+        if(Array.isArray(data.adminUsers)) state.adminUsers = data.adminUsers;
+        refreshAll();
+      }catch(err){
+        $('#atvFeedback').textContent = err.message || 'Erro ao enviar atividade.';
+      }
     };
 
     // ===== Ranking =====
     function renderRanking(sortBy='xp'){
-      const grid=$('#gridRanking'); grid.innerHTML=''; const arr = state.users.filter(u=>!u.admin);
+      const grid=$('#gridRanking'); grid.innerHTML='';
+      const arr = Array.isArray(state.ranking) ? [...state.ranking] : [];
       if(sortBy==='xp') arr.sort((a,b)=> (b.xp||0)-(a.xp||0));
       if(sortBy==='nome') arr.sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
-      arr.forEach((a,idx)=>{ const medal = idx===0?'badge-gold': idx===1?'badge-silver': idx===2?'badge-bronze':''; const card=el('div','rounded-2xl p-5 bg-white dark:bg-slate-800 shadow-soft'); card.innerHTML=`<div class="flex items-center gap-3"><div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-lg">${(a.nome||'?').slice(0,1).toUpperCase()}</div><div class="flex-1"><div class="flex items-center gap-2"><h4 class="font-semibold">${a.nome}</h4>${medal?`<span class="badge ${medal}">${idx+1}º</span>`:''}</div><div class="text-xs text-slate-500">Nível ${levelOf(a.xp)}</div></div><div class="text-right"><div class="text-2xl font-bold">${a.xp||0}</div><div class="text-xs text-slate-500">XP</div></div></div>`; grid.appendChild(card); }); lucide.createIcons(); }
+      arr.forEach((a,idx)=>{
+        const medal = idx===0?'badge-gold': idx===1?'badge-silver': idx===2?'badge-bronze':'';
+        const nivel = a.nivel || levelOf(a.xp);
+        const card=el('div','rounded-2xl p-5 bg-white dark:bg-slate-800 shadow-soft');
+        card.innerHTML=`<div class="flex items-center gap-3"><div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-lg">${(a.nome||'?').slice(0,1).toUpperCase()}</div><div class="flex-1"><div class="flex items-center gap-2"><h4 class="font-semibold">${a.nome}</h4>${medal?`<span class="badge ${medal}">${idx+1}º</span>`:''}</div><div class="text-xs text-slate-500">Nível ${nivel}</div></div><div class="text-right"><div class="text-2xl font-bold">${a.xp||0}</div><div class="text-xs text-slate-500">XP</div></div></div>`;
+        grid.appendChild(card);
+      });
+      lucide.createIcons();
+    }
     $('#btnSortXP').onclick = ()=> renderRanking('xp');
     $('#btnSortNome').onclick = ()=> renderRanking('nome');
 
     // ===== Embeds =====
     function normalizeEmbed(url){ if(!url) return ''; if(url.includes('onedrive')||url.includes('sharepoint')){ if(url.includes('embed')) return url; return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`; } if(url.includes('drive.google.com')){ return url.replace('/view?usp=sharing','/preview'); } return url; }
     function renderEmbeds(){ const excelURL=normalizeEmbed(state.embeds.excel); const pptURL=normalizeEmbed(state.embeds.ppt); $('#excelFrameWrap').innerHTML = excelURL? `<iframe src="${excelURL}" class="w-full h-full"></iframe>` : '<div class="fill flex items-center justify-center text-slate-400 text-sm p-4 text-center">Cole o link do Excel e salve.</div>'; $('#pptFrameWrap').innerHTML = pptURL? `<iframe src="${pptURL}" class="w-full h-full"></iframe>` : '<div class="fill flex items-center justify-center text-slate-400 text-sm p-4 text-center">Cole o link do PowerPoint e salve.</div>'; }
-    $('#btnSaveExcel').onclick = ()=>{ state.embeds.excel = $('#inputExcel').value.trim(); save(); }
-    $('#btnSavePPT').onclick = ()=>{ state.embeds.ppt = $('#inputPPT').value.trim(); save(); }
+    $('#btnSaveExcel').onclick = async ()=>{
+      if(!currentUser?.admin) return alert('Somente administradores podem salvar este link.');
+      const url = $('#inputExcel').value.trim();
+      if(!url) return alert('Informe o link do Excel.');
+      try{
+        const data = await callApi('updateEmbed', { type:'excel', url });
+        if(data.embeds) state.embeds = Object.assign({}, state.embeds, data.embeds);
+        renderEmbeds();
+      }catch(err){ /* já tratado */ }
+    };
+    $('#btnSavePPT').onclick = async ()=>{
+      if(!currentUser?.admin) return alert('Somente administradores podem salvar este link.');
+      const url = $('#inputPPT').value.trim();
+      if(!url) return alert('Informe o link do PowerPoint.');
+      try{
+        const data = await callApi('updateEmbed', { type:'ppt', url });
+        if(data.embeds) state.embeds = Object.assign({}, state.embeds, data.embeds);
+        renderEmbeds();
+      }catch(err){ }
+    };
 
     // ===== Admin =====
-    function renderAdmin(){ const tbody=$('#tbodyAdmin'); if(!tbody) return; tbody.innerHTML=''; state.users.filter(u=>!u.admin).sort((a,b)=>(b.xp||0)-(a.xp||0)).forEach(u=>{ const concl=Object.values(u.progresso||{}).filter(p=>p.done).length; const tr=el('tr','border-t border-slate-100 dark:border-slate-700'); tr.innerHTML=`<td class="py-2 pr-2">${u.nome}</td><td class="py-2 pr-2">${u.email}</td><td class="py-2 pr-2 font-semibold">${u.xp||0}</td><td class="py-2 pr-2">${levelOf(u.xp)}</td><td class="py-2 pr-2">${concl}/24</td><td class="py-2 pr-2"><div class="flex gap-2"><button class="btn btn-ghost btn-xs" data-bonus="${u.id}" data-amt="20">+20</button><button class="btn btn-ghost btn-xs" data-bonus="${u.id}" data-amt="50">+50</button></div></td>`; tbody.appendChild(tr); }); tbody.querySelectorAll('button[data-bonus]').forEach(b=> b.onclick=()=>{ const uid=b.getAttribute('data-bonus'); const amt=parseInt(b.getAttribute('data-amt'),10)||0; const u=state.users.find(x=>x.id===uid); if(!u) return; u.xp=(u.xp||0)+amt; save(); }); }
-    $('#btnExport').onclick = ()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='dados_plataforma.json'; a.click(); URL.revokeObjectURL(a.href); };
-    $('#importInput')?.addEventListener('change', e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); localStorage.setItem(SKEY, JSON.stringify(data)); location.reload(); }catch{ alert('JSON inválido'); } }; r.readAsText(f); });
+    function renderAdmin(){
+      const tbody=$('#tbodyAdmin');
+      if(!tbody) return;
+      tbody.innerHTML='';
+      if(!currentUser?.admin){
+        const tr=el('tr');
+        tr.innerHTML='<td colspan="6" class="py-3 text-center text-slate-500">Área restrita aos administradores.</td>';
+        tbody.appendChild(tr);
+        return;
+      }
+      (state.adminUsers||[]).forEach(u=>{
+        const tr=el('tr','border-t border-slate-100 dark:border-slate-700');
+        const concl = u.concluidos ?? 0;
+        const nivel = u.nivel || levelOf(u.xp);
+        tr.innerHTML=`<td class="py-2 pr-2">${u.nome}</td><td class="py-2 pr-2">${u.email||'-'}</td><td class="py-2 pr-2 font-semibold">${u.xp||0}</td><td class="py-2 pr-2">${nivel}</td><td class="py-2 pr-2">${concl}/24</td><td class="py-2 pr-2"><div class="flex gap-2"><button class="btn btn-ghost btn-xs" data-bonus="${u.id}" data-amt="20">+20</button><button class="btn btn-ghost btn-xs" data-bonus="${u.id}" data-amt="50">+50</button></div></td>`;
+        tbody.appendChild(tr);
+      });
+      tbody.querySelectorAll('button[data-bonus]').forEach(b=> b.onclick = async ()=>{
+        const uid=b.getAttribute('data-bonus');
+        const amt=parseInt(b.getAttribute('data-amt'),10)||0;
+        try{
+          const data = await callApi('awardXp', { userId:uid, amount:amt });
+          if(Array.isArray(data.adminUsers)) state.adminUsers = data.adminUsers;
+          if(Array.isArray(data.ranking)) state.ranking = data.ranking;
+          refreshAll();
+        }catch(err){ }
+      });
+    }
+    $('#btnExport').onclick = async ()=>{
+      if(!currentUser?.admin) return alert('Somente administradores podem exportar os dados.');
+      try{
+        const data = await callApi('exportData');
+        const blob=new Blob([JSON.stringify(data.export||{},null,2)],{type:'application/json'});
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(blob);
+        a.download='dados_plataforma.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      }catch(err){ }
+    };
+    $('#importInput')?.addEventListener('change', async e=>{
+      if(!currentUser?.admin) return alert('Somente administradores podem importar dados.');
+      const f=e.target.files[0];
+      if(!f) return;
+      try{
+        const text = await f.text();
+        const json = JSON.parse(text);
+        await callApi('importData', json);
+        await bootstrap(false);
+        alert('Importação concluída.');
+      }catch(err){ alert(err.message || 'JSON inválido.'); }
+      e.target.value='';
+    });
 
     // ===== Navegação =====
     const tabs = document.querySelectorAll('.tab');
@@ -330,10 +514,10 @@
     function refreshAll(){ renderDashboard(); renderModulos(); renderRanking('xp'); renderEmbeds(); renderAdmin(); $('#semesterInfo').textContent = state.cfg.ciclo || 'Ciclo atual'; lucide.createIcons(); }
 
     // Init
-    load();
-    if(!Array.isArray(state.modules) || state.modules.length!==24){ state.modules = MODULES; }
-    showAuth(true);
+    updateUserInfo();
     refreshAll();
+    showAuth(true);
+    bootstrap(true);
   </script>
 </body>
 </html>
