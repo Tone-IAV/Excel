@@ -33,7 +33,10 @@ const TABLE_HEADERS = {
 const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
 
 function doGet() {
-  return jsonResponse({ success: true, message: 'Use POST com JSON {action, payload}.' });
+  return HtmlService
+    .createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('Curso de Excel — Plataforma Gamificada');
 }
 
 function doPost(e) {
