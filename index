@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Plataforma Gamificada — Curso de Excel</title>
+
+  <!-- Tailwind via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: {
+        colors: { primary:'#007BFF', accent:'#00C9A7' },
+        boxShadow: { soft:'0 10px 30px rgba(0,0,0,.08)' },
+        borderRadius: { '2xl':'1.25rem' }
+      }},
+      darkMode: 'class'
+    }
+  </script>
+  <style>
+    .card { border-radius:1rem; box-shadow:0 10px 30px rgba(0,0,0,.08); background:#fff; padding:1rem; }
+    .dark .card { background:#0f172a; }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .9rem; border-radius:.7rem; border:1px solid transparent; font-weight:600; }
+    .btn-primary { background:#007BFF; color:#fff; }
+    .btn-ghost { background:transparent; color:#334155; }
+    .dark .btn-ghost { color:#e2e8f0; }
+    .input { width:100%; padding:.55rem .75rem; border-radius:.7rem; border:1px solid #e5e7eb; }
+    .dark .input { background:#0f172a; color:#e5e7eb; border-color:#475569; }
+    .pill { font-size:.75rem; padding:.2rem .6rem; border-radius:9999px; background:#f1f5f9; color:#475569; }
+    .dark .pill { background:#334155; color:#e2e8f0; }
+    .hidden-admin { opacity:.6; font-size:.8rem; }
+    .aspect-video { position:relative; padding-top:56.25%; }
+    .aspect-video > iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
+
+<header class="sticky top-0 z-20 bg-white/70 dark:bg-slate-900/70 backdrop-blur border-b border-slate-200 dark:border-slate-700">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+    <h1 class="text-lg font-bold">Plataforma — Curso de Excel</h1>
+    <div class="ml-auto flex items-center gap-2">
+      <span id="userInfo" class="pill">Visitante</span>
+      <button id="btnLogout" class="btn btn-ghost hidden">Sair</button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+  <!-- AUTH -->
+  <section id="authSection" class="grid md:grid-cols-2 gap-4">
+    <div class="card">
+      <h2 class="text-xl font-semibold mb-2">Criar conta</h2>
+      <div class="grid gap-2">
+        <input id="rName" class="input" placeholder="Nome completo" />
+        <input id="rEmail" class="input" placeholder="E-mail" />
+        <input id="rPass" type="password" class="input" placeholder="Senha" />
+        <div class="hidden-admin">
+          <label class="text-xs block mb-1">Código de segurança (somente para Administrador)</label>
+          <input id="rAdminCode" class="input" placeholder="(opcional)" />
+        </div>
+        <button id="btnSignup" class="btn btn-primary">Criar conta</button>
+        <p class="text-xs text-slate-500">Obs.: Administrador só é criado com código válido.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="text-xl font-semibold mb-2">Entrar</h2>
+      <div class="grid gap-2">
+        <input id="lEmail" class="input" placeholder="E-mail" />
+        <input id="lPass" type="password" class="input" placeholder="Senha" />
+        <button id="btnLogin" class="btn btn-ghost">Entrar</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section id="dashSection" class="hidden">
+    <div class="grid md:grid-cols-3 gap-4">
+      <div class="card md:col-span-2">
+        <h3 class="text-lg font-semibold mb-2">Sua evolução</h3>
+        <div class="grid sm:grid-cols-3 gap-3">
+          <div class="rounded-2xl p-4 bg-primary/10">
+            <div class="text-xs">XP total</div><div id="xpBox" class="text-3xl font-bold">0</div>
+          </div>
+          <div class="rounded-2xl p-4 bg-emerald-100">
+            <div class="text-xs">Módulos concluídos</div><div id="doneBox" class="text-3xl font-bold">0</div>
+          </div>
+          <div class="rounded-2xl p-4 bg-amber-100">
+            <div class="text-xs">Nível</div><div id="lvlBox" class="text-3xl font-bold">1</div>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-center justify-between text-sm mb-1">
+            <span>Progresso nos 24 módulos</span><span id="pctBox">0%</span>
+          </div>
+          <div class="h-3 rounded-full bg-slate-200 overflow-hidden">
+            <div id="barBox" class="h-3 bg-primary" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 class="text-lg font-semibold mb-2">Check-in diário</h3>
+        <p class="text-sm text-slate-500 mb-2">Ganhe +XP 1x ao dia.</p>
+        <button id="btnCheckin" class="btn btn-primary">Confirmar presença</button>
+        <div id="checkinMsg" class="text-xs text-emerald-600 mt-2"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 class="text-lg font-semibold mb-2">Enviar atividade (exemplo)</h3>
+      <div class="grid md:grid-cols-4 gap-2 items-end">
+        <div>
+          <label class="text-xs">Módulo</label>
+          <input id="aModule" class="input" type="number" min="1" max="24" value="1"/>
+        </div>
+        <div>
+          <label class="text-xs">% de acerto</label>
+          <input id="aScore" class="input" type="number" min="0" max="100" value="80"/>
+        </div>
+        <div>
+          <label class="text-xs">XP máximo do módulo</label>
+          <input id="aMaxXP" class="input" type="number" min="0" value="40"/>
+        </div>
+        <button id="btnSubmitActivity" class="btn btn-ghost">Enviar resultado</button>
+      </div>
+      <div id="activityMsg" class="text-xs mt-2"></div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card">
+        <h3 class="text-lg font-semibold mb-2">Ranking</h3>
+        <div id="rankWrap" class="space-y-2 text-sm"></div>
+      </div>
+      <div class="card">
+        <h3 class="text-lg font-semibold mb-2">Excel & PowerPoint (links)</h3>
+        <div class="grid gap-2">
+          <input id="excelLink" class="input" placeholder="Cole link compartilhado do Excel (OneDrive/SharePoint/Drive)"/>
+          <input id="pptLink" class="input" placeholder="Cole link compartilhado do PowerPoint"/>
+          <div class="flex gap-2">
+            <button id="btnSaveEmbeds" class="btn btn-primary">Salvar</button>
+            <button id="btnLoadEmbeds" class="btn btn-ghost">Atualizar</button>
+          </div>
+        </div>
+        <div class="grid md:grid-cols-2 gap-3 mt-3">
+          <div>
+            <div class="text-xs mb-1">Excel</div>
+            <div class="aspect-video bg-slate-200 rounded">
+              <iframe id="excelFrame"></iframe>
+            </div>
+          </div>
+          <div>
+            <div class="text-xs mb-1">PowerPoint</div>
+            <div class="aspect-video bg-slate-200 rounded">
+              <iframe id="pptFrame"></iframe>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin -->
+    <div id="adminPanel" class="card hidden">
+      <h3 class="text-lg font-semibold mb-2">Painel do Administrador</h3>
+      <p class="text-sm text-slate-500 mb-2">Ranking consolidado (apenas alunos). Use para premiações.</p>
+      <div id="adminRank" class="space-y-2 text-sm"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // Estado simples no front
+  let currentUser = null;
+
+  // Helpers
+  const $ = s => document.querySelector(s);
+  const normalizeEmbed = url => {
+    if (!url) return '';
+    if (url.includes('onedrive') || url.includes('sharepoint')) {
+      if (url.includes('embed')) return url;
+      return 'https://view.officeapps.live.com/op/embed.aspx?src=' + encodeURIComponent(url);
+    }
+    if (url.includes('drive.google.com')) {
+      return url.replace('/view?usp=sharing','/preview');
+    }
+    return url;
+  };
+
+  // UI switches
+  function updateUI() {
+    if (!currentUser) {
+      $('#authSection').classList.remove('hidden');
+      $('#dashSection').classList.add('hidden');
+      $('#userInfo').textContent = 'Visitante';
+      $('#btnLogout').classList.add('hidden');
+      return;
+    }
+    $('#authSection').classList.add('hidden');
+    $('#dashSection').classList.remove('hidden');
+    $('#btnLogout').classList.remove('hidden');
+    $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
+    // estado
+    google.script.run.withSuccessHandler(s=>{
+      $('#xpBox').textContent  = s.xp;
+      $('#lvlBox').textContent = s.level;
+      $('#doneBox').textContent = s.concluidos;
+      const pct = Math.round((s.concluidos/24)*100);
+      $('#pctBox').textContent = pct + '%';
+      $('#barBox').style.width = pct + '%';
+    }).getUserState({ userId: currentUser.id });
+
+    // ranking
+    refreshRanking();
+    // admin panel
+    $('#adminPanel').classList.toggle('hidden', !currentUser.isAdmin);
+  }
+
+  function refreshRanking() {
+    google.script.run.withSuccessHandler(list=>{
+      const wrap = $('#rankWrap');
+      wrap.innerHTML = '';
+      list.forEach(r=>{
+        const div = document.createElement('div');
+        div.innerHTML = `<b>${r.pos}º</b> — ${r.name} • XP ${r.xp} • Nível ${r.level}`;
+        wrap.appendChild(div);
+      });
+      if (currentUser?.isAdmin) {
+        const adm = $('#adminRank');
+        adm.innerHTML = wrap.innerHTML;
+      }
+    }).getRanking();
+  }
+
+  // AUTH
+  $('#btnSignup').onclick = ()=>{
+    const payload = {
+      name: $('#rName').value.trim(),
+      email: $('#rEmail').value.trim(),
+      password: $('#rPass').value.trim(),
+      adminCode: $('#rAdminCode').value.trim() // discreto; só vira admin se == xbY4nu
+    };
+    google.script.run
+      .withFailureHandler(err=> alert(err.message || err))
+      .withSuccessHandler(user=> { currentUser=user; updateUI(); })
+      .registerUser(payload);
+  };
+
+  $('#btnLogin').onclick = ()=>{
+    const payload = {
+      email: $('#lEmail').value.trim(),
+      password: $('#lPass').value.trim()
+    };
+    google.script.run
+      .withFailureHandler(err=> alert(err.message || err))
+      .withSuccessHandler(user=> { currentUser=user; updateUI(); })
+      .loginUser(payload);
+  };
+
+  $('#btnLogout').onclick = ()=>{ currentUser=null; updateUI(); };
+
+  // Check-in
+  $('#btnCheckin').onclick = ()=>{
+    if (!currentUser) return alert('Faça login primeiro.');
+    google.script.run
+      .withFailureHandler(err=> alert(err.message || err))
+      .withSuccessHandler(res=>{
+        $('#checkinMsg').textContent = res.ok
+          ? `Presença registrada (+${res.xpGanho} XP). Total: ${res.totalXP} XP.`
+          : res.msg;
+        updateUI();
+        setTimeout(()=> $('#checkinMsg').textContent='', 3000);
+      })
+      .checkin({ userId: currentUser.id });
+  };
+
+  // Submit activity (exemplo)
+  $('#btnSubmitActivity').onclick = ()=>{
+    if (!currentUser) return alert('Faça login primeiro.');
+    const payload = {
+      userId: currentUser.id,
+      moduleId: Number($('#aModule').value||1),
+      scorePct: Number($('#aScore').value||0),
+      maxXP: Number($('#aMaxXP').value||0)
+    };
+    google.script.run
+      .withFailureHandler(err=> alert(err.message || err))
+      .withSuccessHandler(res=>{
+        $('#activityMsg').textContent = `Enviado! Você ganhou +${res.deltaXP} XP. Total: ${res.totalXP} XP (Nível ${res.level}).`;
+        updateUI();
+        setTimeout(()=> $('#activityMsg').textContent='', 4000);
+      })
+      .submitActivity(payload);
+  };
+
+  // Embeds
+  $('#btnSaveEmbeds').onclick = ()=>{
+    const excel = $('#excelLink').value.trim();
+    const ppt   = $('#pptLink').value.trim();
+    google.script.run
+      .withFailureHandler(err=> alert(err.message || err))
+      .withSuccessHandler(()=> loadEmbeds())
+      .saveEmbeds({ excel, ppt });
+  };
+  $('#btnLoadEmbeds').onclick = ()=> loadEmbeds();
+  function loadEmbeds() {
+    google.script.run.withSuccessHandler(e=>{
+      $('#excelFrame').src = normalizeEmbed(e.excel||'');
+      $('#pptFrame').src   = normalizeEmbed(e.ppt||'');
+    }).getEmbeds();
+  }
+
+  // Boot
+  (function init(){
+    updateUI(); // começa como visitante
+    loadEmbeds();
+  })();
+</script>
+</body>
+</html>
