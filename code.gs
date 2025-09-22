@@ -3,11 +3,14 @@ const SPREADSHEET_ID = '1DCzIOIcRBaJ3WJVQCOWg6KXyghjRGMJUHekV1fGygJ4';
 const ADMIN_SECURITY_CODE = 'xbY4nu'; // código exigido p/ criar admins
 
 // Abas usadas
-const SHEET_USERS    = 'Users';     // id, name, email, passHash, isAdmin, xp, createdAt
-const SHEET_PROGRESS = 'Progress';  // userId, moduleId, scorePct, earnedXP, completedAt
-const SHEET_CHECKIN  = 'Checkins';  // userId, dateISO, xp
-const SHEET_CONFIG   = 'Config';    // key, value
-const SHEET_EMBEDS   = 'Embeds';    // key, url
+const SHEET_USERS     = 'Users';     // id, name, email, passHash, isAdmin, xp, createdAt
+const SHEET_PROGRESS  = 'Progress';  // userId, moduleId, scorePct, earnedXP, completedAt
+const SHEET_CHECKIN   = 'Checkins';  // userId, dateISO, xp
+const SHEET_CONFIG    = 'Config';    // key, value
+const SHEET_EMBEDS    = 'Embeds';    // key, url
+const SHEET_SESSIONS  = 'Sessions';  // userId, tokenHash, expiresAt, createdAt
+
+const SESSION_DURATION_HOURS = 24 * 7; // validade de 7 dias
 
 /** =================== BOOTSTRAP =================== **/
 function onOpen() {
@@ -46,6 +49,7 @@ function setup_() {
   ensure(SHEET_CHECKIN,  ['userId','dateISO','xp']);
   ensure(SHEET_CONFIG,   ['key','value']);
   ensure(SHEET_EMBEDS,   ['key','url']);
+  ensure(SHEET_SESSIONS, ['userId','tokenHash','expiresAt','createdAt']);
 
   // Defaults de config
   const cfg = getConfig_();
@@ -87,6 +91,46 @@ function getUserById_(userId) {
     if (rows[i][0]===userId){
       const r = rows[i];
       return { id:r[0], name:r[1], email:r[2], isAdmin:!!r[4], xp:Number(r[5]||0) };
+    }
+  }
+  return null;
+}
+
+function createSession_(userId) {
+  if (!userId) throw new Error('userId inválido.');
+  const token = Utilities.getUuid().replace(/-/g, '');
+  const tokenHash = sha256_(token);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + SESSION_DURATION_HOURS * 60 * 60 * 1000);
+
+  const s = sh_(SHEET_SESSIONS);
+  const rows = getAll_(s);
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i];
+    const rowUserId = row[0];
+    const rowExpires = row[2];
+    let shouldDelete = rowUserId === userId;
+    if (!shouldDelete && rowExpires) {
+      const expDate = new Date(rowExpires);
+      if (!isNaN(expDate.getTime()) && expDate.getTime() <= now.getTime()) {
+        shouldDelete = true;
+      }
+    }
+    if (shouldDelete) {
+      s.deleteRow(i + 2);
+    }
+  }
+
+  s.appendRow([userId, tokenHash, expiresAt.toISOString(), nowISO_()]);
+  return { token, expiresAt: expiresAt.toISOString() };
+}
+
+function findSessionByHash_(tokenHash) {
+  const s = sh_(SHEET_SESSIONS);
+  const rows = getAll_(s);
+  for (let i = 0; i < rows.length; i++) {
+    if ((rows[i][1] || '') === tokenHash) {
+      return { row: i + 2, data: rows[i] };
     }
   }
   return null;
@@ -142,12 +186,15 @@ function registerUser(payload) {
   const id = Utilities.getUuid();
   sh_(SHEET_USERS).appendRow([id, name, email, passHash, isAdmin, 0, nowISO_()]);
 
+  const session = createSession_(id);
   return {
     ok: true,
     user: {
       id, name, email, isAdmin, xp: 0,
       level: 1,
-    }
+    },
+    token: session.token,
+    expiresAt: session.expiresAt,
   };
 }
 
@@ -171,7 +218,55 @@ function loginUser(payload) {
     xp: Number(hit.data[5]||0)
   };
   user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel||100));
+  const session = createSession_(user.id);
+  return {
+    ok: true,
+    user,
+    token: session.token,
+    expiresAt: session.expiresAt,
+  };
+}
+
+function resumeSession(token) {
+  setup_();
+  const tokenStr = (token || '').toString().trim();
+  if (!tokenStr) return null;
+
+  const tokenHash = sha256_(tokenStr);
+  const hit = findSessionByHash_(tokenHash);
+  if (!hit) return null;
+
+  const expiresAt = hit.data[2];
+  if (expiresAt) {
+    const expDate = new Date(expiresAt);
+    if (!isNaN(expDate.getTime()) && expDate.getTime() < Date.now()) {
+      sh_(SHEET_SESSIONS).deleteRow(hit.row);
+      return null;
+    }
+  }
+
+  const userId = hit.data[0];
+  const user = getUserById_(userId);
+  if (!user) {
+    sh_(SHEET_SESSIONS).deleteRow(hit.row);
+    return null;
+  }
+
+  user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel||100));
   return user;
+}
+
+function logout(token) {
+  setup_();
+  const tokenStr = (token || '').toString().trim();
+  if (!tokenStr) return { ok: true };
+
+  const tokenHash = sha256_(tokenStr);
+  const hit = findSessionByHash_(tokenHash);
+  if (hit) {
+    sh_(SHEET_SESSIONS).deleteRow(hit.row);
+  }
+  return { ok: true };
 }
 
 function checkin(payload) {
