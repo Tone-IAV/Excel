@@ -41,9 +41,9 @@
       <h2 class="text-xl font-bold mb-2">Entrar ou Criar Conta</h2>
       <p class="text-sm text-slate-500 mb-4">Crie sua conta para acompanhar os <b>24 módulos</b>, registrar atividades e subir no ranking. <br><span class="text-amber-600">(Demo: os dados ficam apenas no seu navegador.)</span></p>
       <form id="authForm" class="grid gap-3">
-        <input id="authNome" class="input" placeholder="Nome completo" />
-        <input id="authEmail" class="input" placeholder="E-mail" />
-        <input id="authSenha" type="password" class="input" placeholder="Senha" />
+        <input id="authNome" class="input" placeholder="Nome completo" autocomplete="name" />
+        <input id="authEmail" class="input" placeholder="E-mail" autocomplete="email" />
+        <input id="authSenha" type="password" class="input" placeholder="Senha" autocomplete="current-password" />
         <label class="text-xs text-slate-500 flex items-center gap-2"><input id="authAdmin" type="checkbox"/> Sou administrador</label>
         <div class="flex gap-2">
           <button id="btnSignup" type="button" class="btn btn-primary flex-1"><i data-lucide="user-plus"></i> Criar conta</button>
