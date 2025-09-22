@@ -40,16 +40,16 @@
     <div class="card max-w-md w-full">
       <h2 class="text-xl font-bold mb-2">Entrar ou Criar Conta</h2>
       <p class="text-sm text-slate-500 mb-4">Crie sua conta para acompanhar os <b>24 módulos</b>, registrar atividades e subir no ranking. <br><span class="text-amber-600">(Demo: os dados ficam apenas no seu navegador.)</span></p>
-      <div class="grid gap-3">
+      <form id="authForm" class="grid gap-3">
         <input id="authNome" class="input" placeholder="Nome completo" />
         <input id="authEmail" class="input" placeholder="E-mail" />
         <input id="authSenha" type="password" class="input" placeholder="Senha" />
         <label class="text-xs text-slate-500 flex items-center gap-2"><input id="authAdmin" type="checkbox"/> Sou administrador</label>
         <div class="flex gap-2">
-          <button id="btnSignup" class="btn btn-primary flex-1"><i data-lucide="user-plus"></i> Criar conta</button>
-          <button id="btnLogin" class="btn btn-ghost flex-1"><i data-lucide="log-in"></i> Entrar</button>
+          <button id="btnSignup" type="button" class="btn btn-primary flex-1"><i data-lucide="user-plus"></i> Criar conta</button>
+          <button id="btnLogin" type="button" class="btn btn-ghost flex-1"><i data-lucide="log-in"></i> Entrar</button>
         </div>
-      </div>
+      </form>
     </div>
   </div>
 
@@ -429,7 +429,27 @@
 
     // ===== Embeds =====
     function normalizeEmbed(url){ if(!url) return ''; if(url.includes('onedrive')||url.includes('sharepoint')){ if(url.includes('embed')) return url; return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`; } if(url.includes('drive.google.com')){ return url.replace('/view?usp=sharing','/preview'); } return url; }
-    function renderEmbeds(){ const excelURL=normalizeEmbed(state.embeds.excel); const pptURL=normalizeEmbed(state.embeds.ppt); $('#excelFrameWrap').innerHTML = excelURL? `<iframe src="${excelURL}" class="w-full h-full"></iframe>` : '<div class="fill flex items-center justify-center text-slate-400 text-sm p-4 text-center">Cole o link do Excel e salve.</div>'; $('#pptFrameWrap').innerHTML = pptURL? `<iframe src="${pptURL}" class="w-full h-full"></iframe>` : '<div class="fill flex items-center justify-center text-slate-400 text-sm p-4 text-center">Cole o link do PowerPoint e salve.</div>'; }
+    function setEmbedContent(wrapper, url, emptyText){
+      if(!wrapper) return;
+      wrapper.innerHTML='';
+      if(url){
+        const frame=document.createElement('iframe');
+        frame.src=url;
+        frame.className='w-full h-full';
+        frame.setAttribute('allowfullscreen','');
+        wrapper.appendChild(frame);
+        return;
+      }
+      const placeholder=el('div','fill flex items-center justify-center text-slate-400 text-sm p-4 text-center');
+      placeholder.textContent=emptyText;
+      wrapper.appendChild(placeholder);
+    }
+    function renderEmbeds(){
+      const excelURL=normalizeEmbed(state.embeds.excel);
+      const pptURL=normalizeEmbed(state.embeds.ppt);
+      setEmbedContent($('#excelFrameWrap'), excelURL, 'Cole o link do Excel e salve.');
+      setEmbedContent($('#pptFrameWrap'), pptURL, 'Cole o link do PowerPoint e salve.');
+    }
     $('#btnSaveExcel').onclick = async ()=>{
       if(!currentUser?.admin) return alert('Somente administradores podem salvar este link.');
       const url = $('#inputExcel').value.trim();
@@ -512,6 +532,9 @@
 
     // ===== Refresh =====
     function refreshAll(){ renderDashboard(); renderModulos(); renderRanking('xp'); renderEmbeds(); renderAdmin(); $('#semesterInfo').textContent = state.cfg.ciclo || 'Ciclo atual'; lucide.createIcons(); }
+
+    // ===== Form helpers =====
+    $('#authForm')?.addEventListener('submit', e=> e.preventDefault());
 
     // Init
     updateUserInfo();
