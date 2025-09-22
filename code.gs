@@ -64,6 +64,21 @@ function nowISO_()          { return new Date().toISOString(); }
 function todayISO_()        { return Utilities.formatDate(new Date(), 'UTC', 'yyyy-MM-dd'); }
 function toB64_(bytes)      { return Utilities.base64Encode(bytes); }
 function sha256_(str)       { return toB64_(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, str, Utilities.Charset.UTF_8)); }
+function parseDateValue_(value) {
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return isNaN(time) ? null : new Date(time);
+  }
+  if (typeof value === 'number') {
+    const dateFromNumber = new Date(value);
+    return isNaN(dateFromNumber.getTime()) ? null : dateFromNumber;
+  }
+  const str = (value || '').toString().trim();
+  if (!str) return null;
+  const normalized = str.length === 10 ? str + 'T00:00:00Z' : str;
+  const parsed = new Date(normalized);
+  return isNaN(parsed.getTime()) ? null : parsed;
+}
 function getAll_(sheet)     { const r=sheet.getDataRange().getValues(); return r.length>1 ? r.slice(1) : []; }
 function findByEmail_(email){ const rows=getAll_(sh_(SHEET_USERS)); for (let i=0;i<rows.length;i++){ if ((rows[i][2]||'').toLowerCase()===email.toLowerCase()){ return { row:i+2, data:rows[i] }; } } return null; }
 function getConfig_()       { const rows=getAll_(sh_(SHEET_CONFIG)); const m={}; rows.forEach(r=>m[(r[0]||'').toString()]=(r[1]||'').toString()); return m; }
@@ -371,6 +386,101 @@ function getUserState(payload) {
     xp: u.xp, level: 1 + Math.floor(u.xp / Number(cfg.xpPerLevel||100)),
     concluidos
   };
+}
+
+function getCheckinHistory(userId) {
+  const id = (userId || '').toString().trim();
+  if (!id) throw new Error('userId inválido.');
+
+  const rows = getAll_(sh_(SHEET_CHECKIN));
+  const entries = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[0] || '').toString() !== id) continue;
+
+    const dateObj = parseDateValue_(row[1]);
+    const timestamp = dateObj ? dateObj.getTime() : null;
+    const iso = dateObj ? dateObj.toISOString() : ((row[1] || '').toString());
+    const day = dateObj
+      ? Utilities.formatDate(dateObj, 'UTC', 'yyyy-MM-dd')
+      : (iso.length >= 10 ? iso.slice(0, 10) : '');
+
+    entries.push({
+      date: iso,
+      day,
+      xp: Number(row[2] || 0),
+      timestamp
+    });
+  }
+
+  entries.sort((a, b) => {
+    const aTime = typeof a.timestamp === 'number' ? a.timestamp : -Infinity;
+    const bTime = typeof b.timestamp === 'number' ? b.timestamp : -Infinity;
+    return bTime - aTime;
+  });
+
+  return entries;
+}
+
+function getActivityHistory(userId) {
+  const id = (userId || '').toString().trim();
+  if (!id) throw new Error('userId inválido.');
+
+  const rows = getAll_(sh_(SHEET_PROGRESS));
+  const entries = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[0] || '').toString() !== id) continue;
+
+    const moduleId = Number(row[1] || 0);
+    const scorePct = Math.round(Number(row[2] || 0));
+    const earnedXP = Number(row[3] || 0);
+    const dateObj = parseDateValue_(row[4]);
+    const timestamp = dateObj ? dateObj.getTime() : null;
+    const iso = dateObj ? dateObj.toISOString() : ((row[4] || '').toString());
+    const day = dateObj
+      ? Utilities.formatDate(dateObj, 'UTC', 'yyyy-MM-dd')
+      : (iso.length >= 10 ? iso.slice(0, 10) : '');
+
+    entries.push({
+      moduleId,
+      scorePct,
+      earnedXP,
+      date: iso,
+      day,
+      timestamp,
+      progressPct: 0
+    });
+  }
+
+  if (!entries.length) return entries;
+
+  const totalModules = 24;
+  const asc = entries.slice().sort((a, b) => {
+    const aTime = typeof a.timestamp === 'number' ? a.timestamp : Number.MAX_SAFE_INTEGER;
+    const bTime = typeof b.timestamp === 'number' ? b.timestamp : Number.MAX_SAFE_INTEGER;
+    return aTime - bTime;
+  });
+  const seenModules = new Set();
+
+  asc.forEach(entry => {
+    if (entry.moduleId) {
+      seenModules.add(String(entry.moduleId));
+    }
+    const completed = seenModules.size;
+    const pct = totalModules > 0 ? Math.min(100, Math.round((completed / totalModules) * 100)) : 0;
+    entry.progressPct = pct;
+  });
+
+  entries.sort((a, b) => {
+    const aTime = typeof a.timestamp === 'number' ? a.timestamp : -Infinity;
+    const bTime = typeof b.timestamp === 'number' ? b.timestamp : -Infinity;
+    return bTime - aTime;
+  });
+
+  return entries;
 }
 
 /** Embeds (Excel/PPT) */

@@ -41,6 +41,15 @@
     .btn[disabled] { opacity:.6; cursor:not-allowed; }
     .aspect-video { position:relative; padding-top:56.25%; }
     .aspect-video > iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
+    .history-tab { padding:.35rem .75rem; border-radius:9999px; border:1px solid rgba(148,163,184,.4); background:#f8fafc; color:#475569; font-size:.75rem; font-weight:600; transition:background-color .2s ease,color .2s ease,border-color .2s ease; }
+    .history-tab:hover { background:#e2e8f0; }
+    .history-tab-active { background:#007BFF; color:#fff; border-color:#007BFF; }
+    .dark .history-tab { background:rgba(15,23,42,.9); color:#e2e8f0; border-color:rgba(148,163,184,.35); }
+    .dark .history-tab:hover { background:rgba(148,163,184,.2); }
+    .dark .history-tab-active { background:#2563eb; border-color:#2563eb; color:#fff; }
+    .input-sm { font-size:.85rem; padding:.35rem .6rem; }
+    .history-empty { font-size:.85rem; color:#64748b; background:#f8fafc; padding:1rem; border-radius:1rem; border:1px dashed rgba(148,163,184,.4); text-align:center; }
+    .dark .history-empty { color:#cbd5f5; background:rgba(15,23,42,.6); border-color:rgba(148,163,184,.25); }
   </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
@@ -131,6 +140,39 @@
         <button id="btnCheckin" class="btn btn-primary">Confirmar presença</button>
         <div id="checkinMsg" class="text-xs text-emerald-600 mt-2"></div>
       </div>
+    </div>
+
+    <div class="card" id="historyCard">
+      <div class="flex flex-wrap items-center gap-3 mb-3">
+        <h3 class="text-lg font-semibold">Histórico de XP</h3>
+        <div id="historyStreakWrap" class="flex flex-wrap items-center gap-2 text-xs hidden">
+          <span id="historyStreakCurrent" class="pill"></span>
+          <span id="historyStreakBest" class="pill"></span>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <div class="inline-flex gap-2 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-full">
+          <button type="button" class="history-tab history-tab-active" data-history-tab="checkins">Check-ins</button>
+          <button type="button" class="history-tab" data-history-tab="activities">Atividades</button>
+        </div>
+        <div class="ml-auto flex flex-wrap items-center gap-2 text-xs">
+          <label for="historyPeriodFilter" class="uppercase tracking-wide text-slate-500 dark:text-slate-400">Período</label>
+          <select id="historyPeriodFilter" class="input input-sm">
+            <option value="7">7 dias</option>
+            <option value="30" selected>30 dias</option>
+            <option value="90">90 dias</option>
+            <option value="365">1 ano</option>
+            <option value="all">Todo o período</option>
+          </select>
+        </div>
+        <div id="historyModuleFilterWrap" class="flex flex-wrap items-center gap-2 text-xs hidden">
+          <label for="historyModuleFilter" class="uppercase tracking-wide text-slate-500 dark:text-slate-400">Módulo</label>
+          <select id="historyModuleFilter" class="input input-sm">
+            <option value="all" selected>Todos os módulos</option>
+          </select>
+        </div>
+      </div>
+      <div id="historyList" class="grid gap-2 text-sm"></div>
     </div>
 
     <div class="card">
@@ -372,6 +414,411 @@
     });
   }
 
+  const historyTabs = Array.from(document.querySelectorAll('[data-history-tab]'));
+  const historyListEl = $('#historyList');
+  const historyPeriodSelect = $('#historyPeriodFilter');
+  const historyModuleSelect = $('#historyModuleFilter');
+  const historyModuleWrap = $('#historyModuleFilterWrap');
+  const historyStreakWrap = $('#historyStreakWrap');
+  const historyStreakCurrent = $('#historyStreakCurrent');
+  const historyStreakBest = $('#historyStreakBest');
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+  const historyState = {
+    checkins: [],
+    activities: [],
+    streak: { current: 0, best: 0 },
+    loading: { checkins: false, activities: false },
+    errors: { checkins: '', activities: '' }
+  };
+  let activeHistoryTab = 'checkins';
+
+  historyTabs.forEach(button => {
+    button.addEventListener('click', () => {
+      const tab = button.getAttribute('data-history-tab') || 'checkins';
+      if (tab === activeHistoryTab) return;
+      activeHistoryTab = tab;
+      historyTabs.forEach(btn => {
+        const btnTab = btn.getAttribute('data-history-tab');
+        btn.classList.toggle('history-tab-active', btnTab === activeHistoryTab);
+      });
+      renderHistory();
+    });
+  });
+
+  if (historyPeriodSelect) {
+    historyPeriodSelect.addEventListener('change', () => renderHistory());
+  }
+
+  if (historyModuleSelect) {
+    historyModuleSelect.addEventListener('change', () => renderHistory());
+  }
+
+  function resetHistorySection() {
+    historyState.checkins = [];
+    historyState.activities = [];
+    historyState.streak = { current: 0, best: 0 };
+    historyState.loading.checkins = false;
+    historyState.loading.activities = false;
+    historyState.errors.checkins = '';
+    historyState.errors.activities = '';
+    activeHistoryTab = 'checkins';
+    if (historyPeriodSelect) historyPeriodSelect.value = '30';
+    if (historyModuleSelect) historyModuleSelect.value = 'all';
+    historyTabs.forEach(btn => {
+      const tab = btn.getAttribute('data-history-tab');
+      btn.classList.toggle('history-tab-active', tab === activeHistoryTab);
+    });
+    updateHistoryModuleFilterOptions();
+    renderHistory();
+  }
+
+  function renderHistory() {
+    if (!historyListEl) return;
+    if (!currentUser) {
+      historyListEl.innerHTML = '<p class="history-empty">Faça login para acompanhar seu histórico.</p>';
+      if (historyModuleWrap) historyModuleWrap.classList.add('hidden');
+      if (historyStreakWrap) historyStreakWrap.classList.add('hidden');
+      return;
+    }
+
+    if (historyModuleWrap) {
+      historyModuleWrap.classList.toggle('hidden', activeHistoryTab !== 'activities');
+    }
+
+    const stateKey = activeHistoryTab === 'activities' ? 'activities' : 'checkins';
+    const isLoading = historyState.loading[stateKey];
+    const errorMessage = historyState.errors[stateKey];
+    const periodValue = historyPeriodSelect ? historyPeriodSelect.value : 'all';
+    const moduleValue = historyModuleSelect ? historyModuleSelect.value : 'all';
+
+    if (activeHistoryTab !== 'activities' && historyModuleWrap) {
+      historyModuleWrap.classList.add('hidden');
+    } else if (activeHistoryTab === 'activities') {
+      updateHistoryModuleFilterOptions();
+    }
+
+    historyListEl.innerHTML = '';
+
+    if (isLoading) {
+      const loadingText = activeHistoryTab === 'activities' ? 'Carregando atividades...' : 'Carregando check-ins...';
+      historyListEl.innerHTML = `<p class="history-empty">${loadingText}</p>`;
+      renderStreakInfo();
+      return;
+    }
+
+    if (errorMessage) {
+      historyListEl.innerHTML = `<p class="history-empty text-rose-600 dark:text-rose-300">${errorMessage}</p>`;
+      renderStreakInfo();
+      return;
+    }
+
+    let items = (historyState[stateKey] || []).slice();
+
+    if (periodValue !== 'all') {
+      const days = Number(periodValue);
+      if (!Number.isNaN(days) && days > 0) {
+        const now = Date.now();
+        items = items.filter(item => {
+          const ts = getItemTimestamp(item);
+          if (!Number.isFinite(ts)) return false;
+          const diffDays = Math.floor((now - ts) / MS_PER_DAY);
+          return diffDays < days;
+        });
+      }
+    }
+
+    if (activeHistoryTab === 'activities' && moduleValue !== 'all') {
+      items = items.filter(item => String(item.moduleId || '') === moduleValue);
+    }
+
+    items.sort((a, b) => {
+      const aTime = getItemTimestamp(a);
+      const bTime = getItemTimestamp(b);
+      return (Number.isFinite(bTime) ? bTime : -Infinity) - (Number.isFinite(aTime) ? aTime : -Infinity);
+    });
+
+    if (!items.length) {
+      const emptyText = activeHistoryTab === 'activities'
+        ? 'Nenhuma atividade registrada para os filtros selecionados.'
+        : 'Ainda não há check-ins no período selecionado. Registre sua presença para começar um streak!';
+      historyListEl.innerHTML = `<p class="history-empty">${emptyText}</p>`;
+      renderStreakInfo();
+      return;
+    }
+
+    items.forEach(item => {
+      historyListEl.appendChild(
+        activeHistoryTab === 'activities' ? renderActivityItem(item) : renderCheckinItem(item)
+      );
+    });
+
+    renderStreakInfo();
+  }
+
+  function renderStreakInfo() {
+    if (!historyStreakWrap) return;
+    if (activeHistoryTab !== 'checkins' || historyState.loading.checkins || historyState.errors.checkins || !currentUser) {
+      historyStreakWrap.classList.add('hidden');
+      return;
+    }
+    if (!historyState.checkins.length) {
+      historyStreakWrap.classList.add('hidden');
+      return;
+    }
+
+    const { current, best } = historyState.streak;
+    historyStreakWrap.classList.remove('hidden');
+
+    if (historyStreakCurrent) {
+      historyStreakCurrent.textContent = current > 0
+        ? `🔥 Streak atual: ${current} dia${current > 1 ? 's' : ''}`
+        : 'Sem streak ativo';
+      historyStreakCurrent.classList.toggle('bg-emerald-100', current >= 3);
+      historyStreakCurrent.classList.toggle('text-emerald-700', current >= 3);
+      historyStreakCurrent.classList.toggle('dark:bg-emerald-500/10', current >= 3);
+      historyStreakCurrent.classList.toggle('dark:text-emerald-300', current >= 3);
+    }
+
+    if (historyStreakBest) {
+      historyStreakBest.textContent = best > 0
+        ? `Recorde: ${best} dia${best > 1 ? 's' : ''}`
+        : '';
+      historyStreakBest.classList.toggle('hidden', best <= 0);
+    }
+  }
+
+  function getItemTimestamp(item) {
+    if (!item) return NaN;
+    if (typeof item.timestamp === 'number' && !Number.isNaN(item.timestamp)) return item.timestamp;
+    const parsed = parseDateValue(item.date || item.day);
+    return parsed ? parsed.getTime() : NaN;
+  }
+
+  function parseDateValue(value) {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    const str = String(value).trim();
+    if (!str) return null;
+    const normalized = str.length === 10 ? `${str}T00:00:00Z` : str;
+    const date = new Date(normalized);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function formatHistoryDate(item) {
+    const ts = getItemTimestamp(item);
+    if (!Number.isFinite(ts)) {
+      const day = item && item.day ? String(item.day) : '';
+      return day ? day.split('-').reverse().join('/') : 'Data indisponível';
+    }
+    try {
+      return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(ts));
+    } catch (err) {
+      return new Date(ts).toLocaleDateString('pt-BR');
+    }
+  }
+
+  function renderCheckinItem(item) {
+    const element = document.createElement('div');
+    element.className = 'flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-700/70 bg-white dark:bg-slate-900/60 px-4 py-3';
+    const xpValue = Number(item?.xp || 0);
+    element.innerHTML = `
+      <div class="flex-1">
+        <div class="font-semibold">${formatHistoryDate(item)}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">Check-in diário</div>
+      </div>
+      <div class="text-sm font-semibold text-emerald-600 dark:text-emerald-400">+${xpValue} XP</div>
+    `;
+    return element;
+  }
+
+  function renderActivityItem(item) {
+    const element = document.createElement('div');
+    element.className = 'flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-slate-700/70 bg-white dark:bg-slate-900/60 px-4 py-3';
+    const moduleLabel = Number.isFinite(item?.moduleId) && item.moduleId > 0 ? `Módulo ${item.moduleId}` : 'Atividade';
+    const xpValue = Number(item?.earnedXP || 0);
+    const scoreValue = Number(item?.scorePct || 0);
+    const progressValue = Number(item?.progressPct || 0);
+    element.innerHTML = `
+      <div class="flex-1">
+        <div class="font-semibold">${moduleLabel}</div>
+        <div class="text-xs text-slate-500 dark:text-slate-400">${formatHistoryDate(item)}</div>
+      </div>
+      <div class="flex flex-col items-end gap-1 text-xs text-slate-500 dark:text-slate-400">
+        <span class="text-sm font-semibold text-primary dark:text-blue-400">+${xpValue} XP</span>
+        <span>Nota: ${scoreValue}%</span>
+        <span>Evolução: ${progressValue}% do curso</span>
+      </div>
+    `;
+    return element;
+  }
+
+  function updateHistoryModuleFilterOptions() {
+    if (!historyModuleSelect) return;
+    const previousValue = historyModuleSelect.value;
+    historyModuleSelect.innerHTML = '';
+
+    const optionAll = document.createElement('option');
+    optionAll.value = 'all';
+    optionAll.textContent = 'Todos os módulos';
+    historyModuleSelect.appendChild(optionAll);
+
+    const modules = Array.from(new Set(historyState.activities
+      .map(item => Number(item?.moduleId || 0))
+      .filter(id => Number.isFinite(id) && id > 0)))
+      .sort((a, b) => a - b);
+
+    modules.forEach(id => {
+      const opt = document.createElement('option');
+      opt.value = String(id);
+      opt.textContent = `Módulo ${id}`;
+      historyModuleSelect.appendChild(opt);
+    });
+
+    if (modules.includes(Number(previousValue))) {
+      historyModuleSelect.value = previousValue;
+    } else {
+      historyModuleSelect.value = 'all';
+    }
+
+    if (historyModuleWrap) {
+      historyModuleWrap.classList.toggle('hidden', activeHistoryTab !== 'activities' || modules.length === 0);
+    }
+  }
+
+  function computeCheckinStreak(items) {
+    if (!Array.isArray(items) || !items.length) return { current: 0, best: 0 };
+    const timestamps = Array.from(new Set(items
+      .map(entry => getItemTimestamp(entry))
+      .filter(ts => Number.isFinite(ts)))).sort((a, b) => a - b);
+    if (!timestamps.length) return { current: 0, best: 0 };
+
+    let best = 1;
+    let streak = 1;
+    for (let i = 1; i < timestamps.length; i++) {
+      const diffDays = Math.round((timestamps[i] - timestamps[i - 1]) / MS_PER_DAY);
+      if (diffDays === 0) {
+        continue;
+      } else if (diffDays === 1) {
+        streak += 1;
+      } else {
+        if (streak > best) best = streak;
+        streak = 1;
+      }
+    }
+    if (streak > best) best = streak;
+
+    const desc = timestamps.slice().sort((a, b) => b - a);
+    let current = 0;
+    let previous = null;
+    for (let i = 0; i < desc.length; i++) {
+      const ts = desc[i];
+      if (i === 0) {
+        current = 1;
+        previous = ts;
+        continue;
+      }
+      const diffDays = Math.round((previous - ts) / MS_PER_DAY);
+      if (diffDays === 0) {
+        continue;
+      }
+      if (diffDays === 1) {
+        current += 1;
+        previous = ts;
+      } else {
+        break;
+      }
+    }
+
+    return { current, best };
+  }
+
+  function normalizeCheckinHistory(data) {
+    if (!Array.isArray(data)) return [];
+    return data.map(item => {
+      const day = item?.day ? String(item.day) : '';
+      const date = item?.date ? String(item.date) : '';
+      const parsed = parseDateValue(date || day);
+      const timestamp = parsed ? parsed.getTime() : (typeof item?.timestamp === 'number' && !Number.isNaN(item.timestamp) ? item.timestamp : null);
+      return {
+        day,
+        date,
+        xp: Number(item?.xp || 0),
+        timestamp: Number.isFinite(timestamp) ? timestamp : null
+      };
+    });
+  }
+
+  function normalizeActivityHistory(data) {
+    if (!Array.isArray(data)) return [];
+    return data.map(item => {
+      const day = item?.day ? String(item.day) : '';
+      const date = item?.date ? String(item.date) : '';
+      const parsed = parseDateValue(date || day);
+      const timestampCandidate = typeof item?.timestamp === 'number' && !Number.isNaN(item.timestamp)
+        ? item.timestamp
+        : (parsed ? parsed.getTime() : null);
+      return {
+        moduleId: Number(item?.moduleId || item?.module || 0),
+        earnedXP: Number(item?.earnedXP || item?.xp || 0),
+        scorePct: Math.round(Number(item?.scorePct || item?.score || 0)),
+        progressPct: Math.max(0, Math.min(100, Math.round(Number(item?.progressPct || item?.progress || 0)))),
+        day,
+        date,
+        timestamp: Number.isFinite(timestampCandidate) ? timestampCandidate : null
+      };
+    });
+  }
+
+  function loadHistoryForCurrentUser() {
+    if (!currentUser || !currentUser.id) return;
+
+    const expectedUserId = currentUser.id;
+    historyState.loading.checkins = true;
+    historyState.errors.checkins = '';
+    historyState.loading.activities = true;
+    historyState.errors.activities = '';
+    renderHistory();
+
+    google.script.run
+      .withFailureHandler(err => {
+        if (!currentUser || currentUser.id !== expectedUserId) return;
+        historyState.loading.checkins = false;
+        historyState.errors.checkins = err?.message || 'Não foi possível carregar o histórico de check-ins.';
+        historyState.checkins = [];
+        historyState.streak = { current: 0, best: 0 };
+        renderHistory();
+      })
+      .withSuccessHandler(data => {
+        if (!currentUser || currentUser.id !== expectedUserId) return;
+        historyState.loading.checkins = false;
+        historyState.checkins = normalizeCheckinHistory(data);
+        historyState.streak = computeCheckinStreak(historyState.checkins);
+        historyState.errors.checkins = '';
+        renderHistory();
+      })
+      .getCheckinHistory(currentUser.id);
+
+    google.script.run
+      .withFailureHandler(err => {
+        if (!currentUser || currentUser.id !== expectedUserId) return;
+        historyState.loading.activities = false;
+        historyState.errors.activities = err?.message || 'Não foi possível carregar o histórico de atividades.';
+        historyState.activities = [];
+        updateHistoryModuleFilterOptions();
+        renderHistory();
+      })
+      .withSuccessHandler(data => {
+        if (!currentUser || currentUser.id !== expectedUserId) return;
+        historyState.loading.activities = false;
+        historyState.activities = normalizeActivityHistory(data);
+        historyState.errors.activities = '';
+        updateHistoryModuleFilterOptions();
+        renderHistory();
+      })
+      .getActivityHistory(currentUser.id);
+  }
+
   const signupMessageEl = $('#signupMsg');
   const loginMessageEl  = $('#loginMsg');
 
@@ -503,12 +950,14 @@
       $('#dashSection').classList.add('hidden');
       $('#userInfo').textContent = 'Visitante';
       $('#btnLogout').classList.add('hidden');
+      resetHistorySection();
       return;
     }
     $('#authSection').classList.add('hidden');
     $('#dashSection').classList.remove('hidden');
     $('#btnLogout').classList.remove('hidden');
     $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
+    loadHistoryForCurrentUser();
     // estado
     google.script.run.withSuccessHandler(s=>{
       $('#xpBox').textContent  = s.xp;
