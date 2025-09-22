@@ -290,16 +290,31 @@
         <div id="rankWrap" class="space-y-2 text-sm"></div>
       </div>
       <div class="card">
-        <h3 class="text-lg font-semibold mb-2">Excel & PowerPoint (links)</h3>
-        <div class="grid gap-2">
-          <input id="excelLink" class="input" placeholder="Cole link compartilhado do Excel (OneDrive/SharePoint/Drive)"/>
-          <input id="pptLink" class="input" placeholder="Cole link compartilhado do PowerPoint"/>
-          <div class="flex gap-2">
+        <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+          <h3 class="text-lg font-semibold">Central de materiais</h3>
+          <span class="pill" id="embedAdminTag" data-admin-only aria-hidden="true">Modo administrador</span>
+        </div>
+        <div id="embedAdminControls" class="grid gap-3 mb-4 hidden" data-admin-only aria-hidden="true">
+          <div class="grid gap-2">
+            <input id="excelLink" class="input" placeholder="Cole link compartilhado do Excel (OneDrive/SharePoint/Drive)"/>
+            <input id="pptLink" class="input" placeholder="Cole link compartilhado do PowerPoint"/>
+          </div>
+          <div class="grid md:grid-cols-2 gap-3">
+            <div class="space-y-2">
+              <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" for="resourcesInput">Recursos recomendados</label>
+              <textarea id="resourcesInput" class="input min-h-[120px] resize-y" placeholder="Liste cada recurso em uma linha"></textarea>
+            </div>
+            <div class="space-y-2">
+              <label class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" for="eventsInput">Próximos eventos</label>
+              <textarea id="eventsInput" class="input min-h-[120px] resize-y" placeholder="Adicione eventos futuros, um por linha"></textarea>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2 justify-end">
             <button id="btnSaveEmbeds" class="btn btn-primary">Salvar</button>
             <button id="btnLoadEmbeds" class="btn btn-ghost">Atualizar</button>
           </div>
         </div>
-        <div class="grid md:grid-cols-2 gap-3 mt-3">
+        <div class="grid md:grid-cols-2 gap-3">
           <div>
             <div class="text-xs mb-1">Excel</div>
             <div class="aspect-video bg-slate-200 rounded">
@@ -313,7 +328,46 @@
             </div>
           </div>
         </div>
+        <div class="mt-4 grid md:grid-cols-2 gap-4">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-semibold">Recursos recomendados</h4>
+            </div>
+            <p id="resourcesEmpty" class="text-xs text-slate-500 hidden">Nenhum recurso cadastrado ainda.</p>
+            <ul id="resourcesList" class="space-y-2 text-sm list-none p-0 m-0"></ul>
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-semibold">Próximos eventos</h4>
+            </div>
+            <p id="eventsEmpty" class="text-xs text-slate-500 hidden">Nenhum evento informado no momento.</p>
+            <ul id="eventsList" class="space-y-2 text-sm list-none p-0 m-0"></ul>
+          </div>
+        </div>
       </div>
+    </div>
+
+    <div class="card" id="communityWallCard">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <h3 class="text-lg font-semibold">Mural da comunidade</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Compartilhe dicas rápidas e conquistas com a turma.</p>
+        </div>
+        <span id="communityLimitBadge" class="pill">Até 240 caracteres</span>
+      </div>
+      <div id="communityFormWrap" class="space-y-2 mb-4 hidden">
+        <textarea id="communityMessage" class="input min-h-[96px] resize-y" maxlength="240" placeholder="Escreva uma dica ou atualização rápida..."></textarea>
+        <div class="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <span id="communityFormFeedback" class="text-rose-500 hidden" aria-live="polite"></span>
+          <span id="communityCounter">0/240</span>
+        </div>
+        <div class="flex justify-end">
+          <button id="btnCommunityPublish" class="btn btn-primary">Publicar no mural</button>
+        </div>
+      </div>
+      <p id="communityGuestNotice" class="text-sm text-slate-500 mb-4 hidden">Entre com sua conta para participar do mural.</p>
+      <div id="communityWallList" class="grid gap-3 text-sm"></div>
+      <p id="communityWallEmpty" class="history-empty hidden">Ainda não há recados por aqui. Seja o primeiro a compartilhar!</p>
     </div>
 
     <!-- Admin -->
@@ -328,10 +382,12 @@
 <script>
   // Estado simples no front
   let currentUser = null;
+  let currentSessionToken = null;
   const STORAGE_KEY = 'excelPlatformSession';
 
   function persistSession(token, user) {
     if (!token || !user || !user.id) return;
+    currentSessionToken = token;
     const payload = {
       token,
       userId: user.id,
@@ -346,11 +402,22 @@
   }
 
   function clearStoredSession() {
+    currentSessionToken = null;
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch (err) {
       console.warn('Não foi possível limpar sessão local:', err);
     }
+  }
+
+  function getSessionToken() {
+    if (currentSessionToken) return currentSessionToken;
+    const stored = getStoredSession();
+    if (stored && stored.token) {
+      currentSessionToken = stored.token;
+      return currentSessionToken;
+    }
+    return null;
   }
 
   function getStoredSession() {
@@ -381,6 +448,34 @@
     return url;
   };
 
+  const adminOnlyElements = Array.from(document.querySelectorAll('[data-admin-only]'));
+  const excelLinkInput = $('#excelLink');
+  const pptLinkInput = $('#pptLink');
+  const excelFrameEl = $('#excelFrame');
+  const pptFrameEl = $('#pptFrame');
+  const btnSaveEmbeds = $('#btnSaveEmbeds');
+  const btnLoadEmbeds = $('#btnLoadEmbeds');
+  const resourcesInputEl = $('#resourcesInput');
+  const eventsInputEl = $('#eventsInput');
+  const resourcesListEl = $('#resourcesList');
+  const resourcesEmptyEl = $('#resourcesEmpty');
+  const eventsListEl = $('#eventsList');
+  const eventsEmptyEl = $('#eventsEmpty');
+  const communityFormWrap = $('#communityFormWrap');
+  const communityGuestNotice = $('#communityGuestNotice');
+  const communityTextarea = $('#communityMessage');
+  const communityCounterEl = $('#communityCounter');
+  const communityFeedbackEl = $('#communityFormFeedback');
+  const communityPublishBtn = $('#btnCommunityPublish');
+  const communityListEl = $('#communityWallList');
+  const communityEmptyEl = $('#communityWallEmpty');
+  const communityLimitBadge = $('#communityLimitBadge');
+  let communityCharLimit = 240;
+  let isPublishingCommunity = false;
+  const communityDateFormatter = typeof Intl !== 'undefined'
+    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : null;
+
   const toastContainer = $('#toastContainer');
   const toastVariants = {
     success: {
@@ -396,6 +491,178 @@
       close: 'bg-black/10 text-slate-900 hover:bg-black/20 focus-visible:ring-amber-700'
     }
   };
+
+  function syncAdminVisibility() {
+    const isAdmin = !!(currentUser && currentUser.isAdmin);
+    adminOnlyElements.forEach(el => {
+      if (!el) return;
+      el.classList.toggle('hidden', !isAdmin);
+      if (isAdmin) {
+        el.removeAttribute('aria-hidden');
+      } else {
+        el.setAttribute('aria-hidden', 'true');
+      }
+    });
+  }
+
+  function renderHighlightList(listEl, items, emptyEl) {
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const data = Array.isArray(items) ? items.map(item => (item || '').toString().trim()).filter(Boolean) : [];
+    if (!data.length) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+    if (emptyEl) emptyEl.classList.add('hidden');
+    data.forEach(text => {
+      const li = document.createElement('li');
+      li.className = 'rounded-xl bg-slate-100 dark:bg-slate-800/70 px-3 py-2 shadow-sm';
+      li.textContent = text;
+      listEl.appendChild(li);
+    });
+  }
+
+  function collectTextareaList(textarea) {
+    if (!textarea) return [];
+    const lines = textarea.value.split('\n');
+    const result = [];
+    lines.forEach(line => {
+      const text = line.trim();
+      if (!text) return;
+      if (!result.includes(text)) result.push(text);
+    });
+    return result;
+  }
+
+  function setCommunityLimit(limit) {
+    const numeric = Number(limit);
+    if (!Number.isFinite(numeric) || numeric <= 0) return;
+    communityCharLimit = numeric;
+    if (communityLimitBadge) communityLimitBadge.textContent = `Até ${numeric} caracteres`;
+    if (communityTextarea) communityTextarea.maxLength = numeric;
+    updateCommunityCounter();
+  }
+
+  function updateCommunityCounter() {
+    if (!communityCounterEl) return;
+    const value = communityTextarea ? communityTextarea.value : '';
+    const length = value ? value.length : 0;
+    communityCounterEl.textContent = `${length}/${communityCharLimit}`;
+    communityCounterEl.classList.toggle('text-rose-500', length > communityCharLimit);
+  }
+
+  function showCommunityError(message) {
+    if (!communityFeedbackEl) return;
+    const text = (message || '').toString().trim();
+    communityFeedbackEl.textContent = text;
+    communityFeedbackEl.classList.toggle('hidden', !text);
+  }
+
+  function updateCommunityPublishState() {
+    if (!communityPublishBtn) return;
+    const message = communityTextarea ? communityTextarea.value.trim() : '';
+    const disabled = !currentUser || !message || message.length > communityCharLimit || isPublishingCommunity;
+    communityPublishBtn.disabled = disabled;
+  }
+
+  function updateCommunityAccess() {
+    const loggedIn = !!currentUser;
+    if (communityFormWrap) communityFormWrap.classList.toggle('hidden', !loggedIn);
+    if (communityGuestNotice) communityGuestNotice.classList.toggle('hidden', loggedIn);
+    if (!loggedIn && communityTextarea) {
+      communityTextarea.value = '';
+      showCommunityError('');
+      updateCommunityCounter();
+    }
+    updateCommunityPublishState();
+  }
+
+  function formatCommunityDate(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    if (communityDateFormatter) {
+      try {
+        return communityDateFormatter.format(date);
+      } catch (err) {
+        // fallback para toLocaleString
+      }
+    }
+    try {
+      return date.toLocaleString('pt-BR');
+    } catch (err) {
+      return date.toISOString();
+    }
+  }
+
+  function renderCommunityWall(entries) {
+    if (!communityListEl) return;
+    communityListEl.innerHTML = '';
+    const list = Array.isArray(entries) ? entries : [];
+    if (!list.length) {
+      if (communityEmptyEl) communityEmptyEl.classList.remove('hidden');
+      return;
+    }
+    if (communityEmptyEl) communityEmptyEl.classList.add('hidden');
+
+    list.forEach(entry => {
+      const card = document.createElement('article');
+      card.className = 'rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/70 p-4 shadow-sm flex flex-col gap-2';
+      card.dataset.id = entry && entry.id ? entry.id : '';
+
+      const header = document.createElement('div');
+      header.className = 'flex items-start justify-between gap-3';
+
+      const meta = document.createElement('div');
+      meta.className = 'flex flex-col';
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'font-semibold text-slate-700 dark:text-slate-100';
+      nameEl.textContent = (entry && entry.authorName) ? entry.authorName : 'Participante';
+      meta.appendChild(nameEl);
+
+      const timeEl = document.createElement('span');
+      timeEl.className = 'text-xs text-slate-500 dark:text-slate-400';
+      timeEl.textContent = formatCommunityDate(entry && entry.createdAt) || 'Agora mesmo';
+      meta.appendChild(timeEl);
+
+      header.appendChild(meta);
+
+      if (currentUser?.isAdmin) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.dataset.action = 'remove-wall-entry';
+        removeBtn.dataset.id = entry && entry.id ? entry.id : '';
+        removeBtn.className = 'text-xs font-semibold text-rose-600 hover:text-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 rounded px-2 py-1 transition';
+        removeBtn.textContent = 'Remover';
+        header.appendChild(removeBtn);
+      }
+
+      const messageEl = document.createElement('p');
+      messageEl.className = 'text-sm text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed';
+      messageEl.textContent = (entry && entry.message) ? entry.message : '';
+
+      card.appendChild(header);
+      card.appendChild(messageEl);
+      communityListEl.appendChild(card);
+    });
+  }
+
+  function refreshCommunityWall() {
+    if (!communityListEl) return;
+    google.script.run
+      .withFailureHandler(err => {
+        console.error('Falha ao carregar mural:', err);
+      })
+      .withSuccessHandler(res => {
+        if (res && typeof res.limit === 'number') {
+          setCommunityLimit(res.limit);
+        }
+        const entries = res && Array.isArray(res.entries) ? res.entries : [];
+        renderCommunityWall(entries);
+      })
+      .listCommunityWallEntries();
+  }
 
   const achievementsState = {
     loading: false,
@@ -1495,10 +1762,105 @@
     input.addEventListener('input', () => clearCardMessage(loginMessageEl));
   });
 
+  if (communityTextarea) {
+    communityTextarea.addEventListener('input', () => {
+      showCommunityError('');
+      updateCommunityCounter();
+      updateCommunityPublishState();
+    });
+  }
+
+  if (communityPublishBtn) {
+    communityPublishBtn.addEventListener('click', () => {
+      if (!currentUser) {
+        showToast({ message: 'Entre com sua conta para publicar no mural.', type: 'warning' });
+        return;
+      }
+      const token = getSessionToken();
+      if (!token) {
+        showToast({ message: 'Sessão expirada. Faça login novamente.', type: 'error' });
+        return;
+      }
+      const message = communityTextarea ? communityTextarea.value.trim() : '';
+      if (!message) {
+        showCommunityError('Escreva uma mensagem para publicar.');
+        if (communityTextarea) {
+          try { communityTextarea.focus({ preventScroll: true }); } catch (err) { communityTextarea.focus(); }
+        }
+        return;
+      }
+      if (message.length > communityCharLimit) {
+        showCommunityError(`A mensagem deve ter até ${communityCharLimit} caracteres.`);
+        return;
+      }
+      isPublishingCommunity = true;
+      updateCommunityPublishState();
+      showCommunityError('');
+      google.script.run
+        .withFailureHandler(err => {
+          isPublishingCommunity = false;
+          updateCommunityPublishState();
+          showCommunityError(err?.message || 'Não foi possível publicar agora.');
+        })
+        .withSuccessHandler(() => {
+          isPublishingCommunity = false;
+          updateCommunityPublishState();
+          if (communityTextarea) communityTextarea.value = '';
+          updateCommunityCounter();
+          showCommunityError('');
+          showToast({ message: 'Mensagem publicada no mural!', type: 'success' });
+          refreshCommunityWall();
+        })
+        .addCommunityWallEntry({ token, message });
+    });
+  }
+
+  if (communityListEl) {
+    communityListEl.addEventListener('click', event => {
+      const target = event.target instanceof HTMLElement
+        ? event.target.closest('[data-action="remove-wall-entry"]')
+        : null;
+      if (!target) return;
+      event.preventDefault();
+      if (!currentUser?.isAdmin) {
+        showToast({ message: 'Apenas administradores podem remover publicações.', type: 'error' });
+        return;
+      }
+      const postId = target.getAttribute('data-id') || '';
+      if (!postId) return;
+      const token = getSessionToken();
+      if (!token) {
+        showToast({ message: 'Sessão expirada. Faça login novamente.', type: 'error' });
+        return;
+      }
+      const button = target instanceof HTMLButtonElement ? target : target.closest('button');
+      if (button) {
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+      }
+      google.script.run
+        .withFailureHandler(err => {
+          if (button) {
+            button.disabled = false;
+            button.removeAttribute('aria-busy');
+          }
+          showToast({ message: err?.message || 'Não foi possível remover agora.', type: 'error' });
+        })
+        .withSuccessHandler(() => {
+          showToast({ message: 'Publicação removida do mural.', type: 'success' });
+          refreshCommunityWall();
+        })
+        .removeCommunityWallEntry({ token, postId });
+    });
+  }
+
+  updateCommunityCounter();
+
   // UI switches
   function updateUI(options = {}) {
     const keepLevelIndicator = !!(options && options.keepLevelIndicator);
     const skipAchievements = !!(options && options.skipAchievements);
+    const skipCommunity = !!(options && options.skipCommunity);
     const achievementsData = options && options.achievementsData;
     const achievementsUnlocked = options && options.achievementsUnlocked;
     const achievementsSilent = !!(options && options.silentAchievements);
@@ -1510,6 +1872,9 @@
       resetHistorySection();
       resetLevelIndicator();
        resetAchievementsUI();
+      syncAdminVisibility();
+      updateCommunityAccess();
+      if (!skipCommunity) refreshCommunityWall();
       return;
     }
     $('#authSection').classList.add('hidden');
@@ -1548,6 +1913,9 @@
     refreshRanking();
     // admin panel
     $('#adminPanel').classList.toggle('hidden', !currentUser.isAdmin);
+    syncAdminVisibility();
+    updateCommunityAccess();
+    if (!skipCommunity) refreshCommunityWall();
   }
 
   function refreshRanking() {
@@ -1699,7 +2067,7 @@
           if (Number.isFinite(Number(totalXP))) $('#xpBox').textContent = totalXP;
           if (Number.isFinite(Number(res.level))) $('#lvlBox').textContent = res.level;
           updateLevelIndicator(res);
-          updateUI({ keepLevelIndicator: true, skipAchievements: true });
+          updateUI({ keepLevelIndicator: true, skipAchievements: true, skipCommunity: true });
         } else {
           $('#checkinMsg').textContent = res?.msg || 'Não foi possível registrar o check-in.';
         }
@@ -1742,33 +2110,69 @@
         if (Number.isFinite(Number(totalXP))) $('#xpBox').textContent = totalXP;
         if (Number.isFinite(Number(res.level))) $('#lvlBox').textContent = res.level;
         updateLevelIndicator(res);
-        updateUI({ keepLevelIndicator: true, skipAchievements: true });
+        updateUI({ keepLevelIndicator: true, skipAchievements: true, skipCommunity: true });
         setTimeout(()=> $('#activityMsg').textContent='', 4000);
       })
       .submitActivity(payload);
   };
 
   // Embeds
-  $('#btnSaveEmbeds').onclick = ()=>{
-    const excel = $('#excelLink').value.trim();
-    const ppt   = $('#pptLink').value.trim();
-    google.script.run
-      .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
-      .withSuccessHandler(()=> loadEmbeds())
-      .saveEmbeds({ excel, ppt });
-  };
-  $('#btnLoadEmbeds').onclick = ()=> loadEmbeds();
+  if (btnSaveEmbeds) {
+    btnSaveEmbeds.addEventListener('click', () => {
+      if (!currentUser?.isAdmin) {
+        showToast({ message: 'Somente administradores podem atualizar os materiais.', type: 'warning' });
+        return;
+      }
+      const token = getSessionToken();
+      if (!token) {
+        showToast({ message: 'Sessão expirada. Faça login novamente.', type: 'error' });
+        return;
+      }
+      const excel = excelLinkInput ? excelLinkInput.value.trim() : '';
+      const ppt = pptLinkInput ? pptLinkInput.value.trim() : '';
+      const recommendedResources = collectTextareaList(resourcesInputEl);
+      const upcomingEvents = collectTextareaList(eventsInputEl);
+      google.script.run
+        .withFailureHandler(err => showToast({ message: err?.message || err, type: 'error' }))
+        .withSuccessHandler(() => {
+          showToast({ message: 'Materiais atualizados com sucesso.', type: 'success' });
+          loadEmbeds();
+        })
+        .saveEmbeds({ excel, ppt, token, recommendedResources, upcomingEvents });
+    });
+  }
+  if (btnLoadEmbeds) {
+    btnLoadEmbeds.addEventListener('click', () => loadEmbeds());
+  }
   function loadEmbeds() {
-    google.script.run.withSuccessHandler(e=>{
-      $('#excelFrame').src = normalizeEmbed(e.excel||'');
-      $('#pptFrame').src   = normalizeEmbed(e.ppt||'');
+    google.script.run.withSuccessHandler(data => {
+      if (excelFrameEl) excelFrameEl.src = normalizeEmbed(data.excel || '');
+      if (pptFrameEl) pptFrameEl.src = normalizeEmbed(data.ppt || '');
+      if (excelLinkInput) excelLinkInput.value = data.excel || '';
+      if (pptLinkInput) pptLinkInput.value = data.ppt || '';
+      renderHighlightList(resourcesListEl, data?.recommendedResources, resourcesEmptyEl);
+      renderHighlightList(eventsListEl, data?.upcomingEvents, eventsEmptyEl);
+      if (resourcesInputEl) {
+        const list = Array.isArray(data?.recommendedResources) ? data.recommendedResources : [];
+        resourcesInputEl.value = list.join('\n');
+      }
+      if (eventsInputEl) {
+        const list = Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
+        eventsInputEl.value = list.join('\n');
+      }
     }).getEmbeds();
   }
 
   // Boot
   (function init(){
+    syncAdminVisibility();
+    updateCommunityAccess();
     loadEmbeds();
+    refreshCommunityWall();
     const stored = getStoredSession();
+    if (stored && stored.token) {
+      currentSessionToken = stored.token;
+    }
     const authSection = $('#authSection');
     if (authSection) authSection.classList.add('hidden');
 

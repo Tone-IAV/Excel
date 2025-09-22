@@ -10,6 +10,12 @@ const SHEET_CONFIG           = 'Config';           // key, value
 const SHEET_EMBEDS           = 'Embeds';           // key, url
 const SHEET_SESSIONS         = 'Sessions';         // userId, tokenHash, expiresAt, createdAt
 const SHEET_USER_ACHIEVEMENT = 'UserAchievements'; // userId, achievementId, unlockedAt, rewardXP
+const SHEET_WALL             = 'Wall';             // id, userId, authorName, message, createdAt, removedAt, removedBy
+
+const CONFIG_RECOMMENDED_RESOURCES = 'recommended_resources';
+const CONFIG_UPCOMING_EVENTS       = 'upcoming_events';
+
+const COMMUNITY_WALL_CHAR_LIMIT = 240;
 
 const ACHIEVEMENTS = [
   {
@@ -118,11 +124,14 @@ function setup_() {
   ensure(SHEET_EMBEDS,           ['key','url']);
   ensure(SHEET_SESSIONS,         ['userId','tokenHash','expiresAt','createdAt']);
   ensure(SHEET_USER_ACHIEVEMENT, ['userId','achievementId','unlockedAt','rewardXP']);
+  ensure(SHEET_WALL,             ['id','userId','authorName','message','createdAt','removedAt','removedBy']);
 
   // Defaults de config
   const cfg = getConfig_();
   if (!cfg.xpCheckin) setConfig_('xpCheckin','5');
   if (!cfg.xpPerLevel) setConfig_('xpPerLevel','100');
+  if (!cfg[CONFIG_RECOMMENDED_RESOURCES]) setConfig_(CONFIG_RECOMMENDED_RESOURCES, '[]');
+  if (!cfg[CONFIG_UPCOMING_EVENTS]) setConfig_(CONFIG_UPCOMING_EVENTS, '[]');
 }
 
 /** =================== HELPERS =================== **/
@@ -151,6 +160,49 @@ function getAll_(sheet)     { const r=sheet.getDataRange().getValues(); return r
 function findByEmail_(email){ const rows=getAll_(sh_(SHEET_USERS)); for (let i=0;i<rows.length;i++){ if ((rows[i][2]||'').toLowerCase()===email.toLowerCase()){ return { row:i+2, data:rows[i] }; } } return null; }
 function getConfig_()       { const rows=getAll_(sh_(SHEET_CONFIG)); const m={}; rows.forEach(r=>m[(r[0]||'').toString()]=(r[1]||'').toString()); return m; }
 function setConfig_(k,v)    { const s=sh_(SHEET_CONFIG); const rows=getAll_(s); for (let i=0;i<rows.length;i++){ if (rows[i][0]==k){ s.getRange(i+2,2).setValue(v); return; } } s.appendRow([k,v]); }
+
+function normalizeStringArray_(value) {
+  if (!Array.isArray(value)) return [];
+  const result = [];
+  for (let i = 0; i < value.length; i++) {
+    const item = value[i];
+    if (item === null || item === undefined) continue;
+    const textItem = item.toString().trim();
+    if (!textItem) continue;
+    if (result.indexOf(textItem) === -1) result.push(textItem);
+  }
+  return result;
+}
+
+function parseConfigListValue_(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return normalizeStringArray_(raw);
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return normalizeStringArray_(parsed);
+    } catch (err) {
+      // fallback para tratamento simples
+    }
+    return normalizeStringArray_(trimmed.split('\n'));
+  }
+  return [];
+}
+
+function saveConfigList_(key, list) {
+  const normalized = normalizeStringArray_(Array.isArray(list) ? list : []);
+  const value = normalized.length ? JSON.stringify(normalized) : '[]';
+  setConfig_(key, value);
+  return normalized;
+}
+
+function getConfigList_(key) {
+  const cfg = getConfig_();
+  const raw = cfg[key];
+  return parseConfigListValue_(raw);
+}
 
 function computeLevelInfo_(xpRaw, cfg) {
   const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
@@ -539,6 +591,33 @@ function findSessionByHash_(tokenHash) {
   return null;
 }
 
+function getSessionUserByToken_(token) {
+  const tokenStr = (token || '').toString().trim();
+  if (!tokenStr) return null;
+  const tokenHash = sha256_(tokenStr);
+  const hit = findSessionByHash_(tokenHash);
+  if (!hit) return null;
+
+  const expiresAtRaw = hit.data[2];
+  if (expiresAtRaw) {
+    const expiresAtDate = parseDateValue_(expiresAtRaw);
+    if (expiresAtDate && expiresAtDate.getTime() < Date.now()) {
+      sh_(SHEET_SESSIONS).deleteRow(hit.row);
+      return null;
+    }
+  }
+
+  const userId = hit.data[0];
+  if (!userId) return null;
+  const user = getUserById_(userId);
+  if (!user) {
+    sh_(SHEET_SESSIONS).deleteRow(hit.row);
+    return null;
+  }
+
+  return { user, sessionRow: hit.row };
+}
+
 /** =================== API PÚBLICA (chamada pelo HTML) =================== **/
 function registerUser(payload) {
   setup_();
@@ -920,16 +999,129 @@ function getActivityHistory(userId) {
 
 /** Embeds (Excel/PPT) */
 function saveEmbeds(payload) {
-  const { excel, ppt } = payload;
-  setKeyUrl_(SHEET_EMBEDS, 'excel', excel||'');
-  setKeyUrl_(SHEET_EMBEDS, 'ppt', ppt||'');
-  return { ok:true };
+  setup_();
+  const token = payload && payload.token;
+  const session = getSessionUserByToken_(token);
+  if (!session || !session.user || !session.user.isAdmin) {
+    throw new Error('Apenas administradores podem atualizar os materiais.');
+  }
+
+  const excel = payload && payload.excel ? payload.excel.toString().trim() : '';
+  const ppt = payload && payload.ppt ? payload.ppt.toString().trim() : '';
+  setKeyUrl_(SHEET_EMBEDS, 'excel', excel);
+  setKeyUrl_(SHEET_EMBEDS, 'ppt', ppt);
+
+  const resources = saveConfigList_(CONFIG_RECOMMENDED_RESOURCES, payload && payload.recommendedResources);
+  const events = saveConfigList_(CONFIG_UPCOMING_EVENTS, payload && payload.upcomingEvents);
+
+  return { ok: true, recommendedResources: resources, upcomingEvents: events };
 }
 function getEmbeds() {
+  setup_();
   const rows = getAll_(sh_(SHEET_EMBEDS));
   const map = {};
   rows.forEach(r=> map[(r[0]||'')] = (r[1]||''));
-  return { excel: map['excel']||'', ppt: map['ppt']||'' };
+  const resources = getConfigList_(CONFIG_RECOMMENDED_RESOURCES);
+  const events = getConfigList_(CONFIG_UPCOMING_EVENTS);
+  return {
+    excel: map['excel']||'',
+    ppt: map['ppt']||'',
+    recommendedResources: resources,
+    upcomingEvents: events
+  };
+}
+
+function listCommunityWallEntries() {
+  setup_();
+  const rows = getAll_(sh_(SHEET_WALL));
+  const entries = [];
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.length === 0) continue;
+    const removedAt = row[5];
+    if (removedAt) continue;
+    const createdAtRaw = row[4] || '';
+    const createdAtDate = parseDateValue_(createdAtRaw);
+    const createdAt = createdAtDate ? createdAtDate.toISOString() : createdAtRaw.toString();
+    const timestamp = createdAtDate ? createdAtDate.getTime() : null;
+    entries.push({
+      id: row[0] || '',
+      userId: row[1] || '',
+      authorName: row[2] || '',
+      message: row[3] || '',
+      createdAt,
+      timestamp
+    });
+  }
+
+  entries.sort((a, b) => {
+    const aTime = typeof a.timestamp === 'number' ? a.timestamp : -Infinity;
+    const bTime = typeof b.timestamp === 'number' ? b.timestamp : -Infinity;
+    return bTime - aTime;
+  });
+
+  return { entries, limit: COMMUNITY_WALL_CHAR_LIMIT };
+}
+
+function addCommunityWallEntry(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const session = getSessionUserByToken_(token);
+  if (!session || !session.user) {
+    throw new Error('Sessão inválida. Faça login novamente.');
+  }
+
+  const rawMessage = payload && payload.message ? payload.message.toString() : '';
+  const message = rawMessage.trim();
+  if (!message) throw new Error('Escreva uma mensagem para publicar.');
+  if (message.length > COMMUNITY_WALL_CHAR_LIMIT) {
+    throw new Error(`A mensagem deve ter até ${COMMUNITY_WALL_CHAR_LIMIT} caracteres.`);
+  }
+
+  const normalized = message.replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  const sheet = sh_(SHEET_WALL);
+  const id = Utilities.getUuid();
+  const createdAt = nowISO_();
+  sheet.appendRow([id, session.user.id, session.user.name || '', normalized, createdAt, '', '']);
+
+  return {
+    ok: true,
+    entry: {
+      id,
+      userId: session.user.id,
+      authorName: session.user.name || '',
+      message: normalized,
+      createdAt
+    }
+  };
+}
+
+function removeCommunityWallEntry(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const session = getSessionUserByToken_(token);
+  if (!session || !session.user || !session.user.isAdmin) {
+    throw new Error('Apenas administradores podem remover publicações.');
+  }
+
+  const postId = payload && payload.postId ? payload.postId.toString().trim() : '';
+  if (!postId) throw new Error('Identificador do post inválido.');
+
+  const sheet = sh_(SHEET_WALL);
+  const rows = getAll_(sheet);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[0] || '') === postId) {
+      if (row[5]) {
+        return { ok: true, alreadyRemoved: true };
+      }
+      sheet.getRange(i + 2, 6, 1, 2).setValues([[nowISO_(), session.user.id]]);
+      return { ok: true };
+    }
+  }
+
+  throw new Error('Publicação não encontrada.');
 }
 function setKeyUrl_(sheetName, key, url) {
   const s = sh_(sheetName);
