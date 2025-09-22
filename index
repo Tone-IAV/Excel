@@ -29,6 +29,16 @@
     .pill { font-size:.75rem; padding:.2rem .6rem; border-radius:9999px; background:#f1f5f9; color:#475569; }
     .dark .pill { background:#334155; color:#e2e8f0; }
     .hidden-admin { opacity:.6; font-size:.8rem; }
+    .feedback { font-size:.85rem; padding:.5rem .75rem; border-radius:.75rem; border:1px solid transparent; }
+    .feedback-error { background:#fee2e2; color:#b91c1c; border-color:#fecaca; }
+    .feedback-success { background:#dcfce7; color:#166534; border-color:#bbf7d0; }
+    .dark .feedback-error { background:rgba(239,68,68,.15); color:#fecaca; border-color:rgba(248,113,113,.4); }
+    .dark .feedback-success { background:rgba(34,197,94,.18); color:#bbf7d0; border-color:rgba(134,239,172,.4); }
+    .error-text { font-size:.75rem; color:#dc2626; min-height:1rem; }
+    .dark .error-text { color:#fca5a5; }
+    .hint { font-size:.7rem; color:#64748b; }
+    .dark .hint { color:#94a3b8; }
+    .btn[disabled] { opacity:.6; cursor:not-allowed; }
     .aspect-video { position:relative; padding-top:56.25%; }
     .aspect-video > iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
   </style>
@@ -48,23 +58,37 @@
 <main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
   <!-- AUTH -->
   <section id="authSection" class="grid md:grid-cols-2 gap-4">
-    <div class="card">
+    <div class="card" id="signupCard">
       <h2 class="text-xl font-semibold mb-2">Criar conta</h2>
-      <div class="grid gap-2">
-        <input id="rName" class="input" placeholder="Nome completo" />
-        <input id="rEmail" class="input" placeholder="E-mail" />
-        <input id="rPass" type="password" class="input" placeholder="Senha" />
-        <div class="hidden-admin">
-          <label class="text-xs block mb-1">Código de segurança (somente para Administrador)</label>
-          <input id="rAdminCode" class="input" placeholder="(opcional)" />
+      <div id="signupMsg" class="feedback hidden"></div>
+      <div class="grid gap-3">
+        <div class="space-y-1">
+          <input id="rName" class="input" placeholder="Nome completo" />
+          <p id="rNameError" class="error-text"></p>
         </div>
-        <button id="btnSignup" class="btn btn-primary">Criar conta</button>
+        <div class="space-y-1">
+          <input id="rEmail" class="input" placeholder="E-mail" title="Utilize um endereço válido (ex.: nome@empresa.com)." />
+          <p class="hint">Utilize um endereço válido (ex.: nome@empresa.com).</p>
+          <p id="rEmailError" class="error-text"></p>
+        </div>
+        <div class="space-y-1">
+          <input id="rPass" type="password" class="input" placeholder="Senha" title="Mínimo de 8 caracteres com letras maiúsculas, minúsculas, números e símbolos." />
+          <p class="hint">Mínimo de 8 caracteres com letras maiúsculas, minúsculas, números e símbolos.</p>
+          <p id="rPassError" class="error-text"></p>
+        </div>
+        <div class="hidden-admin space-y-1">
+          <label class="text-xs block">Código de segurança (somente para Administrador)</label>
+          <input id="rAdminCode" class="input" placeholder="(opcional)" />
+          <p id="rAdminCodeError" class="error-text"></p>
+        </div>
+        <button id="btnSignup" class="btn btn-primary" disabled>Criar conta</button>
         <p class="text-xs text-slate-500">Obs.: Administrador só é criado com código válido.</p>
       </div>
     </div>
 
     <div class="card">
       <h2 class="text-xl font-semibold mb-2">Entrar</h2>
+      <div id="loginMsg" class="feedback hidden"></div>
       <div class="grid gap-2">
         <input id="lEmail" class="input" placeholder="E-mail" />
         <input id="lPass" type="password" class="input" placeholder="Senha" />
@@ -186,6 +210,130 @@
     return url;
   };
 
+  const signupMessageEl = $('#signupMsg');
+  const loginMessageEl  = $('#loginMsg');
+
+  function renderCardMessage(el, type, message) {
+    if (!el) return;
+    const text = (message || '').toString();
+    el.textContent = text;
+    el.classList.remove('feedback-error', 'feedback-success');
+    if (!text) {
+      el.classList.add('hidden');
+      return;
+    }
+    el.classList.remove('hidden');
+    el.classList.add(type === 'success' ? 'feedback-success' : 'feedback-error');
+  }
+
+  function clearCardMessage(el) {
+    renderCardMessage(el, '', '');
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const requiredSignupKeys = ['name','email','password'];
+  const signupFields = {
+    name: {
+      input: $('#rName'),
+      error: $('#rNameError'),
+      touched: false,
+      customError: null,
+      validator: value => {
+        if (!value) return { valid:false, message:'Informe o nome completo.' };
+        if (value.length < 3) return { valid:false, message:'O nome deve ter pelo menos 3 caracteres.' };
+        return { valid:true, message:'' };
+      }
+    },
+    email: {
+      input: $('#rEmail'),
+      error: $('#rEmailError'),
+      touched: false,
+      customError: null,
+      validator: value => {
+        if (!value) return { valid:false, message:'Informe o e-mail.' };
+        if (!emailPattern.test(value)) return { valid:false, message:'Formato de e-mail inválido.' };
+        return { valid:true, message:'' };
+      }
+    },
+    password: {
+      input: $('#rPass'),
+      error: $('#rPassError'),
+      touched: false,
+      customError: null,
+      validator: value => {
+        const missing = [];
+        if (value.length < 8) missing.push('no mínimo 8 caracteres');
+        if (!/[A-Z]/.test(value)) missing.push('uma letra maiúscula');
+        if (!/[a-z]/.test(value)) missing.push('uma letra minúscula');
+        if (!/\d/.test(value)) missing.push('um número');
+        if (!/[^A-Za-z0-9]/.test(value)) missing.push('um símbolo');
+        if (missing.length) {
+          const last = missing.pop();
+          const message = missing.length ? `A senha deve conter ${missing.join(', ')} e ${last}.` : `A senha deve conter ${last}.`;
+          return { valid:false, message };
+        }
+        return { valid:true, message:'' };
+      }
+    },
+    adminCode: {
+      input: $('#rAdminCode'),
+      error: $('#rAdminCodeError'),
+      touched: false,
+      customError: null,
+      validator: () => ({ valid:true, message:'' })
+    }
+  };
+
+  const btnSignup = $('#btnSignup');
+  const loginEmailInput = $('#lEmail');
+  const loginPasswordInput = $('#lPass');
+  const btnLogin = $('#btnLogin');
+  let isSignupSubmitting = false;
+
+  function evaluateField(key, opts = {}) {
+    const field = signupFields[key];
+    if (!field || !field.input) return true;
+    const rawValue = field.input.value || '';
+    const value = rawValue.trim();
+    const shouldShow = opts.force || field.touched || rawValue.length > 0;
+
+    if (field.customError) {
+      if (field.error) field.error.textContent = shouldShow ? field.customError : '';
+      return false;
+    }
+
+    const result = field.validator(value, rawValue);
+    if (field.error) field.error.textContent = shouldShow ? result.message : '';
+    return !!result.valid;
+  }
+
+  function updateSignupButton() {
+    const allValid = requiredSignupKeys.every(key => evaluateField(key));
+    if (btnSignup) btnSignup.disabled = !allValid || isSignupSubmitting;
+  }
+
+  Object.entries(signupFields).forEach(([key, field]) => {
+    if (!field.input) return;
+    field.input.addEventListener('input', () => {
+      field.customError = null;
+      clearCardMessage(signupMessageEl);
+      evaluateField(key);
+      updateSignupButton();
+    });
+    field.input.addEventListener('blur', () => {
+      field.touched = true;
+      evaluateField(key, { force: true });
+      updateSignupButton();
+    });
+  });
+
+  updateSignupButton();
+
+  [loginEmailInput, loginPasswordInput].forEach(input => {
+    if (!input) return;
+    input.addEventListener('input', () => clearCardMessage(loginMessageEl));
+  });
+
   // UI switches
   function updateUI() {
     if (!currentUser) {
@@ -232,29 +380,94 @@
   }
 
   // AUTH
-  $('#btnSignup').onclick = ()=>{
-    const payload = {
-      name: $('#rName').value.trim(),
-      email: $('#rEmail').value.trim(),
-      password: $('#rPass').value.trim(),
-      adminCode: $('#rAdminCode').value.trim() // discreto; só vira admin se == xbY4nu
-    };
-    google.script.run
-      .withFailureHandler(err=> alert(err.message || err))
-      .withSuccessHandler(user=> { currentUser=user; updateUI(); })
-      .registerUser(payload);
-  };
+  if (btnSignup) {
+    btnSignup.addEventListener('click', () => {
+      clearCardMessage(signupMessageEl);
+      Object.values(signupFields).forEach(field => { field.touched = true; });
+      const isValid = requiredSignupKeys.every(key => evaluateField(key, { force: true }));
+      updateSignupButton();
+      if (!isValid) {
+        renderCardMessage(signupMessageEl, 'error', 'Revise os campos destacados.');
+        return;
+      }
 
-  $('#btnLogin').onclick = ()=>{
-    const payload = {
-      email: $('#lEmail').value.trim(),
-      password: $('#lPass').value.trim()
-    };
-    google.script.run
-      .withFailureHandler(err=> alert(err.message || err))
-      .withSuccessHandler(user=> { currentUser=user; updateUI(); })
-      .loginUser(payload);
-  };
+      const payload = {
+        name: signupFields.name.input.value.trim(),
+        email: signupFields.email.input.value.trim(),
+        password: signupFields.password.input.value,
+        adminCode: signupFields.adminCode.input.value.trim()
+      };
+
+      isSignupSubmitting = true;
+      updateSignupButton();
+
+      google.script.run
+        .withFailureHandler(err => {
+          isSignupSubmitting = false;
+          renderCardMessage(signupMessageEl, 'error', err.message || err);
+          updateSignupButton();
+        })
+        .withSuccessHandler(res => {
+          isSignupSubmitting = false;
+
+          if (res && res.ok) {
+            clearCardMessage(signupMessageEl);
+            currentUser = res.user;
+            updateUI();
+            updateSignupButton();
+            return;
+          }
+
+          if (res && res.errors) {
+            Object.entries(res.errors).forEach(([fieldKey, message]) => {
+              const field = signupFields[fieldKey];
+              if (field) {
+                field.touched = true;
+                field.customError = message;
+                evaluateField(fieldKey, { force: true });
+              }
+            });
+          }
+
+          let messageText = 'Revise os campos destacados.';
+          if (res && res.message) {
+            messageText = res.message;
+          } else if (!res || !res.errors || Object.keys(res.errors).length === 0) {
+            messageText = 'Não foi possível criar a conta. Tente novamente.';
+          }
+          renderCardMessage(signupMessageEl, 'error', messageText);
+          updateSignupButton();
+        })
+        .registerUser(payload);
+    });
+  }
+
+  if (btnLogin) {
+    btnLogin.addEventListener('click', () => {
+      clearCardMessage(loginMessageEl);
+      const email = loginEmailInput ? loginEmailInput.value.trim() : '';
+      const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
+      if (!email || !password) {
+        renderCardMessage(loginMessageEl, 'error', 'Informe e-mail e senha.');
+        return;
+      }
+
+      google.script.run
+        .withFailureHandler(err => {
+          renderCardMessage(loginMessageEl, 'error', err.message || err);
+        })
+        .withSuccessHandler(user => {
+          if (user && user.id) {
+            clearCardMessage(loginMessageEl);
+            currentUser = user;
+            updateUI();
+          } else {
+            renderCardMessage(loginMessageEl, 'error', 'Não foi possível entrar. Tente novamente.');
+          }
+        })
+        .loginUser({ email, password });
+    });
+  }
 
   $('#btnLogout').onclick = ()=>{ currentUser=null; updateUI(); };
 
