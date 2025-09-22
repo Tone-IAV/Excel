@@ -33,6 +33,7 @@ const TABLE_HEADERS = {
 const spreadsheet = SpreadsheetApp.openById(SPREADSHEET_ID);
 
 function doGet() {
+  ensureInitialData();
   return HtmlService
     .createTemplateFromFile('Index')
     .evaluate()
@@ -41,6 +42,7 @@ function doGet() {
 
 function doPost(e) {
   try {
+    ensureInitialData();
     const payload = JSON.parse(e.postData?.contents || '{}');
     const action = payload.action;
     const token = payload.token;
@@ -329,6 +331,60 @@ const DEFAULT_MODULES = (function() {
   };
   return modules;
 })();
+
+function ensureInitialData() {
+  Object.keys(SHEETS).forEach(key => ensureSheet(SHEETS[key]));
+  seedConfigDefaults();
+  seedModuleDefaults();
+}
+
+function seedConfigDefaults() {
+  const existing = readSheet(SHEETS.CONFIG);
+  const seen = new Set(existing.map(row => String(row.Chave || '').toLowerCase()));
+  const defaults = [
+    { Chave: 'xpCheckin', Valor: 5 },
+    { Chave: 'xpPorNivel', Valor: 100 },
+    { Chave: 'ciclo', Valor: 'Turma Excel — 2025' }
+  ];
+  defaults.forEach(item => {
+    const key = String(item.Chave || '').toLowerCase();
+    if (!seen.has(key)) {
+      writeRow(SHEETS.CONFIG, item);
+      seen.add(key);
+    }
+  });
+}
+
+function seedModuleDefaults() {
+  const moduleRows = readSheet(SHEETS.MODULES);
+  if (moduleRows.length) return;
+  ensureSheet(SHEETS.QUESTIONS);
+  DEFAULT_MODULES.forEach((mod, idx) => {
+    writeRow(SHEETS.MODULES, {
+      ModuleID: mod.id,
+      Ordem: idx + 1,
+      Titulo: mod.titulo,
+      Descricao: mod.desc,
+      XP: mod.xp,
+      VideoURL: mod.videoUrl || '',
+      MaterialURL: mod.materialUrl || '',
+      Ativo: true
+    });
+    (mod.perguntas || []).forEach((pergunta, qIndex) => {
+      writeRow(SHEETS.QUESTIONS, {
+        ModuleID: mod.id,
+        QuestionID: pergunta.id || `Q${qIndex + 1}`,
+        Tipo: pergunta.tipo || 'mc',
+        Enunciado: pergunta.enunciado,
+        OpcoesJSON: pergunta.opcoes && pergunta.opcoes.length ? JSON.stringify(pergunta.opcoes) : '',
+        Correta: pergunta.correta !== undefined ? pergunta.correta : '',
+        Peso: pergunta.peso !== undefined ? pergunta.peso : 1,
+        MinCaracteres: pergunta.minCaracteres !== undefined ? pergunta.minCaracteres : '',
+        Feedback: pergunta.feedback || ''
+      });
+    });
+  });
+}
 
 function loadModules() {
   const moduleRows = readSheet(SHEETS.MODULES);
