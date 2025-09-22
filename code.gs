@@ -106,6 +106,20 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
+function renderStudentSubPage(payload) {
+  const pageRaw = payload && payload.page ? payload.page.toString() : '';
+  const page = pageRaw.replace(/[^a-z0-9\-]/gi, '').toLowerCase();
+  let filename = '';
+  if (page === 'next-lesson') {
+    filename = 'next-lesson';
+  } else if (page === 'achievements-catalog') {
+    filename = 'achievements-catalog';
+  } else {
+    throw new Error('Página desconhecida.');
+  }
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
 /** Cria abas e cabeçalhos se não existirem */
 function setup_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
