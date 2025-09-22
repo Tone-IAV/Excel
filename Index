@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Curso de Excel — Plataforma Gamificada</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme:{ extend:{ colors:{ primary:'#007BFF',accent:'#00C9A7',ink:'#0F172A' }, boxShadow:{ soft:'0 10px 30px rgba(0,0,0,.08)' }, borderRadius:{ '2xl':'1.25rem' } } }, darkMode:'class' }
+  </script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    .glass{backdrop-filter:blur(10px);background:rgba(255,255,255,.65)}.dark .glass{background:rgba(17,24,39,.55)}
+    .card{border-radius:1.25rem;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:1.25rem;background:#fff}
+    .dark .card{background:#0f172a}
+    .btn{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1rem;border-radius:.75rem;font-weight:500;transition:.2s;border:1px solid transparent}
+    .btn-primary{background:#007BFF;color:#fff}
+    .btn-ghost{background:transparent;color:#1f2937}
+    .dark .btn-ghost{color:#e5e7eb}
+    .btn:hover{filter:brightness(1.06)}
+    .input{width:100%;padding:.5rem .75rem;border-radius:.75rem;border:1px solid #e5e7eb;background:#fff;color:#0f172a}
+    .dark .input{border-color:#475569;background:#0f172a;color:#e5e7eb}
+    .pill{font-size:.75rem;padding:.25rem .6rem;border-radius:9999px;background:#f1f5f9;color:#475569}
+    .dark .pill{background:#334155;color:#e2e8f0}
+    .tab{padding:.5rem 1rem;border-radius:.75rem;cursor:pointer;font-weight:500;color:#475569}
+    .dark .tab{color:#cbd5e1}
+    .tab.active{background:#007BFF;color:white}
+    .badge{font-size:.65rem;padding:.1rem .5rem;border-radius:9999px;text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+    .badge-gold{background:rgba(250,204,21,.2);color:#a16207}
+    .badge-silver{background:rgba(203,213,225,.25);color:#475569}
+    .badge-bronze{background:rgba(180,83,9,.2);color:#b45309}
+    .aspect-video{position:relative;padding-top:56.25%}
+    .aspect-video>iframe,.aspect-video>.fill{position:absolute;inset:0;width:100%;height:100%}
+    .modal{position:fixed;inset:0;background:rgba(15,23,42,.6);display:flex;align-items:center;justify-content:center;padding:1rem;z-index:50}
+  </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-900 text-ink dark:text-slate-100 min-h-screen">
+  <!-- AUTH MODAL -->
+  <div id="authModal" class="modal hidden">
+    <div class="card max-w-md w-full">
+      <h2 class="text-xl font-bold mb-2">Entrar ou Criar Conta</h2>
+      <p class="text-sm text-slate-500 mb-4">Crie sua conta para acompanhar os <b>24 módulos</b>, registrar atividades e subir no ranking. <br><span class="text-amber-600">(Demo: os dados ficam apenas no seu navegador.)</span></p>
+      <div class="grid gap-3">
+        <input id="authNome" class="input" placeholder="Nome completo" />
+        <input id="authEmail" class="input" placeholder="E-mail" />
+        <input id="authSenha" type="password" class="input" placeholder="Senha" />
+        <label class="text-xs text-slate-500 flex items-center gap-2"><input id="authAdmin" type="checkbox"/> Sou administrador</label>
+        <div class="flex gap-2">
+          <button id="btnSignup" class="btn btn-primary flex-1"><i data-lucide="user-plus"></i> Criar conta</button>
+          <button id="btnLogin" class="btn btn-ghost flex-1"><i data-lucide="log-in"></i> Entrar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="glass sticky top-0 z-30 border-b border-slate-200/60 dark:border-slate-700/60">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
+      <div class="flex items-center gap-3">
+        <div class="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="h-6 w-6 text-primary"><path fill="currentColor" d="M4 4h9l7 7v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zm9 1v6h6"/></svg>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold">Curso de Excel — Plataforma Gamificada</h1>
+          <p class="text-xs text-slate-500">Módulos | Atividades | XP | Ranking | Excel & PowerPoint Compartilhados</p>
+        </div>
+      </div>
+      <div class="ml-auto flex items-center gap-2">
+        <span id="userInfo" class="pill">Visitante</span>
+        <button id="btnDark" class="btn btn-ghost" title="Tema"><i data-lucide="moon"></i><span class="hidden sm:inline">Tema</span></button>
+        <button id="btnLogout" class="btn btn-ghost hidden" title="Sair"><i data-lucide="log-out"></i><span class="hidden sm:inline">Sair</span></button>
+      </div>
+    </div>
+  </header>
+
+  <!-- NAV -->
+  <nav class="max-w-7xl mx-auto px-4 pt-4 flex flex-wrap gap-2">
+    <button class="tab active" data-tab="dashboard"><i data-lucide="home"></i> <span>Dashboard</span></button>
+    <button class="tab" data-tab="atividades"><i data-lucide="list-checks"></i> <span>Minhas Atividades</span></button>
+    <button class="tab" data-tab="ranking"><i data-lucide="trophy"></i> <span>Ranking</span></button>
+    <button class="tab" data-tab="arquivos"><i data-lucide="file-spreadsheet"></i> <span>Excel & PPT</span></button>
+    <button id="tabAdminBtn" class="tab hidden" data-tab="admin"><i data-lucide="shield"></i> <span>Admin</span></button>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <!-- DASHBOARD -->
+    <section id="tab-dashboard" class="grid md:grid-cols-3 gap-4">
+      <div class="card md:col-span-2">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold">Visão Geral</h2>
+          <span id="semesterInfo" class="pill">Ciclo atual</span>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-3">
+          <div class="rounded-2xl p-4 bg-primary/10 dark:bg-primary/20">
+            <p class="text-xs text-slate-600 dark:text-slate-200">Seus pontos (XP)</p>
+            <p id="kpiXP" class="text-3xl font-bold">0</p>
+          </div>
+          <div class="rounded-2xl p-4 bg-emerald-100 dark:bg-emerald-900/40">
+            <p class="text-xs text-slate-600 dark:text-slate-200">Atividades concluídas</p>
+            <p id="kpiAtv" class="text-3xl font-bold">0</p>
+          </div>
+          <div class="rounded-2xl p-4 bg-amber-100 dark:bg-amber-900/40">
+            <p class="text-xs text-slate-600 dark:text-slate-200">Nível</p>
+            <p id="kpiNivel" class="text-3xl font-bold">1</p>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div class="flex items-center justify-between mb-1"><span class="text-sm">Progresso nos 24 módulos</span><span id="progressPct" class="text-sm">0%</span></div>
+          <div class="w-full bg-slate-200 dark:bg-slate-700 h-3 rounded-full overflow-hidden">
+            <div id="progressBar" class="h-3 bg-primary" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="text-lg font-semibold mb-2">Check-in diário</h3>
+        <p class="text-sm text-slate-500 mb-3">Ganhe <b>+5 XP</b> por presença no dia.</p>
+        <button id="btnCheckin" class="btn btn-primary"><i data-lucide="sparkles"></i> Confirmar presença</button>
+        <p id="checkinMsg" class="text-xs text-emerald-600 mt-2"></p>
+      </div>
+    </section>
+
+    <!-- ATIVIDADES DO ALUNO -->
+    <section id="tab-atividades" class="hidden space-y-4">
+      <div class="card">
+        <h2 class="text-xl font-semibold mb-2">Trilha de 24 Módulos (1h/dia)</h2>
+        <div id="gridModulos" class="grid md:grid-cols-3 gap-3"></div>
+      </div>
+      <div class="card hidden" id="panelAtividade">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 id="atvTitulo" class="text-lg font-semibold">Atividade</h3>
+            <p id="atvDesc" class="text-sm text-slate-500"></p>
+          </div>
+          <button id="btnFecharAtv" class="btn btn-ghost"><i data-lucide="x"></i></button>
+        </div>
+        <div id="atvPerguntas" class="mt-4 space-y-4"></div>
+        <div class="mt-4 flex items-center justify-between">
+          <span id="atvFeedback" class="text-sm"></span>
+          <button id="btnEnviarAtv" class="btn btn-primary"><i data-lucide="send"></i> Enviar respostas</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RANKING GERAL -->
+    <section id="tab-ranking" class="hidden space-y-4">
+      <div class="card">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold">Ranking da Turma</h2>
+          <div class="flex gap-2">
+            <button id="btnSortXP" class="btn btn-ghost"><i data-lucide="trophy"></i> Ordenar por XP</button>
+            <button id="btnSortNome" class="btn btn-ghost"><i data-lucide="sort-asc"></i> Ordenar por Nome</button>
+          </div>
+        </div>
+        <div id="gridRanking" class="grid md:grid-cols-3 gap-3"></div>
+      </div>
+    </section>
+
+    <!-- ARQUIVOS COMPARTILHADOS -->
+    <section id="tab-arquivos" class="hidden space-y-4">
+      <div class="card">
+        <h2 class="text-xl font-semibold mb-2">Vincular arquivos compartilhados</h2>
+        <p class="text-sm text-slate-500 mb-4">Cole os links de compartilhamento do <b>Excel</b> e <b>PowerPoint</b> para colaboração/visualização (OneDrive/SharePoint/Google Drive).</p>
+        <div class="grid md:grid-cols-2 gap-3">
+          <div>
+            <label class="text-sm font-medium">Link do Excel</label>
+            <input id="inputExcel" class="input mt-1" placeholder="Cole o link do Excel" />
+            <button id="btnSaveExcel" class="btn btn-primary mt-2"><i data-lucide="save"></i> Salvar Excel</button>
+          </div>
+          <div>
+            <label class="text-sm font-medium">Link do PowerPoint</label>
+            <input id="inputPPT" class="input mt-1" placeholder="Cole o link do PPT" />
+            <button id="btnSavePPT" class="btn btn-primary mt-2"><i data-lucide="save"></i> Salvar PowerPoint</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="card">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold">Excel</h3><span class="pill">Colab</span></div>
+          <div class="aspect-video rounded-2xl overflow-hidden" id="excelFrameWrap"><div class="fill flex items-center justify-center text-slate-400 text-sm p-4 text-center">Cole o link do Excel e salve.</div></div>
+        </div>
+        <div class="card">
+          <div class="flex items-center justify-between mb-2"><h3 class="font-semibold">PowerPoint</h3><span class="pill">Apresentação</span></div>
+          <div class="aspect-video rounded-2xl overflow-hidden" id="pptFrameWrap"><div class="fill flex items-center justify-center text-slate-400 text-sm p-4 text-center">Cole o link do PowerPoint e salve.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN -->
+    <section id="tab-admin" class="hidden space-y-4">
+      <div class="card">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold">Painel do Administrador</h2>
+          <div class="flex gap-2">
+            <button id="btnExport" class="btn btn-ghost"><i data-lucide="download"></i> Exportar</button>
+            <label class="btn btn-ghost cursor-pointer"><i data-lucide="upload"></i> Importar<input id="importInput" type="file" accept="application/json" class="hidden"/></label>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-sm">
+            <thead><tr class="text-left text-slate-500"><th class="py-2 pr-2">Aluno</th><th class="py-2 pr-2">E-mail</th><th class="py-2 pr-2">XP</th><th class="py-2 pr-2">Nível</th><th class="py-2 pr-2">Concluídos</th><th class="py-2 pr-2">Bônus</th></tr></thead>
+            <tbody id="tbodyAdmin"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="max-w-7xl mx-auto px-4 pb-10 text-center text-xs text-slate-500">Plataforma local-first (LocalStorage). Para produção, conectar a um backend/Sheets/Firestore.</footer>
+
+  <script>
+    // ===== Persitência & Estruturas =====
+    const SKEY = 'excelPlatform_v2';
+    const state = {
+      users: [], // {id,nome,email,senhaHash,admin:boolean, xp, progresso:{[modId]:{done:boolean, score:number}}, checkins:string[]}
+      embeds: {excel:'',ppt:''},
+      cfg: { xpCheckin:5, xpPorNivel:100, ciclo:'Turma Excel — 2025' },
+      modules: [] // preenchido abaixo
+    };
+
+    // 24 módulos — exemplos de perguntas (Dia 1 com questões reais, demais com placeholders)
+    const MODULES = Array.from({length:24}).map((_,i)=>({
+      id: i+1,
+      titulo: `${i+1}. Módulo ${i+1}`,
+      desc: 'Atividade prática do módulo.',
+      xp: 30,
+      perguntas: []
+    }));
+    MODULES[0] = {
+      id:1,
+      titulo:'1. Boas‑vindas, interface e fundamentos',
+      desc:'Crie sua primeira planilha com cabeçalhos e formate os dados. Responda as perguntas para validar o aprendizado.',
+      xp: 40,
+      perguntas:[
+        { id:'q1', tipo:'mc', enunciado:'Onde fica a Faixa de Opções (Ribbon)?',
+          opcoes:['Na barra lateral esquerda','Na parte superior da janela','Dentro da célula ativa','No menu de contexto'], correta:1 },
+        { id:'q2', tipo:'mc', enunciado:'Qual atalho salva rapidamente?',
+          opcoes:['Ctrl/Cmd + N','Ctrl/Cmd + 1','Ctrl/Cmd + S','Ctrl/Cmd + Enter'], correta:2 },
+        { id:'q3', tipo:'text', enunciado:'Descreva dois cuidados ao criar cabeçalhos da planilha.' }
+      ]
+    };
+
+    state.modules = MODULES;
+
+    // ===== Helpers =====
+    const $ = s => document.querySelector(s);
+    const el = (t,c) => { const x=document.createElement(t); if(c) x.className=c; return x; };
+    const todayStr = () => new Date().toISOString().slice(0,10);
+    const levelOf = xp => 1 + Math.floor((xp||0) / (state.cfg.xpPorNivel||100));
+    const hash = s => s; // demo (não seguro)
+
+    function load(){ const raw = localStorage.getItem(SKEY); if(raw){ try{const data=JSON.parse(raw); Object.assign(state,data);}catch(e){console.error(e)} } }
+    function save(){ localStorage.setItem(SKEY, JSON.stringify(state)); refreshAll(); }
+
+    // ===== Tema
+    function setTheme(dark){ document.documentElement.classList.toggle('dark',dark); localStorage.setItem('theme_dark',dark?'1':'0'); }
+    $('#btnDark').onclick = ()=> setTheme(!(localStorage.getItem('theme_dark')==='1'));
+    setTheme(localStorage.getItem('theme_dark')==='1');
+
+    // ===== Auth =====
+    let currentUser = null; // {id, ...}
+    function showAuth(show){ $('#authModal').classList.toggle('hidden', !show); }
+    function updateUserInfo(){ $('#userInfo').textContent = currentUser? `${currentUser.nome} (${currentUser.admin?'Admin':'Aluno'})` : 'Visitante'; $('#btnLogout').classList.toggle('hidden', !currentUser); $('#tabAdminBtn').classList.toggle('hidden', !(currentUser?.admin)); }
+
+    $('#btnSignup').onclick = ()=>{
+      const nome=$('#authNome').value.trim(); const email=$('#authEmail').value.trim().toLowerCase(); const senha=$('#authSenha').value.trim(); const admin=$('#authAdmin').checked;
+      if(!nome||!email||!senha) return alert('Preencha nome, e-mail e senha.');
+      if(state.users.some(u=>u.email===email)) return alert('E-mail já cadastrado.');
+      const user={ id:crypto.randomUUID(), nome,email,senhaHash:hash(senha),admin, xp:0, progresso:{}, checkins:[] };
+      state.users.push(user); save(); currentUser=user; showAuth(false); updateUserInfo(); refreshAll();
+    };
+    $('#btnLogin').onclick = ()=>{
+      const email=$('#authEmail').value.trim().toLowerCase(); const senha=$('#authSenha').value.trim();
+      const u = state.users.find(x=>x.email===email && x.senhaHash===hash(senha));
+      if(!u) return alert('Credenciais inválidas.');
+      currentUser=u; showAuth(false); updateUserInfo(); refreshAll();
+    };
+    $('#btnLogout').onclick = ()=>{ currentUser=null; updateUserInfo(); showAuth(true); };
+
+    // ===== Dashboard KPIs =====
+    function renderDashboard(){ if(!currentUser){ $('#kpiXP').textContent='0'; $('#kpiAtv').textContent='0'; $('#kpiNivel').textContent='1'; $('#progressBar').style.width='0%'; $('#progressPct').textContent='0%'; return; }
+      $('#kpiXP').textContent = currentUser.xp||0; const concl = Object.values(currentUser.progresso||{}).filter(p=>p.done).length; $('#kpiAtv').textContent = concl; $('#kpiNivel').textContent = levelOf(currentUser.xp); const pct = Math.round((concl/state.modules.length)*100); $('#progressBar').style.width=pct+'%'; $('#progressPct').textContent=pct+'%'; }
+
+    // Check-in diário
+    $('#btnCheckin').onclick = ()=>{ if(!currentUser) return showAuth(true); const today=todayStr(); if(!(currentUser.checkins||[]).includes(today)){ currentUser.checkins.push(today); currentUser.xp=(currentUser.xp||0)+ (state.cfg.xpCheckin||5); $('#checkinMsg').textContent=`Presença registrada. +${state.cfg.xpCheckin} XP!`; } else { $('#checkinMsg').textContent='Presença de hoje já registrada.'; } save(); setTimeout(()=>$('#checkinMsg').textContent='',3000); };
+
+    // ===== Módulos & Atividades =====
+    function renderModulos(){ const grid=$('#gridModulos'); grid.innerHTML=''; state.modules.forEach(m=>{ const prog=currentUser?.progresso?.[m.id]||{done:false,score:0}; const card=el('div','card'); card.innerHTML=`<div class="flex items-start justify-between"><div><h4 class="font-semibold">${m.titulo}</h4><p class="text-sm text-slate-500">${m.desc}</p></div><span class="pill">${prog.done? 'Concluído' : m.xp+' XP'}</span></div><div class="mt-3 flex items-center justify-between"><div class="text-xs text-slate-500">Score: ${prog.score||0}</div><button class="btn btn-primary" data-open="${m.id}"><i data-lucide="play"></i> ${prog.done? 'Refazer' : 'Começar'}</button></div>`; grid.appendChild(card); }); lucide.createIcons(); grid.querySelectorAll('button[data-open]').forEach(b=> b.onclick=()=> openAtividade(parseInt(b.getAttribute('data-open')))); }
+
+    let atvAtual = null;
+    function openAtividade(modId){ if(!currentUser) return showAuth(true); const m = state.modules.find(x=>x.id===modId); atvAtual=m; $('#panelAtividade').classList.remove('hidden'); $('#atvTitulo').textContent=m.titulo; $('#atvDesc').textContent=m.desc+` • Vale ${m.xp} XP`; const wrap=$('#atvPerguntas'); wrap.innerHTML=''; m.perguntas.forEach((q,idx)=>{ const block=el('div'); block.innerHTML=`<div class="font-medium">${idx+1}) ${q.enunciado}</div>`; if(q.tipo==='mc'){ const list=el('div','mt-2 grid gap-2'); q.opcoes.forEach((opt,i)=>{ const id=`${m.id}_${q.id}_${i}`; list.innerHTML += `<label class="flex items-center gap-2 text-sm"><input type="radio" name="${m.id}_${q.id}" value="${i}" class="scale-110"/> ${opt}</label>`; }); block.appendChild(list); } else if(q.tipo==='text'){ const ta=el('textarea','input mt-2'); ta.rows=3; ta.placeholder='Sua resposta...'; ta.setAttribute('data-text', `${m.id}_${q.id}`); block.appendChild(ta); } wrap.appendChild(block); }); $('#atvFeedback').textContent=''; }
+    $('#btnFecharAtv').onclick = ()=> { $('#panelAtividade').classList.add('hidden'); };
+
+    $('#btnEnviarAtv').onclick = ()=>{ if(!currentUser || !atvAtual) return; // avaliação simples
+      let score=0; let total=0; atvAtual.perguntas.forEach(q=>{ if(q.tipo==='mc'){ total++; const sel = document.querySelector(`input[name="${atvAtual.id}_${q.id}"]:checked`); if(sel && parseInt(sel.value,10)===q.correta) score++; } else if(q.tipo==='text'){ const tx = document.querySelector(`textarea[data-text="${atvAtual.id}_${q.id}"]`); if(tx && tx.value.trim().length>=10){ score++; } total++; });
+      const pct = Math.round((score/total)*100);
+      const earned = Math.round(atvAtual.xp * (pct/100));
+      // registrar progresso
+      currentUser.progresso[atvAtual.id] = { done:true, score:pct };
+      currentUser.xp = (currentUser.xp||0) + earned;
+      $('#atvFeedback').textContent = `Você acertou ${score}/${total} (${pct}%). +${earned} XP!`;
+      save();
+    };
+
+    // ===== Ranking =====
+    function renderRanking(sortBy='xp'){
+      const grid=$('#gridRanking'); grid.innerHTML=''; const arr = state.users.filter(u=>!u.admin);
+      if(sortBy==='xp') arr.sort((a,b)=> (b.xp||0)-(a.xp||0));
+      if(sortBy==='nome') arr.sort((a,b)=> (a.nome||'').localeCompare(b.nome||''));
+      arr.forEach((a,idx)=>{ const medal = idx===0?'badge-gold': idx===1?'badge-silver': idx===2?'badge-bronze':''; const card=el('div','rounded-2xl p-5 bg-white dark:bg-slate-800 shadow-soft'); card.innerHTML=`<div class="flex items-center gap-3"><div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-lg">${(a.nome||'?').slice(0,1).toUpperCase()}</div><div class="flex-1"><div class="flex items-center gap-2"><h4 class="font-semibold">${a.nome}</h4>${medal?`<span class="badge ${medal}">${idx+1}º</span>`:''}</div><div class="text-xs text-slate-500">Nível ${levelOf(a.xp)}</div></div><div class="text-right"><div class="text-2xl font-bold">${a.xp||0}</div><div class="text-xs text-slate-500">XP</div></div></div>`; grid.appendChild(card); }); lucide.createIcons(); }
+    $('#btnSortXP').onclick = ()=> renderRanking('xp');
+    $('#btnSortNome').onclick = ()=> renderRanking('nome');
+
+    // ===== Embeds =====
+    function normalizeEmbed(url){ if(!url) return ''; if(url.includes('onedrive')||url.includes('sharepoint')){ if(url.includes('embed')) return url; return `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`; } if(url.includes('drive.google.com')){ return url.replace('/view?usp=sharing','/preview'); } return url; }
+    function renderEmbeds(){ const excelURL=normalizeEmbed(state.embeds.excel); const pptURL=normalizeEmbed(state.embeds.ppt); $('#excelFrameWrap').innerHTML = excelURL? `<iframe src="${excelURL}" class="w-full h-full"></iframe>` : '<div class="fill flex items-center justify-center text-slate-400 text-sm p-4 text-center">Cole o link do Excel e salve.</div>'; $('#pptFrameWrap').innerHTML = pptURL? `<iframe src="${pptURL}" class="w-full h-full"></iframe>` : '<div class="fill flex items-center justify-center text-slate-400 text-sm p-4 text-center">Cole o link do PowerPoint e salve.</div>'; }
+    $('#btnSaveExcel').onclick = ()=>{ state.embeds.excel = $('#inputExcel').value.trim(); save(); }
+    $('#btnSavePPT').onclick = ()=>{ state.embeds.ppt = $('#inputPPT').value.trim(); save(); }
+
+    // ===== Admin =====
+    function renderAdmin(){ const tbody=$('#tbodyAdmin'); if(!tbody) return; tbody.innerHTML=''; state.users.filter(u=>!u.admin).sort((a,b)=>(b.xp||0)-(a.xp||0)).forEach(u=>{ const concl=Object.values(u.progresso||{}).filter(p=>p.done).length; const tr=el('tr','border-t border-slate-100 dark:border-slate-700'); tr.innerHTML=`<td class="py-2 pr-2">${u.nome}</td><td class="py-2 pr-2">${u.email}</td><td class="py-2 pr-2 font-semibold">${u.xp||0}</td><td class="py-2 pr-2">${levelOf(u.xp)}</td><td class="py-2 pr-2">${concl}/24</td><td class="py-2 pr-2"><div class="flex gap-2"><button class="btn btn-ghost btn-xs" data-bonus="${u.id}" data-amt="20">+20</button><button class="btn btn-ghost btn-xs" data-bonus="${u.id}" data-amt="50">+50</button></div></td>`; tbody.appendChild(tr); }); tbody.querySelectorAll('button[data-bonus]').forEach(b=> b.onclick=()=>{ const uid=b.getAttribute('data-bonus'); const amt=parseInt(b.getAttribute('data-amt'),10)||0; const u=state.users.find(x=>x.id===uid); if(!u) return; u.xp=(u.xp||0)+amt; save(); }); }
+    $('#btnExport').onclick = ()=>{ const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='dados_plataforma.json'; a.click(); URL.revokeObjectURL(a.href); };
+    $('#importInput')?.addEventListener('change', e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=()=>{ try{ const data=JSON.parse(r.result); localStorage.setItem(SKEY, JSON.stringify(data)); location.reload(); }catch{ alert('JSON inválido'); } }; r.readAsText(f); });
+
+    // ===== Navegação =====
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach(t=> t.addEventListener('click', ()=>{ tabs.forEach(o=>o.classList.remove('active')); t.classList.add('active'); const id=t.dataset.tab; document.querySelectorAll('main section').forEach(s=>s.classList.add('hidden')); $('#tab-'+id).classList.remove('hidden'); }));
+
+    // ===== Refresh =====
+    function refreshAll(){ renderDashboard(); renderModulos(); renderRanking('xp'); renderEmbeds(); renderAdmin(); $('#semesterInfo').textContent = state.cfg.ciclo || 'Ciclo atual'; lucide.createIcons(); }
+
+    // Init
+    load();
+    if(!Array.isArray(state.modules) || state.modules.length!==24){ state.modules = MODULES; }
+    showAuth(true);
+    refreshAll();
+  </script>
+</body>
+</html>
