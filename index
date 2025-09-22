@@ -226,7 +226,7 @@
           <p class="text-xs mt-2 opacity-80" id="nextLessonProgressHint"></p>
         </div>
       </div>
-      <div class="grid lg:grid-cols-2 gap-6">
+      <div class="grid lg:grid-cols-2 gap-6" data-home-only>
         <div>
           <div class="flex items-center justify-between gap-2 mb-3">
             <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-200">Missões do dia</h3>
@@ -247,7 +247,7 @@
       </div>
     </div>
 
-    <div id="studentHomeWrap" class="grid gap-6 lg:grid-cols-12 auto-rows-max">
+    <div id="studentHomeWrap" class="grid gap-6 lg:grid-cols-12 auto-rows-max" data-home-only>
       <div class="lg:col-span-8 space-y-6">
         <div class="card card-flat">
           <h3 class="text-lg font-semibold mb-2">Sua evolução</h3>
@@ -605,6 +605,7 @@
   const studentSubPageLoadingEl = $('#studentSubPageLoading');
   const studentSubPageErrorEl = $('#studentSubPageError');
   const studentSubPageContainer = $('#studentSubPageContainer');
+  const homeOnlySections = Array.from(document.querySelectorAll('[data-home-only]'));
   let communityCharLimit = 240;
   let isPublishingCommunity = false;
   const communityDateFormatter = typeof Intl !== 'undefined'
@@ -1370,7 +1371,13 @@
       return;
     }
 
-    if (normalized === 'home') {
+    const isHome = normalized === 'home';
+    homeOnlySections.forEach(section => {
+      if (!section) return;
+      section.classList.toggle('hidden', !isHome);
+    });
+
+    if (isHome) {
       activeSubPage = 'home';
       setActiveSubPageButtons('home');
       updateBreadcrumbSubPage(null);
@@ -1408,6 +1415,9 @@
         if (studentSubPageContainer) {
           studentSubPageContainer.innerHTML = html || '';
           attachNavListeners(studentSubPageContainer);
+        }
+        if (studentSubPageSection && typeof studentSubPageSection.scrollIntoView === 'function') {
+          studentSubPageSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
         if (expectedPage === 'next-lesson') {
           populateNextLessonPage();
