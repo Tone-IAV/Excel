@@ -37,7 +37,8 @@ function doGet() {
   return HtmlService
     .createTemplateFromFile('Index')
     .evaluate()
-    .setTitle('Curso de Excel — Plataforma Gamificada');
+    .setTitle('Curso de Excel — Plataforma Gamificada')
+    .setSandboxMode(HtmlService.SandboxMode.IFRAME);
 }
 
 function doPost(e) {
