@@ -70,6 +70,26 @@
     .dark .milestone-chip-achieved { background:rgba(34,197,94,.3); color:#bbf7d0; }
     .dark .milestone-chip-next { background:rgba(250,204,21,.25); color:#fde68a; }
     #nextLevelBar { transition:width .45s ease; }
+    .achievements-scroll { display:flex; gap:1rem; overflow-x:auto; padding-bottom:.5rem; scroll-snap-type:x mandatory; }
+    .achievements-scroll::-webkit-scrollbar { height:6px; }
+    .achievement-card { min-width:200px; scroll-snap-align:start; border-radius:1rem; padding:1rem; border:1px solid rgba(148,163,184,.25); background:rgba(248,250,252,.95); box-shadow:0 6px 16px rgba(15,23,42,.08); transition:transform .25s ease, box-shadow .25s ease; }
+    .achievement-card:hover { transform:translateY(-2px); box-shadow:0 14px 32px rgba(15,23,42,.15); }
+    .achievement-card-unlocked { background:linear-gradient(135deg,rgba(34,197,94,.18),rgba(16,185,129,.25)); border-color:rgba(34,197,94,.3); color:#064e3b; }
+    .achievement-card-unlocked .achievement-xp { background:rgba(255,255,255,.4); color:#047857; }
+    .achievement-card-locked { background:linear-gradient(135deg,rgba(148,163,184,.18),rgba(226,232,240,.45)); color:#1f2937; }
+    .achievement-card-ready { border-color:rgba(251,191,36,.65); box-shadow:0 18px 38px rgba(251,191,36,.25); }
+    .achievement-card-ready .achievement-progress-bar { background:linear-gradient(135deg,#fbbf24,#f97316); }
+    .dark .achievement-card { background:rgba(15,23,42,.85); border-color:rgba(51,65,85,.6); box-shadow:0 8px 24px rgba(15,23,42,.4); color:#e2e8f0; }
+    .dark .achievement-card-unlocked { background:linear-gradient(135deg,rgba(16,185,129,.35),rgba(5,150,105,.45)); border-color:rgba(16,185,129,.5); color:#d1fae5; }
+    .dark .achievement-card-unlocked .achievement-xp { background:rgba(15,23,42,.35); color:#6ee7b7; }
+    .dark .achievement-card-locked { background:linear-gradient(135deg,rgba(30,41,59,.7),rgba(51,65,85,.7)); color:#e2e8f0; }
+    .achievement-icon { font-size:1.75rem; line-height:1; }
+    .achievement-xp { font-size:.7rem; font-weight:700; padding:.25rem .6rem; border-radius:9999px; background:rgba(255,255,255,.65); color:#1e293b; text-transform:uppercase; letter-spacing:.08em; }
+    .achievements-grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); }
+    .achievement-progress-track { height:6px; border-radius:9999px; background:rgba(148,163,184,.35); overflow:hidden; }
+    .achievement-progress-bar { height:100%; border-radius:9999px; background:linear-gradient(135deg,#38bdf8,#2563eb); transition:width .35s ease; }
+    .dark .achievement-progress-track { background:rgba(71,85,105,.55); }
+    .dark .achievement-progress-bar { background:linear-gradient(135deg,#38bdf8,#1d4ed8); }
   </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
@@ -179,7 +199,35 @@
         <h3 class="text-lg font-semibold mb-2">Check-in diário</h3>
         <p class="text-sm text-slate-500 mb-2">Ganhe +XP 1x ao dia.</p>
         <button id="btnCheckin" class="btn btn-primary">Confirmar presença</button>
+        <div id="checkinStreakInfo" class="mt-3 text-xs text-slate-500 dark:text-slate-300 leading-relaxed"></div>
         <div id="checkinMsg" class="text-xs text-emerald-600 mt-2"></div>
+      </div>
+    </div>
+
+    <div id="achievementsCard" class="card">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h3 class="text-lg font-semibold">Conquistas</h3>
+        <span id="achievementsSummary" class="text-xs text-slate-500 dark:text-slate-400"></span>
+      </div>
+      <div id="achievementsLoading" class="text-sm text-slate-500 dark:text-slate-300">Carregando conquistas...</div>
+      <div id="achievementsError" class="text-sm text-rose-600 dark:text-rose-300 hidden"></div>
+      <div id="achievementsContent" class="space-y-5 hidden">
+        <div>
+          <div class="flex items-center justify-between text-sm mb-2">
+            <span class="font-semibold">Desbloqueadas</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400">Celebre suas conquistas recentes</span>
+          </div>
+          <div id="achievementsUnlocked" class="achievements-scroll"></div>
+          <p id="achievementsUnlockedEmpty" class="text-xs text-slate-500 dark:text-slate-300">Faça login para desbloquear suas primeiras conquistas.</p>
+        </div>
+        <div>
+          <div class="flex items-center justify-between text-sm mb-2">
+            <span class="font-semibold">Próximas metas</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso e continue evoluindo</span>
+          </div>
+          <div id="achievementsUpcoming" class="achievements-grid"></div>
+          <p id="achievementsUpcomingEmpty" class="text-xs text-slate-500 dark:text-slate-300">Participe de check-ins e atividades para liberar novas medalhas.</p>
+        </div>
       </div>
     </div>
 
@@ -349,6 +397,14 @@
     }
   };
 
+  const achievementsState = {
+    loading: false,
+    error: '',
+    achievements: [],
+    summary: { total: 0, unlocked: 0 },
+    metrics: {}
+  };
+
   function showToast({ message, type = 'success', duration = 4000 } = {}) {
     const text = (message ?? '').toString().trim();
     if (!toastContainer || !text) return;
@@ -461,6 +517,16 @@
   const milestoneWrap = $('#milestoneWrap');
   const levelCardEl = $('#levelCard');
   const levelBadgeEl = $('#levelBadge');
+  const achievementsCardEl = $('#achievementsCard');
+  const achievementsSummaryEl = $('#achievementsSummary');
+  const achievementsUnlockedWrap = $('#achievementsUnlocked');
+  const achievementsUnlockedEmpty = $('#achievementsUnlockedEmpty');
+  const achievementsUpcomingWrap = $('#achievementsUpcoming');
+  const achievementsUpcomingEmpty = $('#achievementsUpcomingEmpty');
+  const achievementsLoadingEl = $('#achievementsLoading');
+  const achievementsErrorEl = $('#achievementsError');
+  const achievementsContentEl = $('#achievementsContent');
+  const checkinStreakInfoEl = $('#checkinStreakInfo');
 
   function resetLevelIndicator() {
     if (nextLevelTextEl) nextLevelTextEl.textContent = 'Faça login para acompanhar seus marcos.';
@@ -520,6 +586,308 @@
       span.textContent = 'Conquiste níveis para desbloquear marcos!';
       milestoneWrap.appendChild(span);
     }
+  }
+
+  function formatNumber(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return value;
+    try {
+      return new Intl.NumberFormat('pt-BR').format(numeric);
+    } catch (err) {
+      return numeric.toString();
+    }
+  }
+
+  function formatAchievementDate(value) {
+    const parsed = parseDateValue(value);
+    if (!parsed) return 'agora mesmo';
+    try {
+      return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
+    } catch (err) {
+      return parsed.toLocaleDateString('pt-BR');
+    }
+  }
+
+  function getAchievementTimestamp(value) {
+    if (!value) return 0;
+    const parsed = parseDateValue(value);
+    if (parsed) return parsed.getTime();
+    const date = new Date(value);
+    const time = date.getTime();
+    return Number.isNaN(time) ? 0 : time;
+  }
+
+  function normalizeAchievementsResponse(data) {
+    if (!data || typeof data !== 'object') {
+      return {
+        achievements: [],
+        summary: { total: 0, unlocked: 0 },
+        metrics: {}
+      };
+    }
+    const achievements = Array.isArray(data.achievements)
+      ? data.achievements.map(item => ({
+          id: item?.id || '',
+          title: item?.title || '',
+          description: item?.description || '',
+          category: item?.category || '',
+          icon: item?.icon || '',
+          rewardXP: Number(item?.rewardXP || 0),
+          unlocked: !!item?.unlocked,
+          achieved: !!item?.achieved,
+          unlockedAt: item?.unlockedAt ? String(item.unlockedAt) : '',
+          target: Number(item?.target || 0),
+          progressValue: Number(item?.progressValue || item?.progress || 0),
+          progress: Number(item?.progress || item?.progressValue || 0),
+          progressPct: Math.max(0, Math.min(100, Number(item?.progressPct || 0))),
+          progressLabel: item?.progressLabel || '',
+          readyToUnlock: !!item?.readyToUnlock,
+          extra: item?.extra || {}
+        }))
+      : [];
+    const summary = {
+      total: Number(data.summary?.total || achievements.length || 0),
+      unlocked: Number(data.summary?.unlocked || achievements.filter(a => a.unlocked).length || 0)
+    };
+    const metrics = data.metrics && typeof data.metrics === 'object' ? data.metrics : {};
+    return { achievements, summary, metrics };
+  }
+
+  function createUnlockedAchievementBadge(item) {
+    const badge = document.createElement('div');
+    badge.className = 'achievement-card achievement-card-unlocked';
+    const icon = item?.icon || '🏆';
+    const reward = Number(item?.rewardXP || 0);
+    const rewardLabel = reward > 0 ? `+${formatNumber(reward)} XP` : 'Badge';
+    const unlockedLabel = item?.unlockedAt ? formatAchievementDate(item.unlockedAt) : 'agora mesmo';
+    badge.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <span class="achievement-icon">${icon}</span>
+        <span class="achievement-xp">${rewardLabel}</span>
+      </div>
+      <div class="text-sm font-semibold leading-snug mb-1">${item?.title || 'Conquista desbloqueada'}</div>
+      <p class="text-xs leading-relaxed opacity-80">${item?.description || 'Continue participando para acumular ainda mais.'}</p>
+      <div class="text-[0.65rem] uppercase tracking-wide mt-3 opacity-70">Desbloqueada em ${unlockedLabel}</div>
+    `;
+    return badge;
+  }
+
+  function createUpcomingAchievementCard(item) {
+    const card = document.createElement('div');
+    const classes = ['achievement-card', 'achievement-card-locked'];
+    if (item?.readyToUnlock) classes.push('achievement-card-ready');
+    card.className = classes.join(' ');
+    const icon = item?.icon || '🎯';
+    const reward = Number(item?.rewardXP || 0);
+    const rewardLabel = reward > 0 ? `+${formatNumber(reward)} XP` : 'Meta';
+    const progressPct = Math.max(0, Math.min(100, Number(item?.progressPct || 0)));
+    const progressLabel = item?.progressLabel || '';
+    const encouragement = item?.readyToUnlock
+      ? 'Pronto! Realize a próxima ação para conquistar.'
+      : 'Continue acumulando progresso para desbloquear.';
+    card.innerHTML = `
+      <div class="flex items-center justify-between mb-3">
+        <span class="achievement-icon">${icon}</span>
+        <span class="achievement-xp">${rewardLabel}</span>
+      </div>
+      <div class="text-sm font-semibold leading-snug mb-1">${item?.title || 'Próxima meta'}</div>
+      <p class="text-xs leading-relaxed opacity-80 mb-3">${item?.description || ''}</p>
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-[0.65rem] uppercase tracking-wide opacity-75">
+          <span>${progressLabel}</span>
+          <span>${progressPct}%</span>
+        </div>
+        <div class="achievement-progress-track">
+          <div class="achievement-progress-bar" style="width:${progressPct}%"></div>
+        </div>
+      </div>
+      <div class="text-[0.65rem] mt-3 opacity-70">${encouragement}</div>
+    `;
+    return card;
+  }
+
+  function updateCheckinStreakInfo(metrics) {
+    if (!checkinStreakInfoEl) return;
+    if (!currentUser) {
+      checkinStreakInfoEl.textContent = 'Faça login para iniciar sua sequência de check-ins.';
+      checkinStreakInfoEl.classList.remove('text-emerald-600', 'dark:text-emerald-300', 'font-semibold');
+      checkinStreakInfoEl.classList.add('text-slate-500', 'dark:text-slate-300');
+      return;
+    }
+    const current = Number(metrics?.checkinCurrentStreak || metrics?.current || 0);
+    const best = Number(metrics?.checkinBestStreak || metrics?.best || 0);
+    const total = Number(metrics?.totalCheckins || metrics?.total || 0);
+    if (!current && !best && !total) {
+      checkinStreakInfoEl.textContent = 'Registre seu primeiro check-in para iniciar uma sequência!';
+      checkinStreakInfoEl.classList.remove('text-emerald-600', 'dark:text-emerald-300', 'font-semibold');
+      checkinStreakInfoEl.classList.add('text-slate-500', 'dark:text-slate-300');
+      return;
+    }
+    const parts = [];
+    if (current > 0) {
+      parts.push(`🔥 Streak atual: ${current} dia${current > 1 ? 's' : ''}`);
+    } else {
+      parts.push('Sem streak ativo no momento.');
+    }
+    if (best > 0) {
+      parts.push(`Recorde: ${best} dia${best > 1 ? 's' : ''}`);
+    }
+    if (total > 0) {
+      parts.push(`${total} check-in${total > 1 ? 's' : ''} no total`);
+    }
+    checkinStreakInfoEl.textContent = parts.join(' • ');
+    const highlight = current >= 3;
+    if (highlight) {
+      checkinStreakInfoEl.classList.add('text-emerald-600', 'dark:text-emerald-300', 'font-semibold');
+      checkinStreakInfoEl.classList.remove('text-slate-500', 'dark:text-slate-300');
+    } else {
+      checkinStreakInfoEl.classList.remove('text-emerald-600', 'dark:text-emerald-300', 'font-semibold');
+      checkinStreakInfoEl.classList.add('text-slate-500', 'dark:text-slate-300');
+    }
+  }
+
+  function renderAchievements() {
+    if (!achievementsCardEl) return;
+
+    if (!currentUser) {
+      if (achievementsSummaryEl) {
+        achievementsSummaryEl.textContent = 'Faça login para acompanhar suas conquistas.';
+      }
+      if (achievementsContentEl) achievementsContentEl.classList.add('hidden');
+      if (achievementsLoadingEl) achievementsLoadingEl.classList.add('hidden');
+      if (achievementsErrorEl) achievementsErrorEl.classList.add('hidden');
+      if (achievementsUnlockedWrap) achievementsUnlockedWrap.innerHTML = '';
+      if (achievementsUpcomingWrap) achievementsUpcomingWrap.innerHTML = '';
+      if (achievementsUnlockedEmpty) achievementsUnlockedEmpty.classList.remove('hidden');
+      if (achievementsUpcomingEmpty) achievementsUpcomingEmpty.classList.remove('hidden');
+      updateCheckinStreakInfo(null);
+      return;
+    }
+
+    const { loading, error, achievements, summary, metrics } = achievementsState;
+    if (achievementsLoadingEl) achievementsLoadingEl.classList.toggle('hidden', !loading);
+    if (achievementsErrorEl) {
+      achievementsErrorEl.textContent = error || '';
+      achievementsErrorEl.classList.toggle('hidden', !error);
+    }
+    const canShowContent = !loading && !error;
+    if (achievementsContentEl) achievementsContentEl.classList.toggle('hidden', !canShowContent);
+
+    const total = Number(summary?.total || achievements.length || 0);
+    const unlockedCount = Number(summary?.unlocked || achievements.filter(item => item.unlocked).length || 0);
+    if (achievementsSummaryEl) {
+      achievementsSummaryEl.textContent = total > 0
+        ? `${unlockedCount}/${total} desbloqueadas`
+        : 'Nenhuma conquista cadastrada ainda.';
+    }
+
+    updateCheckinStreakInfo(metrics);
+
+    if (!canShowContent) {
+      if (achievementsUnlockedWrap) achievementsUnlockedWrap.innerHTML = '';
+      if (achievementsUpcomingWrap) achievementsUpcomingWrap.innerHTML = '';
+      if (achievementsUnlockedEmpty) achievementsUnlockedEmpty.classList.toggle('hidden', !!loading || !!error);
+      if (achievementsUpcomingEmpty) achievementsUpcomingEmpty.classList.toggle('hidden', !!loading || !!error);
+      return;
+    }
+
+    const unlocked = achievements
+      .filter(item => item.unlocked)
+      .sort((a, b) => getAchievementTimestamp(b.unlockedAt) - getAchievementTimestamp(a.unlockedAt));
+    const upcoming = achievements
+      .filter(item => !item.unlocked)
+      .sort((a, b) => Number(b.progressPct || 0) - Number(a.progressPct || 0));
+    const upcomingLimited = upcoming.slice(0, 6);
+
+    if (achievementsUnlockedWrap) {
+      achievementsUnlockedWrap.innerHTML = '';
+      unlocked.forEach(item => achievementsUnlockedWrap.appendChild(createUnlockedAchievementBadge(item)));
+      achievementsUnlockedWrap.classList.toggle('hidden', unlocked.length === 0);
+    }
+    if (achievementsUnlockedEmpty) {
+      achievementsUnlockedEmpty.textContent = unlocked.length > 0
+        ? ''
+        : 'Ainda sem conquistas desbloqueadas. Faça check-ins e conclua atividades para começar!';
+      achievementsUnlockedEmpty.classList.toggle('hidden', unlocked.length > 0);
+    }
+
+    if (achievementsUpcomingWrap) {
+      achievementsUpcomingWrap.innerHTML = '';
+      upcomingLimited.forEach(item => achievementsUpcomingWrap.appendChild(createUpcomingAchievementCard(item)));
+      achievementsUpcomingWrap.classList.toggle('hidden', upcomingLimited.length === 0);
+    }
+    if (achievementsUpcomingEmpty) {
+      let message = 'Participe de check-ins e atividades para liberar novas medalhas.';
+      if (!upcomingLimited.length && achievements.length > 0) {
+        message = 'Todas as conquistas disponíveis foram desbloqueadas! 🎉';
+      }
+      achievementsUpcomingEmpty.textContent = message;
+      achievementsUpcomingEmpty.classList.toggle('hidden', upcomingLimited.length > 0);
+    }
+  }
+
+  function handleAchievementToasts(list) {
+    if (!Array.isArray(list) || !list.length) return;
+    list.forEach(item => {
+      const icon = item?.icon || '🏆';
+      const reward = Number(item?.rewardXP || 0);
+      const rewardText = reward > 0 ? ` +${formatNumber(reward)} XP` : '';
+      const title = item?.title || 'Nova conquista';
+      showToast({ message: `${icon} Conquista desbloqueada: ${title}!${rewardText}`, type: 'success' });
+    });
+  }
+
+  function applyAchievementsUpdate(overview, unlockedList = [], options = {}) {
+    if (!overview) return;
+    const normalized = normalizeAchievementsResponse(overview);
+    achievementsState.loading = false;
+    achievementsState.error = '';
+    achievementsState.achievements = normalized.achievements;
+    achievementsState.summary = normalized.summary;
+    achievementsState.metrics = normalized.metrics || {};
+    renderAchievements();
+    if (!options?.silent && Array.isArray(unlockedList) && unlockedList.length) {
+      handleAchievementToasts(unlockedList);
+    }
+  }
+
+  function resetAchievementsUI() {
+    achievementsState.loading = false;
+    achievementsState.error = '';
+    achievementsState.achievements = [];
+    achievementsState.summary = { total: 0, unlocked: 0 };
+    achievementsState.metrics = {};
+    renderAchievements();
+  }
+
+  function loadAchievementsOverview() {
+    if (!currentUser || !currentUser.id) {
+      resetAchievementsUI();
+      return;
+    }
+    const expectedUserId = currentUser.id;
+    achievementsState.loading = true;
+    achievementsState.error = '';
+    renderAchievements();
+    google.script.run
+      .withFailureHandler(err => {
+        if (!currentUser || currentUser.id !== expectedUserId) return;
+        achievementsState.loading = false;
+        achievementsState.error = err?.message || 'Não foi possível carregar as conquistas.';
+        achievementsState.metrics = {};
+        renderAchievements();
+      })
+      .withSuccessHandler(data => {
+        if (!currentUser || currentUser.id !== expectedUserId) return;
+        const normalized = normalizeAchievementsResponse(data);
+        achievementsState.loading = false;
+        achievementsState.error = '';
+        achievementsState.achievements = normalized.achievements;
+        achievementsState.summary = normalized.summary;
+        achievementsState.metrics = normalized.metrics || {};
+        renderAchievements();
+      })
+      .getUserAchievementsOverview({ userId: currentUser.id });
   }
 
   function updateLevelIndicator(state) {
@@ -974,6 +1342,11 @@
         historyState.checkins = normalizeCheckinHistory(data);
         historyState.streak = computeCheckinStreak(historyState.checkins);
         historyState.errors.checkins = '';
+        updateCheckinStreakInfo({
+          checkinCurrentStreak: historyState.streak.current,
+          checkinBestStreak: historyState.streak.best,
+          totalCheckins: historyState.checkins.length
+        });
         renderHistory();
       })
       .getCheckinHistory(currentUser.id);
@@ -1125,6 +1498,10 @@
   // UI switches
   function updateUI(options = {}) {
     const keepLevelIndicator = !!(options && options.keepLevelIndicator);
+    const skipAchievements = !!(options && options.skipAchievements);
+    const achievementsData = options && options.achievementsData;
+    const achievementsUnlocked = options && options.achievementsUnlocked;
+    const achievementsSilent = !!(options && options.silentAchievements);
     if (!currentUser) {
       $('#authSection').classList.remove('hidden');
       $('#dashSection').classList.add('hidden');
@@ -1132,6 +1509,7 @@
       $('#btnLogout').classList.add('hidden');
       resetHistorySection();
       resetLevelIndicator();
+       resetAchievementsUI();
       return;
     }
     $('#authSection').classList.add('hidden');
@@ -1141,6 +1519,11 @@
     loadHistoryForCurrentUser();
     if (!keepLevelIndicator) {
       setLevelIndicatorLoading();
+    }
+    if (achievementsData) {
+      applyAchievementsUpdate(achievementsData, achievementsUnlocked || [], { silent: achievementsSilent });
+    } else if (!skipAchievements) {
+      loadAchievementsOverview();
     }
     // estado
     google.script.run
@@ -1302,13 +1685,21 @@
       .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
       .withSuccessHandler(res=>{
         if (res && res.ok) {
+          const bonusXP = Number(res.achievementBonusXP || 0);
+          const unlockedAchievements = Array.isArray(res.achievementsUnlocked) ? res.achievementsUnlocked : [];
+          if (res.achievementsOverview) {
+            applyAchievementsUpdate(res.achievementsOverview, unlockedAchievements);
+          } else if (unlockedAchievements.length) {
+            handleAchievementToasts(unlockedAchievements);
+          }
           const extra = formatLevelProgressMessage(res);
           const totalXP = Number.isFinite(Number(res.totalXP)) ? Number(res.totalXP) : res.totalXP;
-          $('#checkinMsg').textContent = `Presença registrada (+${res.xpGanho} XP). Total: ${totalXP} XP.${extra}`;
+          const bonusText = bonusXP > 0 ? ` Bônus de conquistas: +${bonusXP} XP.` : '';
+          $('#checkinMsg').textContent = `Presença registrada (+${res.xpGanho} XP).${bonusText} Total: ${totalXP} XP.${extra}`;
           if (Number.isFinite(Number(totalXP))) $('#xpBox').textContent = totalXP;
           if (Number.isFinite(Number(res.level))) $('#lvlBox').textContent = res.level;
           updateLevelIndicator(res);
-          updateUI({ keepLevelIndicator: true });
+          updateUI({ keepLevelIndicator: true, skipAchievements: true });
         } else {
           $('#checkinMsg').textContent = res?.msg || 'Não foi possível registrar o check-in.';
         }
@@ -1334,16 +1725,24 @@
           setTimeout(()=> $('#activityMsg').textContent='', 4000);
           return;
         }
+        const bonusXP = Number(res.achievementBonusXP || 0);
+        const unlockedAchievements = Array.isArray(res.achievementsUnlocked) ? res.achievementsUnlocked : [];
+        if (res.achievementsOverview) {
+          applyAchievementsUpdate(res.achievementsOverview, unlockedAchievements);
+        } else if (unlockedAchievements.length) {
+          handleAchievementToasts(unlockedAchievements);
+        }
         const deltaXP = Number.isFinite(Number(res.deltaXP)) ? Number(res.deltaXP) : 0;
         const deltaText = deltaXP > 0 ? `Você ganhou +${deltaXP} XP.` : 'Sem XP adicional desta vez.';
         const totalXP = Number.isFinite(Number(res.totalXP)) ? Number(res.totalXP) : res.totalXP;
         const levelInfo = Number.isFinite(Number(res.level)) ? ` (Nível ${res.level})` : '';
         const extra = formatLevelProgressMessage(res);
-        $('#activityMsg').textContent = `Enviado! ${deltaText} Total: ${totalXP} XP${levelInfo}.${extra}`;
+        const bonusText = bonusXP > 0 ? ` Bônus de conquistas: +${bonusXP} XP.` : '';
+        $('#activityMsg').textContent = `Enviado! ${deltaText}${bonusText} Total: ${totalXP} XP${levelInfo}.${extra}`;
         if (Number.isFinite(Number(totalXP))) $('#xpBox').textContent = totalXP;
         if (Number.isFinite(Number(res.level))) $('#lvlBox').textContent = res.level;
         updateLevelIndicator(res);
-        updateUI({ keepLevelIndicator: true });
+        updateUI({ keepLevelIndicator: true, skipAchievements: true });
         setTimeout(()=> $('#activityMsg').textContent='', 4000);
       })
       .submitActivity(payload);

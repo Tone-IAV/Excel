@@ -3,12 +3,79 @@ const SPREADSHEET_ID = '1DCzIOIcRBaJ3WJVQCOWg6KXyghjRGMJUHekV1fGygJ4';
 const ADMIN_SECURITY_CODE = 'xbY4nu'; // código exigido p/ criar admins
 
 // Abas usadas
-const SHEET_USERS     = 'Users';     // id, name, email, passHash, isAdmin, xp, createdAt
-const SHEET_PROGRESS  = 'Progress';  // userId, moduleId, scorePct, earnedXP, completedAt
-const SHEET_CHECKIN   = 'Checkins';  // userId, dateISO, xp
-const SHEET_CONFIG    = 'Config';    // key, value
-const SHEET_EMBEDS    = 'Embeds';    // key, url
-const SHEET_SESSIONS  = 'Sessions';  // userId, tokenHash, expiresAt, createdAt
+const SHEET_USERS            = 'Users';            // id, name, email, passHash, isAdmin, xp, createdAt
+const SHEET_PROGRESS         = 'Progress';         // userId, moduleId, scorePct, earnedXP, completedAt
+const SHEET_CHECKIN          = 'Checkins';         // userId, dateISO, xp
+const SHEET_CONFIG           = 'Config';           // key, value
+const SHEET_EMBEDS           = 'Embeds';           // key, url
+const SHEET_SESSIONS         = 'Sessions';         // userId, tokenHash, expiresAt, createdAt
+const SHEET_USER_ACHIEVEMENT = 'UserAchievements'; // userId, achievementId, unlockedAt, rewardXP
+
+const ACHIEVEMENTS = [
+  {
+    id: 'checkin_first',
+    title: 'Primeiro Passo',
+    description: 'Registre seu primeiro check-in diário.',
+    category: 'Check-ins',
+    icon: '✅',
+    rewardXP: 10,
+    criteria: { type: 'checkins_total', target: 1 }
+  },
+  {
+    id: 'checkin_7_streak',
+    title: 'Rotina Consolidada',
+    description: 'Mantenha um streak de check-ins por 7 dias seguidos.',
+    category: 'Check-ins',
+    icon: '🔥',
+    rewardXP: 30,
+    criteria: { type: 'checkin_streak', target: 7 }
+  },
+  {
+    id: 'checkin_30_total',
+    title: 'Assiduidade Máxima',
+    description: 'Complete 30 check-ins no total.',
+    category: 'Check-ins',
+    icon: '📅',
+    rewardXP: 50,
+    criteria: { type: 'checkins_total', target: 30 }
+  },
+  {
+    id: 'modules_5_highscore',
+    title: 'Especialista em Excel',
+    description: 'Conclua 5 módulos com nota igual ou superior a 90%.',
+    category: 'Módulos',
+    icon: '📈',
+    rewardXP: 60,
+    criteria: { type: 'modules_high_score', target: 5, minScore: 90 }
+  },
+  {
+    id: 'modules_10_completed',
+    title: 'Maratona de Estudos',
+    description: 'Finalize 10 módulos com aproveitamento mínimo.',
+    category: 'Módulos',
+    icon: '🎓',
+    rewardXP: 80,
+    criteria: { type: 'modules_completed', target: 10, minScore: 70 }
+  },
+  {
+    id: 'xp_500_total',
+    title: 'Acumulador de XP',
+    description: 'Alcance um total de 500 XP.',
+    category: 'Progressão',
+    icon: '🏅',
+    rewardXP: 100,
+    criteria: { type: 'xp_total', target: 500 }
+  },
+  {
+    id: 'xp_1000_total',
+    title: 'Lenda do Excel',
+    description: 'Some 1000 XP na plataforma.',
+    category: 'Progressão',
+    icon: '👑',
+    rewardXP: 150,
+    criteria: { type: 'xp_total', target: 1000 }
+  }
+];
 
 const SESSION_DURATION_HOURS = 24 * 7; // validade de 7 dias
 
@@ -44,12 +111,13 @@ function setup_() {
     sh.setFrozenRows(1);
   };
 
-  ensure(SHEET_USERS,    ['id','name','email','passHash','isAdmin','xp','createdAt']);
-  ensure(SHEET_PROGRESS, ['userId','moduleId','scorePct','earnedXP','completedAt']);
-  ensure(SHEET_CHECKIN,  ['userId','dateISO','xp']);
-  ensure(SHEET_CONFIG,   ['key','value']);
-  ensure(SHEET_EMBEDS,   ['key','url']);
-  ensure(SHEET_SESSIONS, ['userId','tokenHash','expiresAt','createdAt']);
+  ensure(SHEET_USERS,            ['id','name','email','passHash','isAdmin','xp','createdAt']);
+  ensure(SHEET_PROGRESS,         ['userId','moduleId','scorePct','earnedXP','completedAt']);
+  ensure(SHEET_CHECKIN,          ['userId','dateISO','xp']);
+  ensure(SHEET_CONFIG,           ['key','value']);
+  ensure(SHEET_EMBEDS,           ['key','url']);
+  ensure(SHEET_SESSIONS,         ['userId','tokenHash','expiresAt','createdAt']);
+  ensure(SHEET_USER_ACHIEVEMENT, ['userId','achievementId','unlockedAt','rewardXP']);
 
   // Defaults de config
   const cfg = getConfig_();
@@ -93,6 +161,315 @@ function computeLevelInfo_(xpRaw, cfg) {
   const xpToNextLevel = Math.max(0, xpPerLevel - xpIntoLevel);
   const nextLevel = level + 1;
   return { xpPerLevel, level, xpIntoLevel, xpToNextLevel, nextLevel };
+}
+
+/** =================== ACHIEVEMENTS =================== **/
+function getUserAchievementRecords_(userId) {
+  const rows = getAll_(sh_(SHEET_USER_ACHIEVEMENT));
+  const list = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[0] || '') === userId) {
+      list.push({
+        row: i + 2,
+        achievementId: row[1],
+        unlockedAt: row[2] || '',
+        rewardXP: Number(row[3] || 0)
+      });
+    }
+  }
+  return list;
+}
+
+function calculateStreakStats_(days) {
+  if (!Array.isArray(days) || days.length === 0) {
+    return { total: 0, current: 0, best: 0 };
+  }
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const uniqueDays = Array.from(new Set(days.filter(Boolean)));
+  if (!uniqueDays.length) {
+    return { total: 0, current: 0, best: 0 };
+  }
+  const timestamps = [];
+  for (let i = 0; i < uniqueDays.length; i++) {
+    const parsed = parseDateValue_(uniqueDays[i]);
+    if (parsed) {
+      const utc = Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate());
+      if (!Number.isNaN(utc)) timestamps.push(utc);
+    }
+  }
+  if (!timestamps.length) {
+    return { total: 0, current: 0, best: 0 };
+  }
+  timestamps.sort((a, b) => a - b);
+  let best = 0;
+  let streak = 0;
+  let previous = null;
+  for (let i = 0; i < timestamps.length; i++) {
+    const time = timestamps[i];
+    if (previous === null) {
+      streak = 1;
+    } else {
+      const diffDays = Math.round((time - previous) / msPerDay);
+      streak = diffDays === 1 ? streak + 1 : 1;
+    }
+    if (streak > best) best = streak;
+    previous = time;
+  }
+
+  let current = 0;
+  const today = new Date();
+  const todayUTC = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+  const last = timestamps[timestamps.length - 1];
+  const diffToToday = Math.round((todayUTC - last) / msPerDay);
+  if (diffToToday <= 1) {
+    current = 1;
+    let pointer = last;
+    for (let i = timestamps.length - 2; i >= 0; i--) {
+      const diff = Math.round((pointer - timestamps[i]) / msPerDay);
+      if (diff === 1) {
+        current += 1;
+        pointer = timestamps[i];
+      } else {
+        break;
+      }
+    }
+  }
+
+  return {
+    total: timestamps.length,
+    current,
+    best
+  };
+}
+
+function computeUserAchievementMetrics_(userId) {
+  const user = getUserById_(userId) || {};
+  const xpTotal = Number(user.xp || 0);
+
+  const checkinRows = getAll_(sh_(SHEET_CHECKIN));
+  const checkinDays = [];
+  for (let i = 0; i < checkinRows.length; i++) {
+    const row = checkinRows[i];
+    if ((row[0] || '') !== userId) continue;
+    const parsed = parseDateValue_(row[1]);
+    if (parsed) {
+      const day = Utilities.formatDate(parsed, 'UTC', 'yyyy-MM-dd');
+      checkinDays.push(day);
+    } else if (row[1]) {
+      const raw = String(row[1]);
+      const day = raw.length >= 10 ? raw.slice(0, 10) : raw;
+      if (day) checkinDays.push(day);
+    }
+  }
+  const streakStats = calculateStreakStats_(checkinDays);
+
+  const progressRows = getAll_(sh_(SHEET_PROGRESS));
+  const bestScores = {};
+  for (let i = 0; i < progressRows.length; i++) {
+    const row = progressRows[i];
+    if ((row[0] || '') !== userId) continue;
+    const moduleId = String(row[1] || '');
+    const score = Math.max(0, Math.round(Number(row[2] || 0)));
+    if (!bestScores[moduleId] || score > bestScores[moduleId]) {
+      bestScores[moduleId] = score;
+    }
+  }
+
+  let modulesCompleted = 0;
+  let modulesHighScore = 0;
+  const completedThreshold = 70;
+  const highScoreThreshold = 90;
+  Object.keys(bestScores).forEach(key => {
+    const score = bestScores[key];
+    if (score >= completedThreshold) modulesCompleted += 1;
+    if (score >= highScoreThreshold) modulesHighScore += 1;
+  });
+
+  return {
+    xpTotal,
+    totalCheckins: streakStats.total,
+    checkinCurrentStreak: streakStats.current,
+    checkinBestStreak: streakStats.best,
+    modulesCompleted,
+    modulesHighScore,
+    moduleBestScores: bestScores
+  };
+}
+
+function evaluateAchievementStatus_(achievement, metrics) {
+  const criteria = achievement && achievement.criteria ? achievement.criteria : {};
+  const type = criteria.type || '';
+  const targetRaw = Number(criteria.target || 0);
+  const target = Number.isFinite(targetRaw) && targetRaw > 0 ? targetRaw : 1;
+  let currentValue = 0;
+  let achieved = false;
+  let progressLabel = '';
+  const extra = {};
+
+  if (type === 'checkins_total') {
+    currentValue = Math.max(0, Number(metrics.totalCheckins || 0));
+    achieved = currentValue >= target;
+    progressLabel = `${Math.min(currentValue, target)} de ${target} check-ins`;
+  } else if (type === 'checkin_streak') {
+    const best = Math.max(0, Number(metrics.checkinBestStreak || 0));
+    const current = Math.max(0, Number(metrics.checkinCurrentStreak || 0));
+    currentValue = best;
+    achieved = current >= target;
+    extra.currentStreak = current;
+    extra.bestStreak = best;
+    progressLabel = `Melhor sequência: ${best} dia${best === 1 ? '' : 's'}`;
+  } else if (type === 'modules_high_score' || type === 'modules_completed') {
+    const minScoreRaw = Number(criteria.minScore || (type === 'modules_high_score' ? 90 : 70));
+    const minScore = Number.isFinite(minScoreRaw) ? minScoreRaw : (type === 'modules_high_score' ? 90 : 70);
+    const scores = metrics.moduleBestScores || {};
+    let count = 0;
+    Object.keys(scores).forEach(key => {
+      if (Number(scores[key] || 0) >= minScore) count += 1;
+    });
+    currentValue = count;
+    achieved = count >= target;
+    progressLabel = `${Math.min(count, target)} de ${target} módulos (${minScore}%+)`;
+    extra.minScore = minScore;
+  } else if (type === 'xp_total') {
+    currentValue = Math.max(0, Number(metrics.xpTotal || 0));
+    achieved = currentValue >= target;
+    progressLabel = `${Math.min(currentValue, target)} / ${target} XP`;
+    extra.currentXP = currentValue;
+  } else {
+    currentValue = 0;
+    achieved = false;
+  }
+
+  const capped = target > 0 ? Math.min(currentValue, target) : currentValue;
+  const progressPct = target > 0 ? Math.min(100, Math.round((capped / target) * 100)) : (achieved ? 100 : 0);
+
+  return {
+    achieved,
+    currentValue,
+    target,
+    progressPct,
+    progressLabel,
+    extra
+  };
+}
+
+function buildAchievementsOverview_(userId, existingRecords) {
+  if (!userId) {
+    return { achievements: [], summary: { total: 0, unlocked: 0 }, metrics: {} };
+  }
+  const metrics = computeUserAchievementMetrics_(userId);
+  const records = Array.isArray(existingRecords) ? existingRecords : getUserAchievementRecords_(userId);
+  const recordMap = {};
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    if (record && record.achievementId) {
+      recordMap[record.achievementId] = record;
+    }
+  }
+
+  const achievements = ACHIEVEMENTS.map(achievement => {
+    const evaluation = evaluateAchievementStatus_(achievement, metrics);
+    const record = recordMap[achievement.id];
+    const unlocked = !!record;
+    const unlockedAt = record ? record.unlockedAt : null;
+    const rewardXP = Number(achievement.rewardXP || 0);
+    const progressValue = evaluation.currentValue;
+    const target = evaluation.target;
+    return {
+      id: achievement.id,
+      title: achievement.title,
+      description: achievement.description,
+      category: achievement.category || '',
+      icon: achievement.icon || '',
+      rewardXP,
+      unlocked,
+      achieved: !!evaluation.achieved,
+      unlockedAt,
+      target,
+      progressValue,
+      progress: target > 0 ? Math.min(progressValue, target) : progressValue,
+      progressPct: evaluation.progressPct,
+      progressLabel: evaluation.progressLabel,
+      readyToUnlock: !unlocked && evaluation.achieved,
+      extra: evaluation.extra || {}
+    };
+  });
+
+  const summary = {
+    total: achievements.length,
+    unlocked: achievements.filter(item => item.unlocked).length
+  };
+
+  return { achievements, summary, metrics };
+}
+
+function processAchievementsOnProgress_(userId) {
+  if (!userId) {
+    return { achievements: [], summary: { total: 0, unlocked: 0 }, metrics: {}, newlyUnlocked: [], bonusXP: 0 };
+  }
+
+  const achievementSheet = sh_(SHEET_USER_ACHIEVEMENT);
+  const records = getUserAchievementRecords_(userId);
+  const recordMap = {};
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    if (record && record.achievementId) {
+      recordMap[record.achievementId] = record;
+    }
+  }
+
+  const newlyUnlocked = [];
+  let bonusXP = 0;
+  const guardLimit = ACHIEVEMENTS.length + 3;
+  let guard = 0;
+
+  while (guard < guardLimit) {
+    guard += 1;
+    const metrics = computeUserAchievementMetrics_(userId);
+    let unlockedThisLoop = false;
+
+    for (let i = 0; i < ACHIEVEMENTS.length; i++) {
+      const achievement = ACHIEVEMENTS[i];
+      if (!achievement || recordMap[achievement.id]) continue;
+      const evaluation = evaluateAchievementStatus_(achievement, metrics);
+      if (!evaluation.achieved) continue;
+
+      const rewardXP = Number(achievement.rewardXP || 0);
+      const unlockedAt = nowISO_();
+      achievementSheet.appendRow([userId, achievement.id, unlockedAt, rewardXP]);
+      const record = { achievementId: achievement.id, unlockedAt, rewardXP };
+      records.push(record);
+      recordMap[achievement.id] = record;
+      newlyUnlocked.push({
+        id: achievement.id,
+        title: achievement.title,
+        description: achievement.description,
+        category: achievement.category || '',
+        icon: achievement.icon || '',
+        rewardXP,
+        unlockedAt
+      });
+      if (rewardXP > 0) {
+        addUserXP_(userId, rewardXP);
+        bonusXP += rewardXP;
+      }
+      unlockedThisLoop = true;
+    }
+
+    if (!unlockedThisLoop) {
+      break;
+    }
+  }
+
+  const overview = buildAchievementsOverview_(userId, records);
+  return Object.assign({ newlyUnlocked, bonusXP }, overview);
+}
+
+function getUserAchievementsOverview(payload) {
+  const userId = payload && payload.userId;
+  if (!userId) throw new Error('userId inválido.');
+  return buildAchievementsOverview_(userId);
 }
 
 /** Atualiza XP do usuário (soma delta) */
@@ -310,16 +687,27 @@ function checkin(payload) {
   s.appendRow([userId, today, xp]);
   const newXP = addUserXP_(userId, xp);
 
-  const levelInfo = computeLevelInfo_(newXP, cfg);
+  const achievements = processAchievementsOnProgress_(userId);
+  const totalXP = achievements && achievements.metrics && Number.isFinite(Number(achievements.metrics.xpTotal))
+    ? Number(achievements.metrics.xpTotal)
+    : newXP + Number(achievements && achievements.bonusXP || 0);
+  const levelInfo = computeLevelInfo_(totalXP, cfg);
 
   return {
     ok:true,
     xpGanho: xp,
-    totalXP: newXP,
+    totalXP,
     level: levelInfo.level,
     xpPerLevel: levelInfo.xpPerLevel,
     xpToNextLevel: levelInfo.xpToNextLevel,
-    nextLevel: levelInfo.nextLevel
+    nextLevel: levelInfo.nextLevel,
+    achievementBonusXP: achievements && achievements.bonusXP || 0,
+    achievementsUnlocked: achievements && achievements.newlyUnlocked || [],
+    achievementsOverview: achievements ? {
+      achievements: achievements.achievements,
+      summary: achievements.summary,
+      metrics: achievements.metrics
+    } : null
   };
 }
 
@@ -374,16 +762,27 @@ function submitActivity(payload) {
     const userInfo = getUserById_(userId);
     finalXP = Number(userInfo?.xp || 0);
   }
-  const levelInfo = computeLevelInfo_(finalXP, cfg);
+  const achievements = processAchievementsOnProgress_(userId);
+  const totalXP = achievements && achievements.metrics && Number.isFinite(Number(achievements.metrics.xpTotal))
+    ? Number(achievements.metrics.xpTotal)
+    : finalXP + Number(achievements && achievements.bonusXP || 0);
+  const levelInfo = computeLevelInfo_(totalXP, cfg);
 
   return {
     ok:true,
     deltaXP,
-    totalXP: finalXP,
+    totalXP,
     level: levelInfo.level,
     xpPerLevel: levelInfo.xpPerLevel,
     xpToNextLevel: levelInfo.xpToNextLevel,
-    nextLevel: levelInfo.nextLevel
+    nextLevel: levelInfo.nextLevel,
+    achievementBonusXP: achievements && achievements.bonusXP || 0,
+    achievementsUnlocked: achievements && achievements.newlyUnlocked || [],
+    achievementsOverview: achievements ? {
+      achievements: achievements.achievements,
+      summary: achievements.summary,
+      metrics: achievements.metrics
+    } : null
   };
 }
 
