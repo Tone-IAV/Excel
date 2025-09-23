@@ -149,6 +149,41 @@
     .app-nav-link[aria-disabled="true"] { color:#94a3b8; cursor:not-allowed; }
     .app-nav-link[aria-disabled="true"]::after { background:transparent; }
     .app-nav-link[aria-disabled="true"]:hover { color:#94a3b8; }
+    .attachment-item { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:.65rem .9rem; border-radius:1rem; background:#f8fafc; border:1px solid rgba(148,163,184,.35); }
+    .dark .attachment-item { background:rgba(15,23,42,.65); border-color:rgba(71,85,105,.55); }
+    .attachment-info { display:flex; align-items:center; gap:.75rem; min-width:0; }
+    .attachment-icon { width:2.25rem; height:2.25rem; border-radius:9999px; display:inline-flex; align-items:center; justify-content:center; background:rgba(33,115,70,.12); color:#217346; font-size:1.1rem; }
+    .dark .attachment-icon { background:rgba(56,189,248,.15); color:#38bdf8; }
+    .attachment-text { display:flex; flex-direction:column; gap:.15rem; min-width:0; }
+    .attachment-name { font-weight:600; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .dark .attachment-name { color:#e2e8f0; }
+    .attachment-meta { font-size:.75rem; color:#64748b; }
+    .dark .attachment-meta { color:#cbd5f5; }
+    .attachment-remove { color:#dc2626; font-size:.75rem; font-weight:600; }
+    .attachment-remove:hover { color:#b91c1c; }
+    .podium-card { position:relative; border-radius:1.5rem; padding:1.5rem 1.25rem; background:linear-gradient(135deg,rgba(148,163,184,.1),rgba(226,232,240,.45)); text-align:center; box-shadow:0 14px 35px rgba(15,23,42,.12); }
+    .podium-card-first { background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#78350f; box-shadow:0 24px 45px rgba(251,191,36,.35); }
+    .podium-card-second { background:linear-gradient(135deg,#e2e8f0,#cbd5f5); color:#1f2937; }
+    .podium-card-third { background:linear-gradient(135deg,#fed7aa,#fdba74); color:#7c2d12; }
+    .dark .podium-card { background:linear-gradient(135deg,rgba(30,41,59,.75),rgba(51,65,85,.75)); box-shadow:0 14px 35px rgba(15,23,42,.45); }
+    .dark .podium-card-first { background:linear-gradient(135deg,#f59e0b,#b45309); color:#fff; }
+    .dark .podium-card-second { background:linear-gradient(135deg,#475569,#334155); color:#e2e8f0; }
+    .dark .podium-card-third { background:linear-gradient(135deg,#fbbf24,#f97316); color:#fff; }
+    .podium-rank { font-size:.85rem; letter-spacing:.08em; text-transform:uppercase; font-weight:700; opacity:.85; }
+    .podium-name { font-size:1.1rem; font-weight:700; margin-top:.35rem; }
+    .podium-score { font-size:.85rem; color:rgba(15,23,42,.7); }
+    .dark .podium-score { color:rgba(226,232,240,.8); }
+    .leaderboard-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.75rem; padding:.65rem 1rem; }
+    .leaderboard-row:nth-child(even) { background:rgba(148,163,184,.15); }
+    .dark .leaderboard-row:nth-child(even) { background:rgba(30,41,59,.55); }
+    .leaderboard-name { font-weight:600; color:#1f2937; }
+    .dark .leaderboard-name { color:#e2e8f0; }
+    .leaderboard-meta { font-size:.75rem; color:#64748b; }
+    .dark .leaderboard-meta { color:#cbd5f5; }
+    .privacy-chip { display:inline-flex; align-items:center; gap:.3rem; padding:.25rem .65rem; border-radius:9999px; font-size:.7rem; font-weight:600; background:rgba(59,130,246,.15); color:#1d4ed8; }
+    .privacy-chip-private { background:rgba(234,179,8,.18); color:#92400e; }
+    .dark .privacy-chip { background:rgba(37,99,235,.25); color:#bfdbfe; }
+    .dark .privacy-chip-private { background:rgba(251,191,36,.2); color:#fde68a; }
   </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
@@ -170,11 +205,11 @@
     <nav aria-label="Navegação principal">
       <ul id="primaryNav" class="app-nav">
         <li><a href="/inicio" class="app-nav-link" data-app-route="inicio" data-requires-auth="true">Início</a></li>
-        <li><a href="/sobre" class="app-nav-link" data-app-route="sobre">Sobre</a></li>
-        <li><a href="/aulas" class="app-nav-link" data-app-route="aulas">Aulas &amp; Atividades</a></li>
         <li><a href="/painel" class="app-nav-link" data-app-route="painel" data-requires-auth="true">Painel</a></li>
         <li><a href="/conquistas" class="app-nav-link" data-app-route="conquistas">Conquistas</a></li>
+        <li><a href="/aulas" class="app-nav-link" data-app-route="aulas">Aulas &amp; Atividades</a></li>
         <li><a href="/admin" class="app-nav-link" data-app-route="admin" data-requires-auth="true" data-requires-admin="true">Admin</a></li>
+        <li><a href="/sobre" class="app-nav-link" data-app-route="sobre">Sobre</a></li>
       </ul>
     </nav>
     <nav id="headerBreadcrumbs" class="hidden text-xs sm:text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
@@ -202,27 +237,67 @@
 <main class="px-6 lg:px-12 py-6 space-y-8">
   <section data-app-page="inicio" id="inicioPage" class="space-y-8">
   <!-- AUTH -->
-  <section id="authSection" class="grid md:grid-cols-2 gap-4 max-w-4xl mx-auto">
-    <div class="card" id="signupCard">
-      <h2 class="text-xl font-semibold mb-2">Criar conta</h2>
+  <section id="authSection" class="space-y-6 max-w-3xl mx-auto">
+    <div class="card" id="loginCard">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <p class="pill">Acesso seguro</p>
+          <h2 class="text-2xl font-semibold">Bem-vindo de volta</h2>
+          <p class="text-sm text-slate-500">Entre com sua conta para acompanhar o painel gamificado.</p>
+        </div>
+        <button type="button" id="toggleSignup" class="btn btn-ghost text-sm">Ainda não tenho cadastro</button>
+      </div>
+      <div id="loginMsg" class="feedback hidden"></div>
+      <form id="loginForm" class="grid gap-4 mt-2">
+        <div class="grid gap-2">
+          <label for="lEmail" class="text-xs font-semibold uppercase tracking-wide text-slate-500">E-mail</label>
+          <input id="lEmail" class="input" placeholder="nome@empresa.com" autocomplete="email" />
+        </div>
+        <div class="grid gap-2">
+          <label for="lPass" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Senha</label>
+          <input id="lPass" type="password" class="input" placeholder="Digite sua senha" autocomplete="current-password" />
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+          <label class="inline-flex items-center gap-2">
+            <input id="rememberMe" type="checkbox" class="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary" />
+            <span>Lembrar de mim neste navegador</span>
+          </label>
+          <span class="text-xs text-slate-400">Sessão expira após 7 dias de inatividade.</span>
+        </div>
+        <button id="btnLogin" type="submit" class="btn btn-primary">Entrar</button>
+      </form>
+    </div>
+
+    <div class="card hidden" id="signupCard">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <p class="pill">Primeiro acesso</p>
+          <h2 class="text-2xl font-semibold">Crie sua conta gratuita</h2>
+          <p class="text-sm text-slate-500">Preencha os dados abaixo e confirme o cadastro pelo seu e-mail.</p>
+        </div>
+        <button type="button" id="toggleLogin" class="btn btn-ghost text-sm">Já tenho conta</button>
+      </div>
       <div id="signupMsg" class="feedback hidden"></div>
       <div class="grid gap-3">
         <div class="space-y-1">
-          <input id="rName" class="input" placeholder="Nome completo" />
+          <label for="rName" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Nome completo</label>
+          <input id="rName" class="input" placeholder="Nome completo" autocomplete="name" />
           <p id="rNameError" class="error-text"></p>
         </div>
         <div class="space-y-1">
-          <input id="rEmail" class="input" placeholder="E-mail" title="Utilize um endereço válido (ex.: nome@empresa.com)." />
+          <label for="rEmail" class="text-xs font-semibold uppercase tracking-wide text-slate-500">E-mail corporativo</label>
+          <input id="rEmail" class="input" placeholder="nome@empresa.com" title="Utilize um endereço válido (ex.: nome@empresa.com)." autocomplete="email" />
           <p class="hint">Utilize um endereço válido (ex.: nome@empresa.com).</p>
           <p id="rEmailError" class="error-text"></p>
         </div>
         <div class="space-y-1">
-          <input id="rPass" type="password" class="input" placeholder="Senha" title="Mínimo de 8 caracteres com letras maiúsculas, minúsculas, números e símbolos." />
+          <label for="rPass" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Senha</label>
+          <input id="rPass" type="password" class="input" placeholder="Crie uma senha forte" title="Mínimo de 8 caracteres com letras maiúsculas, minúsculas, números e símbolos." autocomplete="new-password" />
           <p class="hint">Mínimo de 8 caracteres com letras maiúsculas, minúsculas, números e símbolos.</p>
           <p id="rPassError" class="error-text"></p>
         </div>
         <div class="hidden-admin space-y-1">
-          <label class="text-xs block">Código de segurança (somente para Administrador)</label>
+          <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Código de segurança (somente para Administrador)</label>
           <input id="rAdminCode" class="input" placeholder="(opcional)" />
           <p id="rAdminCodeError" class="error-text"></p>
         </div>
@@ -231,14 +306,31 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2 class="text-xl font-semibold mb-2">Entrar</h2>
-      <div id="loginMsg" class="feedback hidden"></div>
-      <div class="grid gap-2">
-        <input id="lEmail" class="input" placeholder="E-mail" />
-        <input id="lPass" type="password" class="input" placeholder="Senha" />
-        <button id="btnLogin" class="btn btn-ghost">Entrar</button>
+    <div class="card hidden" id="confirmCard">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+        <div>
+          <p class="pill">Confirmação necessária</p>
+          <h2 class="text-2xl font-semibold">Verifique seu e-mail</h2>
+          <p class="text-sm text-slate-500">Enviamos um código de 6 dígitos para ativar o acesso.</p>
+        </div>
+        <button type="button" id="confirmBackToLogin" class="btn btn-ghost text-sm">Trocar conta</button>
       </div>
+      <div id="confirmMsg" class="feedback hidden"></div>
+      <form id="confirmForm" class="grid gap-4 mt-2">
+        <div class="grid gap-2">
+          <label for="confirmationEmail" class="text-xs font-semibold uppercase tracking-wide text-slate-500">E-mail</label>
+          <input id="confirmationEmail" class="input" readonly />
+        </div>
+        <div class="grid gap-2">
+          <label for="confirmationCode" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Código de confirmação</label>
+          <input id="confirmationCode" class="input tracking-[0.35em] text-center text-lg" maxlength="6" placeholder="000000" inputmode="numeric" autocomplete="one-time-code" />
+        </div>
+        <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <button type="button" id="btnResendConfirmation" class="btn btn-ghost text-sm">Reenviar código</button>
+          <span id="confirmationCountdown" class="text-xs text-slate-400"></span>
+        </div>
+        <button id="btnConfirmSignup" type="submit" class="btn btn-primary">Confirmar acesso</button>
+      </form>
     </div>
   </section>
 
@@ -558,67 +650,147 @@
   </section>
 
   <section data-app-page="painel" id="painelPage" class="hidden space-y-6 max-w-6xl mx-auto">
-    <div class="card card-transparent space-y-3">
-      <p class="pill">Comunidade</p>
-      <h2 class="text-2xl font-semibold text-primary">Troque dúvidas, compartilhe insights e vote em enquetes semanais</h2>
-      <p class="text-sm text-slate-600 dark:text-slate-300">O painel centraliza as postagens da turma, marcações de solução e votações rápidas lançadas pela coordenação.</p>
-    </div>
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <div class="space-y-6">
+        <div class="card card-transparent space-y-3">
+          <p class="pill">Comunidade</p>
+          <h2 class="text-2xl font-semibold text-primary">Central da turma e mural colaborativo</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Compartilhe materiais, resoluções e conquistas. Escolha entre publicar para toda a turma ou enviar apenas para destinatários específicos.</p>
+        </div>
 
-    <div class="card card-transparent" id="communityWallCard">
-      <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
-        <div>
-          <h3 class="text-lg font-semibold">Mural da turma</h3>
-          <p class="text-xs text-slate-500 dark:text-slate-400">Compartilhe dúvidas, prints e conquistas. Posts úteis rendem +5 XP; soluções marcadas, +10 XP.</p>
+        <div class="card" id="communityComposerCard">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-lg font-semibold">Escreva algo para a turma</h3>
+              <p class="text-sm text-slate-500">Mensagens úteis e soluções marcadas rendem XP extra.</p>
+            </div>
+            <span id="communityLimitBadge" class="pill">240 caracteres</span>
+          </div>
+          <div id="communityFormWrap" class="space-y-4 hidden">
+            <textarea id="communityMessage" class="input min-h-[120px] resize-y" maxlength="240" placeholder="Compartilhe uma novidade, dúvida ou insight com a turma..."></textarea>
+            <div class="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+              <span id="communityFormFeedback" class="text-rose-500 hidden" aria-live="polite"></span>
+              <span id="communityCounter">0/240</span>
+            </div>
+            <div class="grid md:grid-cols-2 gap-4">
+              <div class="space-y-1">
+                <label for="communityPrivacySelect" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Visibilidade</label>
+                <select id="communityPrivacySelect" class="input">
+                  <option value="public">Público — toda a turma visualiza</option>
+                  <option value="private">Privado — escolher destinatários</option>
+                </select>
+              </div>
+              <div id="communityTargetsWrap" class="space-y-1 hidden">
+                <label for="communityTargets" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Enviar para</label>
+                <select id="communityTargets" class="input min-h-[120px]" multiple></select>
+                <p class="hint">Selecione um ou mais colegas ou instrutores.</p>
+              </div>
+            </div>
+            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/50 p-4 space-y-3">
+              <div class="flex flex-wrap items-center justify-between gap-3 text-sm">
+                <div class="font-semibold text-slate-600 dark:text-slate-200">Anexos</div>
+                <label class="btn btn-ghost text-sm cursor-pointer">
+                  <input id="communityAttachmentInput" type="file" class="hidden" multiple />
+                  Adicionar arquivo
+                </label>
+              </div>
+              <p class="text-xs text-slate-500">Suporte a imagens, PDFs e planilhas (máx. 10 MB cada). Os arquivos ficam salvos no drive compartilhado da turma.</p>
+              <ul id="communityAttachmentList" class="space-y-2 text-sm"></ul>
+            </div>
+            <div class="flex justify-end">
+              <button id="btnCommunityPublish" class="btn btn-primary">Publicar no mural</button>
+            </div>
+          </div>
+          <p id="communityGuestNotice" class="text-sm text-slate-500 hidden">Entre com sua conta para publicar atualizações e anexos.</p>
         </div>
-        <span id="communityLimitBadge" class="pill">Até 240 caracteres</span>
-      </div>
-      <div id="communityFormWrap" class="space-y-2 mb-4 hidden">
-        <textarea id="communityMessage" class="input min-h-[96px] resize-y" maxlength="240" placeholder="Escreva uma dica ou atualização rápida..."></textarea>
-        <div class="flex items-center justify-between gap-3 text-xs text-slate-500">
-          <span id="communityFormFeedback" class="text-rose-500 hidden" aria-live="polite"></span>
-          <span id="communityCounter">0/240</span>
-        </div>
-        <div class="flex justify-end">
-          <button id="btnCommunityPublish" class="btn btn-primary">Publicar no mural</button>
-        </div>
-      </div>
-      <p id="communityGuestNotice" class="text-sm text-slate-500 mb-4 hidden">Entre com sua conta para participar do mural.</p>
-      <div id="communityWallList" class="grid gap-3 text-sm"></div>
-      <p id="communityWallEmpty" class="history-empty hidden">Ainda não há recados por aqui. Seja o primeiro a compartilhar!</p>
-    </div>
 
-    <div class="card space-y-4">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h3 class="text-lg font-semibold">Enquetes ativas</h3>
-          <p class="text-sm text-slate-600 dark:text-slate-300">Vote e acompanhe o resultado em tempo real. Cada voto registrado rende +3 XP.</p>
+        <div class="card" id="communityWallCard">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div>
+              <h3 class="text-lg font-semibold">Linha do tempo da turma</h3>
+              <p class="text-sm text-slate-500">Publicações públicas e privadas enviadas para você aparecem aqui.</p>
+            </div>
+          </div>
+          <div id="communityWallList" class="grid gap-4 text-sm"></div>
+          <p id="communityWallEmpty" class="history-empty hidden">Ainda não há recados por aqui. Seja o primeiro a compartilhar!</p>
         </div>
-        <span class="pill">Atualiza em tempo real</span>
       </div>
-      <div id="panelPollList" class="space-y-4"></div>
+
+      <div class="space-y-6">
+        <div class="card card-transparent space-y-3">
+          <h3 class="text-lg font-semibold">Boas práticas da comunidade</h3>
+          <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-300 list-disc pl-5">
+            <li>Marque colegas quando compartilhar resoluções privadas para que recebam o acesso.</li>
+            <li>Use anexos para enviar planilhas, roteiros ou prints relevantes.</li>
+            <li>Posts destacados podem render XP bônus definidos pela coordenação.</li>
+          </ul>
+        </div>
+        <div class="card space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold">Enquetes ativas</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Vote e acompanhe o resultado em tempo real. Cada voto registrado rende +3 XP.</p>
+            </div>
+            <span class="pill">Atualiza em tempo real</span>
+          </div>
+          <div id="panelPollList" class="space-y-4"></div>
+        </div>
+      </div>
     </div>
   </section>
 
   <section data-app-page="conquistas" id="conquistasPage" class="hidden space-y-6 max-w-6xl mx-auto">
-    <div class="card card-transparent space-y-3">
-      <p class="pill">Vitrine de badges</p>
-      <h2 class="text-2xl font-semibold text-primary">Celebre cada passo rumo ao nível Mestre</h2>
-      <p class="text-sm text-slate-600 dark:text-slate-300">Acompanhe o total de medalhas desbloqueadas, descubra o próximo troféu e monitore o progresso do seu streak.</p>
-      <div class="grid gap-3 sm:grid-cols-3" id="achievementsHeroStats"></div>
-    </div>
-
-    <div class="card" data-achievements-page data-subpage="achievements-catalog">
-      <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
-        <div>
-          <h3 class="text-xl font-semibold">Catálogo completo de conquistas</h3>
-          <p class="text-sm text-slate-600 dark:text-slate-300">Todas as medalhas disponíveis, critérios e recompensas.</p>
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <div class="space-y-6">
+        <div class="card card-transparent space-y-3">
+          <p class="pill">Vitrine de badges</p>
+          <h2 class="text-2xl font-semibold text-primary">Celebre cada passo rumo ao nível Mestre</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Acompanhe o total de medalhas desbloqueadas, descubra o próximo troféu e monitore o progresso do seu streak.</p>
+          <div class="grid gap-3 sm:grid-cols-3" id="achievementsHeroStats"></div>
         </div>
-        <span class="pill" data-role="achievement-summary">0/0 desbloqueadas</span>
+
+        <div class="card" data-achievements-page data-subpage="achievements-catalog">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 class="text-xl font-semibold">Catálogo completo de conquistas</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Todas as medalhas disponíveis, critérios e recompensas.</p>
+            </div>
+            <span class="pill" data-role="achievement-summary">0/0 desbloqueadas</span>
+          </div>
+          <div data-role="achievement-loading" class="text-sm text-slate-500 dark:text-slate-300">Carregando conquistas...</div>
+          <div data-role="achievement-error" class="text-sm text-rose-600 dark:text-rose-300 hidden"></div>
+          <p data-role="achievement-empty" class="history-empty hidden">Faça login para acompanhar suas conquistas.</p>
+          <div data-role="achievement-list" class="achievements-grid"></div>
+        </div>
       </div>
-      <div data-role="achievement-loading" class="text-sm text-slate-500 dark:text-slate-300">Carregando conquistas...</div>
-      <div data-role="achievement-error" class="text-sm text-rose-600 dark:text-rose-300 hidden"></div>
-      <p data-role="achievement-empty" class="history-empty hidden">Faça login para acompanhar suas conquistas.</p>
-      <div data-role="achievement-list" class="achievements-grid"></div>
+
+      <div class="space-y-6">
+        <div class="card card-transparent space-y-4" id="achievementsAdminPanel">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="pill">Hall da fama</p>
+              <h3 class="text-xl font-semibold">Ranking da temporada</h3>
+              <p class="text-sm text-slate-500">Visão exclusiva para administradores com os alunos mais engajados.</p>
+            </div>
+            <span class="pill" id="achievementsRankingBadge">Atualização diária</span>
+          </div>
+          <div id="achievementsAdminNotice" class="text-sm text-slate-500 dark:text-slate-300">Faça login como administrador para acompanhar o ranking da turma.</div>
+          <div id="achievementsLeaderboard" class="space-y-5 hidden">
+            <div id="achievementsPodium" class="grid gap-3 md:grid-cols-3"></div>
+            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-2">
+                <h4 class="text-sm font-semibold text-slate-600 dark:text-slate-200">Top participantes</h4>
+                <span class="text-xs text-slate-400">Níveis calculados automaticamente</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                  <tbody id="achievementsLeaderboardTable" class="divide-y divide-slate-200 dark:divide-slate-700"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -705,28 +877,49 @@
   let currentUser = null;
   let currentSessionToken = null;
   let sessionExpiryNotified = false;
+  let rememberPreference = false;
+  let pendingConfirmation = null;
+  let confirmationTimer = null;
+  let currentAuthMode = 'login';
   const STORAGE_KEY = 'excelPlatformSession';
   const SESSION_EXPIRED_FALLBACK = 'Sessão expirada. Faça login novamente.';
+  const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
 
-  function persistSession(token, user) {
+  function persistSession(token, user, options = {}) {
     if (!token || !user || !user.id) return;
     currentSessionToken = token;
     sessionExpiryNotified = false;
+    const remember = options && Object.prototype.hasOwnProperty.call(options, 'remember')
+      ? !!options.remember
+      : rememberPreference;
+    rememberPreference = remember;
     const payload = {
       token,
       userId: user.id,
       name: user.name,
       isAdmin: !!user.isAdmin,
     };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-    } catch (err) {
-      console.warn('Não foi possível salvar sessão local:', err);
+    if (remember) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (err) {
+        console.warn('Não foi possível salvar sessão local:', err);
+      }
+    } else {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (err) {
+        console.warn('Não foi possível limpar sessão local:', err);
+      }
     }
   }
 
   function clearStoredSession() {
     currentSessionToken = null;
+    rememberPreference = false;
+    if (typeof rememberMeCheckbox !== 'undefined' && rememberMeCheckbox) {
+      rememberMeCheckbox.checked = false;
+    }
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch (err) {
@@ -847,6 +1040,21 @@
   const resourcesEmptyEl = $('#resourcesEmpty');
   const eventsListEl = $('#eventsList');
   const eventsEmptyEl = $('#eventsEmpty');
+  const loginForm = $('#loginForm');
+  const loginCardEl = $('#loginCard');
+  const signupCardEl = $('#signupCard');
+  const confirmCardEl = $('#confirmCard');
+  const rememberMeCheckbox = $('#rememberMe');
+  const toggleSignupBtn = $('#toggleSignup');
+  const toggleLoginBtn = $('#toggleLogin');
+  const confirmForm = $('#confirmForm');
+  const confirmEmailInput = $('#confirmationEmail');
+  const confirmCodeInput = $('#confirmationCode');
+  const confirmMsgEl = $('#confirmMsg');
+  const btnConfirmSignup = $('#btnConfirmSignup');
+  const btnResendConfirmation = $('#btnResendConfirmation');
+  const confirmBackToLoginBtn = $('#confirmBackToLogin');
+  const confirmationCountdownEl = $('#confirmationCountdown');
   const communityFormWrap = $('#communityFormWrap');
   const communityGuestNotice = $('#communityGuestNotice');
   const communityTextarea = $('#communityMessage');
@@ -856,6 +1064,19 @@
   const communityListEl = $('#communityWallList');
   const communityEmptyEl = $('#communityWallEmpty');
   const communityLimitBadge = $('#communityLimitBadge');
+  const communityPrivacySelect = $('#communityPrivacySelect');
+  const communityTargetsWrap = $('#communityTargetsWrap');
+  const communityTargetsSelect = $('#communityTargets');
+  const communityAttachmentInput = $('#communityAttachmentInput');
+  const communityAttachmentList = $('#communityAttachmentList');
+  const achievementsAdminNoticeEl = $('#achievementsAdminNotice');
+  const achievementsLeaderboardEl = $('#achievementsLeaderboard');
+  const achievementsPodiumEl = $('#achievementsPodium');
+  const achievementsLeaderboardTableEl = $('#achievementsLeaderboardTable');
+  const achievementsRankingBadgeEl = $('#achievementsRankingBadge');
+  const achievementsAdminNoticeDefaultText = achievementsAdminNoticeEl
+    ? achievementsAdminNoticeEl.textContent
+    : '';
   const primaryNavEl = $('#primaryNav');
   const appPageSections = Array.from(document.querySelectorAll('[data-app-page]'));
   const appNavLinks = Array.from(document.querySelectorAll('[data-app-route]'));
@@ -901,11 +1122,21 @@
   const homeOnlySections = Array.from(document.querySelectorAll('[data-home-only]'));
   let communityCharLimit = 240;
   let isPublishingCommunity = false;
+  const communityState = {
+    attachments: [],
+    uploading: 0,
+    shareableUsers: [],
+    loadedShareableUsers: false,
+    privacy: 'public'
+  };
   const communityDateFormatter = typeof Intl !== 'undefined'
     ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
     : null;
   const shortDateFormatter = typeof Intl !== 'undefined'
     ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
+    : null;
+  const timeFormatter = typeof Intl !== 'undefined'
+    ? new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit' })
     : null;
 
   const toastContainer = $('#toastContainer');
@@ -1462,6 +1693,12 @@
 
   function renderPanelPage() {
     renderPolls();
+    renderCommunityAttachments();
+    setCommunityPrivacy(communityState.privacy);
+    renderCommunityTargetsOptions();
+    if (currentUser) {
+      loadShareableUsers();
+    }
   }
 
   function renderAchievementsShowcase(summary = achievementsState.summary, metrics = achievementsState.metrics) {
@@ -1614,6 +1851,13 @@
       const disabled = (requiresAuth && !currentUser) || (requiresAdmin && !(currentUser && currentUser.isAdmin));
       link.setAttribute('aria-disabled', disabled ? 'true' : 'false');
       link.tabIndex = disabled ? -1 : 0;
+      const li = link.closest('li');
+      const guestVisible = route === 'inicio' || route === 'sobre';
+      const hideForGuest = !currentUser && !guestVisible;
+      const hideForAdmin = requiresAdmin && !(currentUser && currentUser.isAdmin);
+      if (li) {
+        li.classList.toggle('hidden', hideForGuest || hideForAdmin);
+      }
     });
   }
 
@@ -1625,6 +1869,10 @@
     }
     if (def.requiresAuth && !currentUser) {
       navigateTo('inicio', { replace: true, silent: true });
+      return;
+    }
+    if (!currentUser && def.slug !== 'inicio' && def.slug !== 'sobre') {
+      navigateTo('sobre', { replace: true, silent: true });
     }
   }
 
@@ -2493,10 +2741,225 @@
     communityFeedbackEl.classList.toggle('hidden', !text);
   }
 
+  function formatFileSize(bytes) {
+    const size = Number(bytes);
+    if (!Number.isFinite(size) || size <= 0) return '';
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${size} B`;
+  }
+
+  function getSelectedCommunityTargets() {
+    if (!communityTargetsSelect) return [];
+    return Array.from(communityTargetsSelect.selectedOptions || [])
+      .map(option => option.value)
+      .filter(value => value);
+  }
+
+  function setCommunityPrivacy(value) {
+    const normalized = value === 'private' ? 'private' : 'public';
+    communityState.privacy = normalized;
+    if (communityPrivacySelect) communityPrivacySelect.value = normalized;
+    if (communityTargetsWrap) communityTargetsWrap.classList.toggle('hidden', normalized !== 'private');
+    if (normalized === 'private') {
+      loadShareableUsers();
+    }
+    updateCommunityPublishState();
+  }
+
+  function renderCommunityAttachments() {
+    if (!communityAttachmentList) return;
+    communityAttachmentList.innerHTML = '';
+    if (!communityState.attachments.length) {
+      const empty = document.createElement('li');
+      empty.className = 'text-xs text-slate-500';
+      empty.textContent = 'Nenhum arquivo anexado até o momento.';
+      communityAttachmentList.appendChild(empty);
+      return;
+    }
+    communityState.attachments.forEach(att => {
+      const li = document.createElement('li');
+      li.className = 'attachment-item';
+
+      const info = document.createElement('div');
+      info.className = 'attachment-info';
+      const icon = document.createElement('span');
+      icon.className = 'attachment-icon';
+      icon.textContent = '📎';
+      const textWrap = document.createElement('div');
+      textWrap.className = 'attachment-text';
+      const nameLink = document.createElement('a');
+      nameLink.className = 'attachment-name';
+      nameLink.textContent = att && att.name ? att.name : 'Arquivo';
+      if (att && att.url) {
+        nameLink.href = att.url;
+        nameLink.target = '_blank';
+        nameLink.rel = 'noopener';
+      } else {
+        nameLink.href = '#';
+        nameLink.addEventListener('click', event => event.preventDefault());
+      }
+      const meta = document.createElement('span');
+      meta.className = 'attachment-meta';
+      meta.textContent = formatFileSize(att && att.sizeBytes);
+      textWrap.append(nameLink, meta);
+      info.append(icon, textWrap);
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'attachment-remove';
+      removeBtn.textContent = 'Remover';
+      removeBtn.addEventListener('click', () => discardDraftAttachment(att, removeBtn));
+
+      li.append(info, removeBtn);
+      communityAttachmentList.appendChild(li);
+    });
+  }
+
+  function discardDraftAttachment(att, button) {
+    if (!att || !att.id) return;
+    const index = communityState.attachments.findIndex(item => item.id === att.id);
+    if (index === -1) return;
+    const finalize = () => {
+      communityState.attachments.splice(index, 1);
+      renderCommunityAttachments();
+      updateCommunityPublishState();
+    };
+    const token = getSessionToken();
+    if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+      finalize();
+      return;
+    }
+    const originalLabel = button ? button.textContent : '';
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Removendo...';
+    }
+    google.script.run
+      .withFailureHandler(err => {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalLabel || 'Remover';
+        }
+        showCommunityError(err?.message || 'Não foi possível remover o anexo agora.');
+      })
+      .withSuccessHandler(() => {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalLabel || 'Remover';
+        }
+        showCommunityError('');
+        finalize();
+      })
+      .discardCommunityAttachment({ token, attachmentId: att.id });
+  }
+
+  function renderCommunityTargetsOptions() {
+    if (!communityTargetsSelect) return;
+    const previouslySelected = new Set(
+      Array.from(communityTargetsSelect.options || [])
+        .filter(option => option.selected)
+        .map(option => option.value)
+        .filter(Boolean)
+    );
+    communityTargetsSelect.innerHTML = '';
+    if (!communityState.shareableUsers.length) {
+      const empty = document.createElement('option');
+      empty.disabled = true;
+      empty.textContent = 'Nenhum participante disponível';
+      communityTargetsSelect.appendChild(empty);
+      updateCommunityPublishState();
+      return;
+    }
+    communityState.shareableUsers.forEach(user => {
+      const option = document.createElement('option');
+      option.value = user.id;
+      option.textContent = user.name + (user.isAdmin ? ' • Coordenação' : '');
+      option.selected = previouslySelected.has(user.id);
+      communityTargetsSelect.appendChild(option);
+    });
+    updateCommunityPublishState();
+  }
+
+  function loadShareableUsers() {
+    if (!currentUser || communityState.loadedShareableUsers) return;
+    const token = getSessionToken();
+    if (!token) return;
+    google.script.run
+      .withFailureHandler(err => {
+        console.warn('Falha ao carregar destinatários:', err);
+      })
+      .withSuccessHandler(res => {
+        const list = res && Array.isArray(res.users) ? res.users : [];
+        communityState.shareableUsers = list;
+        communityState.loadedShareableUsers = true;
+        renderCommunityTargetsOptions();
+      })
+      .listShareableUsers({ token });
+  }
+
+  function uploadCommunityAttachmentFile(file) {
+    if (!file) return;
+    const token = getSessionToken();
+    if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+      return;
+    }
+    if (file.size > COMMUNITY_ATTACHMENT_MAX_BYTES) {
+      showCommunityError(`O arquivo ${file.name} excede o limite de 10 MB.`);
+      return;
+    }
+    communityState.uploading += 1;
+    updateCommunityPublishState();
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      google.script.run
+        .withFailureHandler(err => {
+          communityState.uploading = Math.max(0, communityState.uploading - 1);
+          updateCommunityPublishState();
+          showCommunityError(err?.message || 'Não foi possível enviar o arquivo agora.');
+        })
+        .withSuccessHandler(res => {
+          communityState.uploading = Math.max(0, communityState.uploading - 1);
+          updateCommunityPublishState();
+          const attachment = res && res.attachment;
+          if (attachment && attachment.id) {
+            communityState.attachments.push(attachment);
+            renderCommunityAttachments();
+            showCommunityError('');
+          }
+        })
+        .uploadCommunityAttachment({
+          token,
+          fileName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+          data: dataUrl
+        });
+    };
+    reader.onerror = () => {
+      communityState.uploading = Math.max(0, communityState.uploading - 1);
+      updateCommunityPublishState();
+      showCommunityError('Não foi possível ler o arquivo selecionado.');
+    };
+    reader.readAsDataURL(file);
+  }
+
   function updateCommunityPublishState() {
     if (!communityPublishBtn) return;
     const message = communityTextarea ? communityTextarea.value.trim() : '';
-    const disabled = !currentUser || !message || message.length > communityCharLimit || isPublishingCommunity;
+    const hasText = !!message;
+    const hasAttachments = communityState.attachments.length > 0;
+    const selectedTargets = getSelectedCommunityTargets();
+    const isPrivate = communityState.privacy === 'private';
+    const invalidTargets = isPrivate && selectedTargets.length === 0;
+    const disabled = !currentUser
+      || (!hasText && !hasAttachments)
+      || message.length > communityCharLimit
+      || isPublishingCommunity
+      || communityState.uploading > 0
+      || invalidTargets;
     communityPublishBtn.disabled = disabled;
   }
 
@@ -2509,6 +2972,16 @@
       showCommunityError('');
       updateCommunityCounter();
     }
+    if (!loggedIn) {
+      communityState.attachments = [];
+      communityState.uploading = 0;
+      communityState.shareableUsers = [];
+      communityState.loadedShareableUsers = false;
+      renderCommunityAttachments();
+      setCommunityPrivacy('public');
+      if (communityTargetsSelect) communityTargetsSelect.innerHTML = '';
+    }
+    renderCommunityTargetsOptions();
     updateCommunityPublishState();
   }
 
@@ -2542,11 +3015,11 @@
 
     list.forEach(entry => {
       const card = document.createElement('article');
-      card.className = 'rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/70 p-4 shadow-sm flex flex-col gap-2';
+      card.className = 'rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/70 p-4 shadow-sm flex flex-col gap-3';
       card.dataset.id = entry && entry.id ? entry.id : '';
 
       const header = document.createElement('div');
-      header.className = 'flex items-start justify-between gap-3';
+      header.className = 'flex flex-wrap items-start justify-between gap-3';
 
       const meta = document.createElement('div');
       meta.className = 'flex flex-col';
@@ -2563,6 +3036,14 @@
 
       header.appendChild(meta);
 
+      const actions = document.createElement('div');
+      actions.className = 'flex flex-col items-end gap-2 text-right';
+      const visibility = entry && entry.visibility === 'private' ? 'private' : 'public';
+      const visibilityChip = document.createElement('span');
+      visibilityChip.className = 'privacy-chip' + (visibility === 'private' ? ' privacy-chip-private' : '');
+      visibilityChip.textContent = visibility === 'private' ? 'Privado' : 'Público';
+      actions.appendChild(visibilityChip);
+
       if (currentUser?.isAdmin) {
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
@@ -2570,7 +3051,11 @@
         removeBtn.dataset.id = entry && entry.id ? entry.id : '';
         removeBtn.className = 'text-xs font-semibold text-rose-600 hover:text-rose-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-400 rounded px-2 py-1 transition';
         removeBtn.textContent = 'Remover';
-        header.appendChild(removeBtn);
+        actions.appendChild(removeBtn);
+      }
+
+      if (actions.children.length) {
+        header.appendChild(actions);
       }
 
       const messageEl = document.createElement('p');
@@ -2579,12 +3064,64 @@
 
       card.appendChild(header);
       card.appendChild(messageEl);
+
+      const targetNames = entry && Array.isArray(entry.targetUserNames)
+        ? entry.targetUserNames.filter(Boolean)
+        : [];
+      if (visibility === 'private' && targetNames.length) {
+        const recipients = document.createElement('p');
+        recipients.className = 'text-xs text-slate-500 dark:text-slate-400';
+        recipients.textContent = 'Destinatários: ' + targetNames.join(', ');
+        card.appendChild(recipients);
+      }
+
+      const attachments = entry && Array.isArray(entry.attachments) ? entry.attachments : [];
+      if (attachments.length) {
+        const attachmentList = document.createElement('ul');
+        attachmentList.className = 'space-y-2';
+        attachments.forEach(att => {
+          if (!att || !att.id) return;
+          const li = document.createElement('li');
+          li.className = 'attachment-item';
+
+          const info = document.createElement('div');
+          info.className = 'attachment-info';
+          const icon = document.createElement('span');
+          icon.className = 'attachment-icon';
+          icon.textContent = '📎';
+          const textWrap = document.createElement('div');
+          textWrap.className = 'attachment-text';
+          const nameLink = document.createElement('a');
+          nameLink.className = 'attachment-name';
+          nameLink.textContent = att.name || 'Arquivo';
+          if (att.url) {
+            nameLink.href = att.url;
+            nameLink.target = '_blank';
+            nameLink.rel = 'noopener';
+          } else {
+            nameLink.href = '#';
+            nameLink.addEventListener('click', event => event.preventDefault());
+          }
+          const metaEl = document.createElement('span');
+          metaEl.className = 'attachment-meta';
+          metaEl.textContent = formatFileSize(att.sizeBytes);
+          textWrap.append(nameLink, metaEl);
+          info.append(icon, textWrap);
+
+          li.appendChild(info);
+          attachmentList.appendChild(li);
+        });
+        card.appendChild(attachmentList);
+      }
+
       communityListEl.appendChild(card);
     });
   }
 
   function refreshCommunityWall() {
     if (!communityListEl) return;
+    const token = getSessionToken();
+    const payload = token ? { token } : {};
     google.script.run
       .withFailureHandler(err => {
         console.error('Falha ao carregar mural:', err);
@@ -2596,7 +3133,7 @@
         const entries = res && Array.isArray(res.entries) ? res.entries : [];
         renderCommunityWall(entries);
       })
-      .listCommunityWallEntries();
+      .listCommunityWallEntries(payload);
   }
 
   const achievementsState = {
@@ -3652,6 +4189,77 @@
     renderCardMessage(el, '', '');
   }
 
+  function resetConfirmationCountdown() {
+    if (confirmationTimer) {
+      clearInterval(confirmationTimer);
+      confirmationTimer = null;
+    }
+    if (confirmationCountdownEl) confirmationCountdownEl.textContent = '';
+  }
+
+  function startConfirmationCountdown() {
+    resetConfirmationCountdown();
+    if (!pendingConfirmation || !pendingConfirmation.expiresAt || !confirmationCountdownEl) return;
+    const expires = new Date(pendingConfirmation.expiresAt);
+    if (Number.isNaN(expires.getTime())) return;
+    const updateCountdown = () => {
+      const remaining = expires.getTime() - Date.now();
+      if (remaining <= 0) {
+        confirmationCountdownEl.textContent = 'Código expirado — solicite um novo envio.';
+        resetConfirmationCountdown();
+        return;
+      }
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      confirmationCountdownEl.textContent = `Código expira em ${minutes}m ${String(seconds).padStart(2, '0')}s`;
+    };
+    updateCountdown();
+    confirmationTimer = setInterval(updateCountdown, 1000);
+  }
+
+  function showAuthView(mode = 'login') {
+    const normalized = mode === 'signup' || mode === 'confirm' ? mode : 'login';
+    currentAuthMode = normalized;
+    if (loginCardEl) loginCardEl.classList.toggle('hidden', normalized !== 'login');
+    if (signupCardEl) signupCardEl.classList.toggle('hidden', normalized !== 'signup');
+    if (confirmCardEl) confirmCardEl.classList.toggle('hidden', normalized !== 'confirm');
+    if (normalized !== 'confirm') {
+      resetConfirmationCountdown();
+      if (normalized === 'login') {
+        pendingConfirmation = null;
+      }
+    } else {
+      startConfirmationCountdown();
+    }
+    if (normalized === 'login' && loginEmailInput) {
+      setTimeout(() => loginEmailInput.focus(), 60);
+    } else if (normalized === 'signup' && signupFields.name.input) {
+      setTimeout(() => signupFields.name.input.focus(), 60);
+    } else if (normalized === 'confirm' && confirmCodeInput) {
+      setTimeout(() => confirmCodeInput.focus(), 60);
+    }
+  }
+
+  function openConfirmationView(confirmation, options = {}) {
+    const remember = options && Object.prototype.hasOwnProperty.call(options, 'remember')
+      ? !!options.remember
+      : rememberPreference;
+    rememberPreference = remember;
+    if (rememberMeCheckbox) {
+      rememberMeCheckbox.checked = rememberPreference;
+    }
+    pendingConfirmation = {
+      email: confirmation && confirmation.email ? confirmation.email : (pendingConfirmation && pendingConfirmation.email) || '',
+      userId: confirmation && confirmation.userId ? confirmation.userId : (pendingConfirmation && pendingConfirmation.userId) || '',
+      expiresAt: confirmation && confirmation.expiresAt ? confirmation.expiresAt : (pendingConfirmation && pendingConfirmation.expiresAt) || '',
+      remember
+    };
+    if (confirmEmailInput) confirmEmailInput.value = pendingConfirmation.email || '';
+    if (confirmCodeInput) confirmCodeInput.value = '';
+    clearCardMessage(confirmMsgEl);
+    showAuthView('confirm');
+  }
+
   const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const requiredSignupKeys = ['name','email','password'];
   const signupFields = {
@@ -3711,6 +4319,8 @@
   const loginPasswordInput = $('#lPass');
   const btnLogin = $('#btnLogin');
   let isSignupSubmitting = false;
+  let isLoginSubmitting = false;
+  let isConfirmSubmitting = false;
 
   function evaluateField(key, opts = {}) {
     const field = signupFields[key];
@@ -3734,6 +4344,18 @@
     if (btnSignup) btnSignup.disabled = !allValid || isSignupSubmitting;
   }
 
+  function updateLoginButton() {
+    if (!btnLogin) return;
+    btnLogin.disabled = !!isLoginSubmitting;
+    btnLogin.textContent = isLoginSubmitting ? 'Entrando...' : 'Entrar';
+  }
+
+  function updateConfirmButton() {
+    if (!btnConfirmSignup) return;
+    btnConfirmSignup.disabled = !!isConfirmSubmitting;
+    btnConfirmSignup.textContent = isConfirmSubmitting ? 'Confirmando...' : 'Confirmar acesso';
+  }
+
   Object.entries(signupFields).forEach(([key, field]) => {
     if (!field.input) return;
     field.input.addEventListener('input', () => {
@@ -3750,6 +4372,32 @@
   });
 
   updateSignupButton();
+  updateLoginButton();
+  updateConfirmButton();
+
+  if (toggleSignupBtn) {
+    toggleSignupBtn.addEventListener('click', () => {
+      clearCardMessage(loginMessageEl);
+      showAuthView('signup');
+    });
+  }
+  if (toggleLoginBtn) {
+    toggleLoginBtn.addEventListener('click', () => {
+      clearCardMessage(signupMessageEl);
+      showAuthView('login');
+    });
+  }
+  if (confirmBackToLoginBtn) {
+    confirmBackToLoginBtn.addEventListener('click', () => {
+      clearCardMessage(confirmMsgEl);
+      showAuthView('login');
+    });
+  }
+  if (rememberMeCheckbox) {
+    rememberMeCheckbox.addEventListener('change', () => {
+      rememberPreference = !!rememberMeCheckbox.checked;
+    });
+  }
 
   [loginEmailInput, loginPasswordInput].forEach(input => {
     if (!input) return;
@@ -3760,6 +4408,32 @@
     communityTextarea.addEventListener('input', () => {
       showCommunityError('');
       updateCommunityCounter();
+      updateCommunityPublishState();
+    });
+  }
+
+  if (communityAttachmentInput) {
+    communityAttachmentInput.addEventListener('change', event => {
+      const input = event.target;
+      const files = input && input.files ? Array.from(input.files) : [];
+      if (files.length) {
+        files.forEach(file => uploadCommunityAttachmentFile(file));
+      }
+      if (input) {
+        input.value = '';
+      }
+    });
+  }
+
+  if (communityPrivacySelect) {
+    communityPrivacySelect.addEventListener('change', event => {
+      const value = event && event.target ? event.target.value : communityState.privacy;
+      setCommunityPrivacy(value);
+    });
+  }
+
+  if (communityTargetsSelect) {
+    communityTargetsSelect.addEventListener('change', () => {
       updateCommunityPublishState();
     });
   }
@@ -3776,6 +4450,11 @@
         return;
       }
       const message = communityTextarea ? communityTextarea.value.trim() : '';
+      const attachments = communityState.attachments
+        .map(att => att && att.id ? att.id : '')
+        .filter(Boolean);
+      const visibility = communityState.privacy === 'private' ? 'private' : 'public';
+      const selectedTargets = getSelectedCommunityTargets();
       if (!message) {
         showCommunityError('Escreva uma mensagem para publicar.');
         if (communityTextarea) {
@@ -3785,6 +4464,13 @@
       }
       if (message.length > communityCharLimit) {
         showCommunityError(`A mensagem deve ter até ${communityCharLimit} caracteres.`);
+        return;
+      }
+      if (visibility === 'private' && selectedTargets.length === 0) {
+        showCommunityError('Selecione ao menos um destinatário para a publicação privada.');
+        if (communityTargetsSelect) {
+          try { communityTargetsSelect.focus({ preventScroll: true }); } catch (err) { communityTargetsSelect.focus(); }
+        }
         return;
       }
       isPublishingCommunity = true;
@@ -3803,12 +4489,24 @@
           isPublishingCommunity = false;
           updateCommunityPublishState();
           if (communityTextarea) communityTextarea.value = '';
+          communityState.attachments = [];
+          renderCommunityAttachments();
+          if (visibility === 'private' && communityTargetsSelect) {
+            Array.from(communityTargetsSelect.options || []).forEach(option => { option.selected = false; });
+          }
           updateCommunityCounter();
+          updateCommunityPublishState();
           showCommunityError('');
           showToast({ message: 'Mensagem publicada no mural!', type: 'success' });
           refreshCommunityWall();
         })
-        .addCommunityWallEntry({ token, message });
+        .addCommunityWallEntry({
+          token,
+          message,
+          visibility,
+          attachments,
+          targetUserIds: visibility === 'private' ? selectedTargets : []
+        });
     });
   }
 
@@ -3858,6 +4556,8 @@
   setActiveSubPageButtons(activeSubPage);
   renderStudentHero();
   updateCommunityCounter();
+  renderCommunityAttachments();
+  renderCommunityTargetsOptions();
 
   // UI switches
   function updateUI(options = {}) {
@@ -3882,6 +4582,7 @@
 
     if (!currentUser) {
       $('#authSection').classList.remove('hidden');
+      showAuthView('login');
       $('#dashSection').classList.add('hidden');
       $('#userInfo').textContent = 'Visitante';
       $('#btnLogout').classList.add('hidden');
@@ -3897,6 +4598,16 @@
       renderPolls();
       renderAdminBulletin();
       renderAdminMissionList();
+      if (achievementsAdminNoticeEl) {
+        if (achievementsAdminNoticeDefaultText) {
+          achievementsAdminNoticeEl.textContent = achievementsAdminNoticeDefaultText;
+        }
+        achievementsAdminNoticeEl.classList.remove('hidden');
+      }
+      if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.add('hidden');
+      if (achievementsPodiumEl) achievementsPodiumEl.innerHTML = '';
+      if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
+      if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Restrito à coordenação';
       return;
     }
 
@@ -3907,6 +4618,7 @@
     setActiveSubPageButtons(activeSubPage);
     syncHeaderContext();
     renderPolls();
+    loadShareableUsers();
 
     if (!keepLevelIndicator) {
       setLevelIndicatorLoading();
@@ -3970,19 +4682,183 @@
   }
 
   function refreshRanking() {
-    google.script.run.withSuccessHandler(list=>{
-      const wrap = $('#rankWrap');
-      wrap.innerHTML = '';
-      list.forEach(r=>{
-        const div = document.createElement('div');
-        div.innerHTML = `<b>${r.pos}º</b> — ${r.name} • XP ${r.xp} • Nível ${r.level}`;
-        wrap.appendChild(div);
-      });
-      if (currentUser?.isAdmin) {
-        const adm = $('#adminRank');
-        adm.innerHTML = wrap.innerHTML;
+    const simpleWrap = $('#rankWrap');
+    const adminWrap = $('#adminRank');
+    const isAdmin = !!(currentUser && currentUser.isAdmin);
+
+    const renderSimpleList = entries => {
+      if (simpleWrap) {
+        simpleWrap.innerHTML = '';
+        if (!entries.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-xs text-slate-500 dark:text-slate-400';
+          empty.textContent = 'Ranking ainda não disponível.';
+          simpleWrap.appendChild(empty);
+        } else {
+          entries.slice(0, 5).forEach(item => {
+            const row = document.createElement('div');
+            row.textContent = `${item.pos}º — ${item.name || 'Participante'} • ${formatNumber(item.xp)} XP`;
+            simpleWrap.appendChild(row);
+          });
+        }
       }
-    }).getRanking();
+      if (adminWrap) {
+        adminWrap.innerHTML = '';
+        if (!entries.length) {
+          const empty = document.createElement('div');
+          empty.className = 'text-xs text-slate-500 dark:text-slate-400';
+          empty.textContent = 'Ranking ainda não disponível.';
+          adminWrap.appendChild(empty);
+        } else {
+          entries.forEach(item => {
+            const row = document.createElement('div');
+            row.textContent = `${item.pos}º — ${item.name || 'Participante'} • ${formatNumber(item.xp)} XP`;
+            adminWrap.appendChild(row);
+          });
+        }
+      }
+    };
+
+    const renderAdminLeaderboard = entries => {
+      if (achievementsRankingBadgeEl) {
+        let label = 'Atualizado agora';
+        if (timeFormatter) {
+          try {
+            label = `Atualizado às ${timeFormatter.format(new Date())}`;
+          } catch (err) {
+            label = 'Atualizado agora';
+          }
+        }
+        achievementsRankingBadgeEl.textContent = label;
+      }
+
+      if (achievementsPodiumEl) {
+        achievementsPodiumEl.innerHTML = '';
+        const podiumByRank = {};
+        entries.forEach(item => {
+          if (item && item.pos && item.pos <= 3 && !podiumByRank[item.pos]) {
+            podiumByRank[item.pos] = item;
+          }
+        });
+        const order = [2, 1, 3];
+        order.forEach(rank => {
+          const entry = podiumByRank[rank];
+          if (!entry) return;
+          const card = document.createElement('div');
+          let classes = 'podium-card';
+          if (rank === 1) classes += ' podium-card-first';
+          else if (rank === 2) classes += ' podium-card-second';
+          else if (rank === 3) classes += ' podium-card-third';
+          card.className = classes;
+          const rankLabel = document.createElement('div');
+          rankLabel.className = 'podium-rank';
+          rankLabel.textContent = `${rank}º lugar`;
+          const nameEl = document.createElement('div');
+          nameEl.className = 'podium-name';
+          nameEl.textContent = entry.name || 'Participante';
+          const scoreEl = document.createElement('div');
+          scoreEl.className = 'podium-score';
+          scoreEl.textContent = `Nível ${formatNumber(entry.level)} • ${formatNumber(entry.xp)} XP`;
+          card.append(rankLabel, nameEl, scoreEl);
+          achievementsPodiumEl.appendChild(card);
+        });
+        if (!achievementsPodiumEl.children.length) {
+          const empty = document.createElement('p');
+          empty.className = 'text-sm text-slate-500 dark:text-slate-300';
+          empty.textContent = 'Ranking ainda não possui participantes suficientes.';
+          achievementsPodiumEl.appendChild(empty);
+        }
+      }
+
+      if (achievementsLeaderboardTableEl) {
+        achievementsLeaderboardTableEl.innerHTML = '';
+        if (!entries.length) {
+          const tr = document.createElement('tr');
+          const td = document.createElement('td');
+          td.colSpan = 2;
+          td.className = 'px-4 py-4 text-sm text-slate-500 dark:text-slate-300';
+          td.textContent = 'Nenhum aluno ranqueado ainda.';
+          tr.appendChild(td);
+          achievementsLeaderboardTableEl.appendChild(tr);
+        } else {
+          entries.forEach(entry => {
+            const tr = document.createElement('tr');
+            const infoTd = document.createElement('td');
+            infoTd.className = 'px-4 py-3 align-middle';
+            const nameDiv = document.createElement('div');
+            nameDiv.className = 'leaderboard-name';
+            nameDiv.textContent = `${entry.pos}º — ${entry.name || 'Participante'}`;
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'leaderboard-meta';
+            metaDiv.textContent = `Nível ${formatNumber(entry.level)} • ${formatNumber(entry.xp)} XP`;
+            infoTd.append(nameDiv, metaDiv);
+            const xpTd = document.createElement('td');
+            xpTd.className = 'px-4 py-3 text-right align-middle font-semibold text-slate-600 dark:text-slate-200';
+            xpTd.textContent = `${formatNumber(entry.xp)} XP`;
+            tr.append(infoTd, xpTd);
+            achievementsLeaderboardTableEl.appendChild(tr);
+          });
+        }
+      }
+
+      if (achievementsLeaderboardEl) {
+        achievementsLeaderboardEl.classList.remove('hidden');
+      }
+      if (achievementsRankingBadgeEl && !entries.length) {
+        achievementsRankingBadgeEl.textContent = 'Sem participantes';
+      }
+    };
+
+    const resetAdminNotice = () => {
+      if (!achievementsAdminNoticeEl) return;
+      if (achievementsAdminNoticeDefaultText) {
+        achievementsAdminNoticeEl.textContent = achievementsAdminNoticeDefaultText;
+      }
+    };
+
+    resetAdminNotice();
+    if (!isAdmin) {
+      if (achievementsAdminNoticeEl) achievementsAdminNoticeEl.classList.remove('hidden');
+      if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.add('hidden');
+      if (achievementsPodiumEl) achievementsPodiumEl.innerHTML = '';
+      if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
+      if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Restrito à coordenação';
+    } else {
+      if (achievementsAdminNoticeEl) achievementsAdminNoticeEl.classList.add('hidden');
+      if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.remove('hidden');
+      if (achievementsPodiumEl) {
+        achievementsPodiumEl.innerHTML = '';
+        const placeholder = document.createElement('p');
+        placeholder.className = 'text-sm text-slate-500 dark:text-slate-300';
+        placeholder.textContent = 'Carregando ranking...';
+        achievementsPodiumEl.appendChild(placeholder);
+      }
+      if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
+      if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Atualizando...';
+    }
+
+    google.script.run
+      .withFailureHandler(err => {
+        renderSimpleList([]);
+        if (isAdmin) {
+          if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.add('hidden');
+          if (achievementsAdminNoticeEl) {
+            achievementsAdminNoticeEl.textContent = err?.message || 'Não foi possível carregar o ranking agora.';
+            achievementsAdminNoticeEl.classList.remove('hidden');
+          }
+          if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Falha ao atualizar';
+        }
+        console.error('Falha ao carregar ranking:', err);
+      })
+      .withSuccessHandler(list => {
+        const entries = Array.isArray(list) ? list : [];
+        renderSimpleList(entries);
+        if (isAdmin) {
+          if (achievementsAdminNoticeEl) achievementsAdminNoticeEl.classList.add('hidden');
+          renderAdminLeaderboard(entries);
+        }
+      })
+      .getRanking();
   }
 
   // AUTH
@@ -4015,13 +4891,20 @@
         })
         .withSuccessHandler(res => {
           isSignupSubmitting = false;
+          updateSignupButton();
+
+          if (res && res.ok && res.requiresConfirmation && res.confirmation) {
+            renderCardMessage(signupMessageEl, 'success', res.message || 'Enviamos um código de confirmação para o seu e-mail.');
+            openConfirmationView(res.confirmation, { remember: rememberPreference });
+            renderCardMessage(confirmMsgEl, 'success', res.message || 'Insira o código enviado para ativar sua conta.');
+            return;
+          }
 
           if (res && res.ok && res.user && res.token) {
             clearCardMessage(signupMessageEl);
             currentUser = res.user;
-            persistSession(res.token, res.user);
+            persistSession(res.token, res.user, { remember: rememberPreference });
             updateUI();
-            updateSignupButton();
             return;
           }
 
@@ -4043,39 +4926,148 @@
             messageText = 'Não foi possível criar a conta. Tente novamente.';
           }
           renderCardMessage(signupMessageEl, 'error', messageText);
-          updateSignupButton();
         })
         .registerUser(payload);
     });
   }
 
-  if (btnLogin) {
-    btnLogin.addEventListener('click', () => {
-      clearCardMessage(loginMessageEl);
-      const email = loginEmailInput ? loginEmailInput.value.trim() : '';
-      const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
-      if (!email || !password) {
-        renderCardMessage(loginMessageEl, 'error', 'Informe e-mail e senha.');
+  function handleLoginSubmit() {
+    if (isLoginSubmitting) return;
+    clearCardMessage(loginMessageEl);
+    const email = loginEmailInput ? loginEmailInput.value.trim() : '';
+    const password = loginPasswordInput ? loginPasswordInput.value.trim() : '';
+    rememberPreference = !!(rememberMeCheckbox && rememberMeCheckbox.checked);
+    if (!email || !password) {
+      renderCardMessage(loginMessageEl, 'error', 'Informe e-mail e senha.');
+      return;
+    }
+
+    isLoginSubmitting = true;
+    updateLoginButton();
+
+    google.script.run
+      .withFailureHandler(err => {
+        isLoginSubmitting = false;
+        updateLoginButton();
+        renderCardMessage(loginMessageEl, 'error', err.message || err);
+      })
+      .withSuccessHandler(res => {
+        isLoginSubmitting = false;
+        updateLoginButton();
+        if (res && res.ok && res.user && res.token) {
+          clearCardMessage(loginMessageEl);
+          currentUser = res.user;
+          persistSession(res.token, res.user, { remember: rememberPreference });
+          updateUI();
+          return;
+        }
+        if (res && res.requiresConfirmation && res.confirmation) {
+          renderCardMessage(loginMessageEl, 'success', res.message || 'Confirme o código enviado para ativar seu acesso.');
+          openConfirmationView(res.confirmation, { remember: rememberPreference });
+          renderCardMessage(confirmMsgEl, 'success', 'Digite o código enviado para concluir o login.');
+          return;
+        }
+        renderCardMessage(loginMessageEl, 'error', (res && res.message) || 'Não foi possível entrar. Tente novamente.');
+      })
+      .loginUser({ email, password });
+  }
+
+  if (loginForm) {
+    loginForm.addEventListener('submit', event => {
+      event.preventDefault();
+      handleLoginSubmit();
+    });
+  }
+
+  if (confirmForm) {
+    confirmForm.addEventListener('submit', event => {
+      event.preventDefault();
+      if (isConfirmSubmitting) return;
+      if (!pendingConfirmation || !pendingConfirmation.email) {
+        renderCardMessage(confirmMsgEl, 'error', 'Solicite o cadastro novamente para receber um novo código.');
         return;
       }
-
+      const codeValue = confirmCodeInput ? confirmCodeInput.value.trim() : '';
+      if (!codeValue) {
+        renderCardMessage(confirmMsgEl, 'error', 'Informe o código enviado por e-mail.');
+        return;
+      }
+      isConfirmSubmitting = true;
+      updateConfirmButton();
       google.script.run
         .withFailureHandler(err => {
-          renderCardMessage(loginMessageEl, 'error', err.message || err);
+          isConfirmSubmitting = false;
+          updateConfirmButton();
+          renderCardMessage(confirmMsgEl, 'error', err.message || err);
         })
         .withSuccessHandler(res => {
-          const user = res && res.user;
-          const token = res && res.token;
-          if (user && user.id && token) {
-            clearCardMessage(loginMessageEl);
-            currentUser = user;
-            persistSession(token, user);
+          isConfirmSubmitting = false;
+          updateConfirmButton();
+          if (res && res.ok && res.user && res.token) {
+            clearCardMessage(confirmMsgEl);
+            const remember = pendingConfirmation && Object.prototype.hasOwnProperty.call(pendingConfirmation, 'remember')
+              ? !!pendingConfirmation.remember
+              : rememberPreference;
+            currentUser = res.user;
+            persistSession(res.token, res.user, { remember });
+            pendingConfirmation = null;
+            resetConfirmationCountdown();
             updateUI();
-          } else {
-            renderCardMessage(loginMessageEl, 'error', 'Não foi possível entrar. Tente novamente.');
+            return;
           }
+          if (res && res.alreadyConfirmed && res.user && res.token) {
+            clearCardMessage(confirmMsgEl);
+            const remember = pendingConfirmation && Object.prototype.hasOwnProperty.call(pendingConfirmation, 'remember')
+              ? !!pendingConfirmation.remember
+              : rememberPreference;
+            currentUser = res.user;
+            persistSession(res.token, res.user, { remember });
+            pendingConfirmation = null;
+            resetConfirmationCountdown();
+            updateUI();
+            return;
+          }
+          if (res && res.expired) {
+            renderCardMessage(confirmMsgEl, 'error', res.message || 'O código informado expirou. Solicite um novo envio.');
+            return;
+          }
+          renderCardMessage(confirmMsgEl, 'error', (res && res.message) || 'Não foi possível confirmar o cadastro. Tente novamente.');
         })
-        .loginUser({ email, password });
+        .confirmUserRegistration({ email: pendingConfirmation.email, code: codeValue });
+    });
+  }
+
+  if (btnResendConfirmation) {
+    btnResendConfirmation.addEventListener('click', () => {
+      if (!pendingConfirmation || !pendingConfirmation.email) {
+        renderCardMessage(confirmMsgEl, 'error', 'Cadastre-se novamente para gerar um novo código.');
+        return;
+      }
+      const originalLabel = btnResendConfirmation.textContent;
+      btnResendConfirmation.disabled = true;
+      btnResendConfirmation.textContent = 'Reenviando...';
+      google.script.run
+        .withFailureHandler(err => {
+          btnResendConfirmation.disabled = false;
+          btnResendConfirmation.textContent = originalLabel;
+          renderCardMessage(confirmMsgEl, 'error', err.message || err);
+        })
+        .withSuccessHandler(res => {
+          btnResendConfirmation.disabled = false;
+          btnResendConfirmation.textContent = originalLabel;
+          if (res && res.ok && res.confirmation) {
+            openConfirmationView(res.confirmation, { remember: pendingConfirmation && pendingConfirmation.remember });
+            renderCardMessage(confirmMsgEl, 'success', 'Enviamos um novo código de confirmação para seu e-mail.');
+            return;
+          }
+          if (res && res.alreadyConfirmed && currentUser) {
+            renderCardMessage(confirmMsgEl, 'info', 'Este acesso já foi confirmado. Faça login normalmente.');
+            showAuthView('login');
+            return;
+          }
+          renderCardMessage(confirmMsgEl, 'error', (res && res.message) || 'Não foi possível reenviar o código agora.');
+        })
+        .resendConfirmationCode({ email: pendingConfirmation.email });
     });
   }
 

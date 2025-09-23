@@ -10,13 +10,17 @@ const SHEET_CONFIG           = 'Config';           // key, value
 const SHEET_EMBEDS           = 'Embeds';           // key, url
 const SHEET_SESSIONS         = 'Sessions';         // userId, tokenHash, expiresAt, createdAt
 const SHEET_USER_ACHIEVEMENT = 'UserAchievements'; // userId, achievementId, unlockedAt, rewardXP
-const SHEET_WALL             = 'Wall';             // id, userId, authorName, message, createdAt, removedAt, removedBy
+const SHEET_WALL             = 'Wall';             // id, userId, authorName, message, createdAt, visibility, targetUserIds, attachmentIds, removedAt, removedBy
+const SHEET_CONFIRMATIONS    = 'UserConfirmations';// userId, email, codeHash, createdAt, expiresAt, confirmedAt, lastSentAt
+const SHEET_WALL_ATTACHMENTS = 'WallAttachments';  // attachmentId, postId, uploaderId, fileId, fileName, mimeType, fileUrl, sizeBytes, uploadedAt, linkedAt
 
 const CONFIG_RECOMMENDED_RESOURCES = 'recommended_resources';
 const CONFIG_UPCOMING_EVENTS       = 'upcoming_events';
 
 const COMMUNITY_WALL_CHAR_LIMIT = 240;
 const CHECKIN_STREAK_XP_CAP = 24;
+const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB por arquivo
+const COMMUNITY_FILES_FOLDER_ID = '1LBfNBUjTMjrEVL1CE-YJtA3ecW_gQMIR';
 
 const ACHIEVEMENTS = [
   {
@@ -188,7 +192,9 @@ function setup_() {
   ensure(SHEET_EMBEDS,           ['key','url']);
   ensure(SHEET_SESSIONS,         ['userId','tokenHash','expiresAt','createdAt']);
   ensure(SHEET_USER_ACHIEVEMENT, ['userId','achievementId','unlockedAt','rewardXP']);
-  ensure(SHEET_WALL,             ['id','userId','authorName','message','createdAt','removedAt','removedBy']);
+  ensure(SHEET_WALL,             ['id','userId','authorName','message','createdAt','visibility','targetUserIds','attachmentIds','removedAt','removedBy']);
+  ensure(SHEET_CONFIRMATIONS,    ['userId','email','codeHash','createdAt','expiresAt','confirmedAt','lastSentAt']);
+  ensure(SHEET_WALL_ATTACHMENTS, ['attachmentId','postId','uploaderId','fileId','fileName','mimeType','fileUrl','sizeBytes','uploadedAt','linkedAt']);
 
   // Defaults de config
   const cfg = getConfig_();
@@ -225,6 +231,127 @@ function findByEmail_(email){ const rows=getAll_(sh_(SHEET_USERS)); for (let i=0
 function getConfig_()       { const rows=getAll_(sh_(SHEET_CONFIG)); const m={}; rows.forEach(r=>m[(r[0]||'').toString()]=(r[1]||'').toString()); return m; }
 function setConfig_(k,v)    { const s=sh_(SHEET_CONFIG); const rows=getAll_(s); for (let i=0;i<rows.length;i++){ if (rows[i][0]==k){ s.getRange(i+2,2).setValue(v); return; } } s.appendRow([k,v]); }
 
+function generateConfirmationCode_() {
+  const min = 100000;
+  const max = 999999;
+  const number = Math.floor(Math.random() * (max - min + 1)) + min;
+  return String(number);
+}
+
+function hashConfirmationCode_(userId, code) {
+  const safeUser = (userId || '').toString();
+  const safeCode = (code || '').toString();
+  return sha256_(safeUser + '|' + safeCode);
+}
+
+function getConfirmationRecordByUserId_(userId) {
+  if (!userId) return null;
+  const rows = getAll_(sh_(SHEET_CONFIRMATIONS));
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[0] || '') === userId) {
+      return {
+        row: i + 2,
+        data: {
+          userId: row[0] || '',
+          email: row[1] || '',
+          codeHash: row[2] || '',
+          createdAt: row[3] || '',
+          expiresAt: row[4] || '',
+          confirmedAt: row[5] || '',
+          lastSentAt: row[6] || ''
+        }
+      };
+    }
+  }
+  return null;
+}
+
+function saveConfirmationCode_(userId, email, codeHash, expiresAtISO) {
+  const sheet = sh_(SHEET_CONFIRMATIONS);
+  const now = nowISO_();
+  const payload = [userId, email, codeHash, now, expiresAtISO, '', now];
+  const existing = getConfirmationRecordByUserId_(userId);
+  if (existing) {
+    sheet.getRange(existing.row, 1, 1, payload.length).setValues([payload]);
+    return {
+      row: existing.row,
+      data: {
+        userId,
+        email,
+        codeHash,
+        createdAt: now,
+        expiresAt: expiresAtISO,
+        confirmedAt: '',
+        lastSentAt: now
+      }
+    };
+  }
+  sheet.appendRow(payload);
+  return {
+    row: sheet.getLastRow(),
+    data: {
+      userId,
+      email,
+      codeHash,
+      createdAt: now,
+      expiresAt: expiresAtISO,
+      confirmedAt: '',
+      lastSentAt: now
+    }
+  };
+}
+
+function markConfirmationAsConfirmed_(userId) {
+  const sheet = sh_(SHEET_CONFIRMATIONS);
+  const existing = getConfirmationRecordByUserId_(userId);
+  const now = nowISO_();
+  if (existing) {
+    sheet.getRange(existing.row, 3).setValue('');
+    sheet.getRange(existing.row, 6).setValue(now);
+    return { row: existing.row, confirmedAt: now };
+  }
+  sheet.appendRow([userId, '', '', now, now, now, now]);
+  return { row: sheet.getLastRow(), confirmedAt: now };
+}
+
+function isUserConfirmed_(userId) {
+  const record = getConfirmationRecordByUserId_(userId);
+  if (!record) return true;
+  return !!record.data.confirmedAt;
+}
+
+function buildConfirmationEmailBodies_(name, code) {
+  const template = HtmlService.createTemplateFromFile('confirmation-email');
+  template.name = name || 'Participante';
+  template.code = code;
+  const html = template.evaluate().getContent();
+  const subject = 'Confirme seu cadastro na Plataforma Excel';
+  const plain = [
+    'Olá ' + (name || 'participante') + ',',
+    '',
+    'Use o código abaixo para confirmar seu cadastro na Plataforma Excel:',
+    '',
+    code,
+    '',
+    'Se você não solicitou este acesso, ignore esta mensagem.'
+  ].join('\n');
+  return { subject, plain, html };
+}
+
+function sendConfirmationEmail_(email, name, code) {
+  if (!email || !code) return;
+  const bodies = buildConfirmationEmailBodies_(name, code);
+  MailApp.sendEmail({
+    to: email,
+    subject: bodies.subject,
+    htmlBody: bodies.html,
+    body: bodies.plain,
+    name: 'Plataforma Excel',
+    noReply: true
+  });
+}
+
 function getModuleById_(moduleId) {
   const numericId = Number(moduleId);
   if (!Number.isFinite(numericId) || numericId <= 0 || !Number.isInteger(numericId)) return null;
@@ -244,6 +371,32 @@ function normalizeStringArray_(value) {
     if (result.indexOf(textItem) === -1) result.push(textItem);
   }
   return result;
+}
+
+function deserializeIdList_(value) {
+  if (!value && value !== 0) return [];
+  if (Array.isArray(value)) return normalizeStringArray_(value);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return normalizeStringArray_(parsed);
+    } catch (err) {
+      // fallback para separação simples
+    }
+    const parts = trimmed.split(/[,;\s]+/);
+    return normalizeStringArray_(parts);
+  }
+  return [];
+}
+
+function serializeIdList_(value) {
+  if (typeof value === 'string') {
+    const parts = value.split(/[,;\s]+/);
+    return JSON.stringify(normalizeStringArray_(parts));
+  }
+  return JSON.stringify(normalizeStringArray_(Array.isArray(value) ? value : []));
 }
 
 function parseConfigListValue_(raw) {
@@ -274,6 +427,23 @@ function getConfigList_(key) {
   const cfg = getConfig_();
   const raw = cfg[key];
   return parseConfigListValue_(raw);
+}
+
+function getUserMap_() {
+  const rows = getAll_(sh_(SHEET_USERS));
+  const map = {};
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const id = row[0] || '';
+    if (!id) continue;
+    map[id] = {
+      name: row[1] || '',
+      email: row[2] || '',
+      isAdmin: !!row[4],
+      xp: Number(row[5] || 0)
+    };
+  }
+  return map;
 }
 
 function computeLevelInfo_(xpRaw, cfg) {
@@ -778,15 +948,23 @@ function registerUser(payload) {
   const id = Utilities.getUuid();
   sh_(SHEET_USERS).appendRow([id, name, email, passHash, isAdmin, 0, nowISO_()]);
 
-  const session = createSession_(id);
+  const confirmationCode = generateConfirmationCode_();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+  const expiresISO = expiresAt.toISOString();
+  const codeHash = hashConfirmationCode_(id, confirmationCode);
+  saveConfirmationCode_(id, email, codeHash, expiresISO);
+  sendConfirmationEmail_(email, name, confirmationCode);
+
   return {
     ok: true,
-    user: {
-      id, name, email, isAdmin, xp: 0,
-      level: 1,
+    requiresConfirmation: true,
+    user: { id, name, email, isAdmin, xp: 0, level: 1 },
+    confirmation: {
+      userId: id,
+      email,
+      expiresAt: expiresISO
     },
-    token: session.token,
-    expiresAt: session.expiresAt,
+    message: 'Enviamos um código de confirmação para o seu e-mail. Utilize-o para concluir o cadastro.'
   };
 }
 
@@ -810,12 +988,120 @@ function loginUser(payload) {
     xp: Number(hit.data[5]||0)
   };
   user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel||100));
+
+  const confirmationRecord = getConfirmationRecordByUserId_(user.id);
+  if (confirmationRecord && !confirmationRecord.data.confirmedAt) {
+    return {
+      ok: false,
+      requiresConfirmation: true,
+      confirmation: {
+        userId: user.id,
+        email: user.email,
+        expiresAt: confirmationRecord.data.expiresAt || ''
+      },
+      message: 'Confirme seu cadastro para acessar a plataforma.'
+    };
+  }
+
   const session = createSession_(user.id);
   return {
     ok: true,
     user,
     token: session.token,
     expiresAt: session.expiresAt,
+  };
+}
+
+function confirmUserRegistration(payload) {
+  setup_();
+  const email = (payload.email || '').trim().toLowerCase();
+  const code = (payload.code || '').toString().trim();
+  if (!email || !code) throw new Error('Informe e-mail e código.');
+
+  const hit = findByEmail_(email);
+  if (!hit) throw new Error('Usuário não encontrado.');
+
+  const userId = hit.data[0];
+  const record = getConfirmationRecordByUserId_(userId);
+  if (!record) {
+    // Usuário antigo sem confirmação pendente
+    const session = createSession_(userId);
+    const user = {
+      id: hit.data[0],
+      name: hit.data[1],
+      email: hit.data[2],
+      isAdmin: !!hit.data[4],
+      xp: Number(hit.data[5] || 0)
+    };
+    user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel || 100));
+    return { ok: true, user, token: session.token, expiresAt: session.expiresAt };
+  }
+
+  if (record.data.confirmedAt) {
+    const session = createSession_(userId);
+    const user = {
+      id: hit.data[0],
+      name: hit.data[1],
+      email: hit.data[2],
+      isAdmin: !!hit.data[4],
+      xp: Number(hit.data[5] || 0)
+    };
+    user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel || 100));
+    return { ok: true, alreadyConfirmed: true, user, token: session.token, expiresAt: session.expiresAt };
+  }
+
+  const expiresAt = record.data.expiresAt ? new Date(record.data.expiresAt) : null;
+  if (expiresAt && !isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+    return { ok: false, expired: true, message: 'O código informado expirou. Solicite um novo envio.' };
+  }
+
+  const expectedHash = record.data.codeHash || '';
+  const providedHash = hashConfirmationCode_(userId, code);
+  if (!expectedHash || expectedHash !== providedHash) {
+    throw new Error('Código inválido. Verifique o e-mail e tente novamente.');
+  }
+
+  markConfirmationAsConfirmed_(userId);
+  const session = createSession_(userId);
+  const user = {
+    id: hit.data[0],
+    name: hit.data[1],
+    email: hit.data[2],
+    isAdmin: !!hit.data[4],
+    xp: Number(hit.data[5] || 0)
+  };
+  user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel || 100));
+  return { ok: true, user, token: session.token, expiresAt: session.expiresAt };
+}
+
+function resendConfirmationCode(payload) {
+  setup_();
+  const email = (payload.email || '').trim().toLowerCase();
+  if (!email) throw new Error('Informe o e-mail.');
+
+  const hit = findByEmail_(email);
+  if (!hit) throw new Error('Usuário não encontrado.');
+
+  const userId = hit.data[0];
+  const record = getConfirmationRecordByUserId_(userId);
+  if (record && record.data.confirmedAt) {
+    return { ok: true, alreadyConfirmed: true };
+  }
+
+  const code = generateConfirmationCode_();
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+  const expiresISO = expiresAt.toISOString();
+  const hash = hashConfirmationCode_(userId, code);
+  saveConfirmationCode_(userId, email, hash, expiresISO);
+  sendConfirmationEmail_(email, hit.data[1] || '', code);
+
+  return {
+    ok: true,
+    confirmation: {
+      userId,
+      email,
+      expiresAt: expiresISO
+    }
   };
 }
 
@@ -1216,27 +1502,152 @@ function getEmbeds() {
   };
 }
 
-function listCommunityWallEntries() {
+function getAllAttachmentsMap_() {
+  const rows = getAll_(sh_(SHEET_WALL_ATTACHMENTS));
+  const map = {};
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const id = row[0] || '';
+    if (!id) continue;
+    map[id] = {
+      row: i + 2,
+      attachmentId: id,
+      postId: row[1] || '',
+      uploaderId: row[2] || '',
+      fileId: row[3] || '',
+      fileName: row[4] || '',
+      mimeType: row[5] || '',
+      fileUrl: row[6] || '',
+      sizeBytes: Number(row[7] || 0),
+      uploadedAt: row[8] || '',
+      linkedAt: row[9] || ''
+    };
+  }
+  return map;
+}
+
+function formatAttachmentForClient_(record) {
+  if (!record) return null;
+  return {
+    id: record.attachmentId,
+    postId: record.postId || '',
+    fileId: record.fileId,
+    name: record.fileName,
+    mimeType: record.mimeType,
+    url: record.fileUrl,
+    sizeBytes: record.sizeBytes,
+    uploadedAt: record.uploadedAt,
+    linkedAt: record.linkedAt
+  };
+}
+
+function validateAttachmentOwnership_(attachmentIds, userId) {
+  const ids = normalizeStringArray_(Array.isArray(attachmentIds) ? attachmentIds : []);
+  if (!ids.length) return [];
+  const map = getAllAttachmentsMap_();
+  const owned = [];
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    const record = map[id];
+    if (!record) {
+      throw new Error('Não foi possível localizar um dos anexos enviados.');
+    }
+    if (record.uploaderId !== userId) {
+      throw new Error('Há anexos que pertencem a outro usuário.');
+    }
+    if (record.postId) {
+      throw new Error('Um dos anexos já foi vinculado a outra publicação.');
+    }
+    owned.push(record);
+  }
+  return owned;
+}
+
+function markAttachmentsAsLinked_(attachments, postId) {
+  if (!Array.isArray(attachments) || !attachments.length) return;
+  const sheet = sh_(SHEET_WALL_ATTACHMENTS);
+  const now = nowISO_();
+  attachments.forEach(att => {
+    sheet.getRange(att.row, 2, 1, 2).setValues([[postId, now]]);
+    att.postId = postId;
+    att.linkedAt = now;
+  });
+}
+
+function listCommunityWallEntries(payload) {
   setup_();
+  let viewerId = null;
+  let viewerIsAdmin = false;
+  if (payload && payload.token) {
+    try {
+      const session = requireSessionUser_(payload.token);
+      viewerId = session.user.id;
+      viewerIsAdmin = !!session.user.isAdmin;
+    } catch (err) {
+      viewerId = null;
+      viewerIsAdmin = false;
+    }
+  }
+
   const rows = getAll_(sh_(SHEET_WALL));
+  const attachmentsMap = getAllAttachmentsMap_();
+  const userMap = getUserMap_();
   const entries = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length === 0) continue;
-    const removedAt = row[5];
+    const removedAt = row[8];
     if (removedAt) continue;
     const createdAtRaw = row[4] || '';
     const createdAtDate = parseDateValue_(createdAtRaw);
     const createdAt = createdAtDate ? createdAtDate.toISOString() : createdAtRaw.toString();
     const timestamp = createdAtDate ? createdAtDate.getTime() : null;
+    const id = row[0] || '';
+    const userId = row[1] || '';
+    const authorName = row[2] || '';
+    const message = row[3] || '';
+    const visibilityRaw = (row[5] || 'public').toString();
+    const visibility = visibilityRaw === 'private' ? 'private' : 'public';
+    const targetIds = deserializeIdList_(row[6]);
+    const attachmentIds = deserializeIdList_(row[7]);
+
+    if (visibility === 'private') {
+      const allowedViewers = new Set([userId]);
+      for (let t = 0; t < targetIds.length; t++) {
+        allowedViewers.add(targetIds[t]);
+      }
+      if (!viewerIsAdmin && (!viewerId || !allowedViewers.has(viewerId))) {
+        continue;
+      }
+    }
+
+    const attachmentList = [];
+    for (let k = 0; k < attachmentIds.length; k++) {
+      const attId = attachmentIds[k];
+      const record = attachmentsMap[attId];
+      if (!record) continue;
+      if (record.postId && record.postId !== id) continue;
+      attachmentList.push(formatAttachmentForClient_(record));
+    }
+
+    const targetNames = [];
+    for (let t = 0; t < targetIds.length; t++) {
+      const info = userMap[targetIds[t]];
+      if (info && info.name) targetNames.push(info.name);
+    }
+
     entries.push({
-      id: row[0] || '',
-      userId: row[1] || '',
-      authorName: row[2] || '',
-      message: row[3] || '',
+      id,
+      userId,
+      authorName,
+      message,
       createdAt,
-      timestamp
+      timestamp,
+      visibility,
+      targetUserIds: targetIds,
+      targetUserNames: targetNames,
+      attachments: attachmentList
     });
   }
 
@@ -1262,10 +1673,40 @@ function addCommunityWallEntry(payload) {
   }
 
   const normalized = message.replace(/\s+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+  const visibilityRaw = (payload && payload.visibility ? payload.visibility.toString() : 'public');
+  const visibility = visibilityRaw === 'private' ? 'private' : 'public';
+
+  const userMap = getUserMap_();
+  const targetsRaw = payload && (payload.targetUserIds || payload.targetIds || payload.targets);
+  const targetIdsNormalized = normalizeStringArray_(Array.isArray(targetsRaw) ? targetsRaw : deserializeIdList_(targetsRaw || []));
+  const sanitizedTargets = [];
+  for (let i = 0; i < targetIdsNormalized.length; i++) {
+    const targetId = targetIdsNormalized[i];
+    if (!targetId) continue;
+    if (targetId === session.user.id) continue;
+    if (!userMap[targetId]) {
+      throw new Error('Não foi possível localizar um dos destinatários selecionados.');
+    }
+    if (sanitizedTargets.indexOf(targetId) === -1) sanitizedTargets.push(targetId);
+  }
+  if (visibility === 'private' && !sanitizedTargets.length) {
+    throw new Error('Selecione ao menos um destinatário para a publicação privada.');
+  }
+
+  const attachmentsRaw = payload && (payload.attachments || payload.attachmentIds);
+  const attachmentIdList = normalizeStringArray_(Array.isArray(attachmentsRaw) ? attachmentsRaw : deserializeIdList_(attachmentsRaw || []));
+  const attachmentRecords = validateAttachmentOwnership_(attachmentIdList, session.user.id);
+
   const sheet = sh_(SHEET_WALL);
   const id = Utilities.getUuid();
   const createdAt = nowISO_();
-  sheet.appendRow([id, session.user.id, session.user.name || '', normalized, createdAt, '', '']);
+  const serializedTargets = serializeIdList_(sanitizedTargets);
+  const serializedAttachments = serializeIdList_(attachmentRecords.map(att => att.attachmentId));
+  sheet.appendRow([id, session.user.id, session.user.name || '', normalized, createdAt, visibility, serializedTargets, serializedAttachments, '', '']);
+  markAttachmentsAsLinked_(attachmentRecords, id);
+
+  const attachmentList = attachmentRecords.map(formatAttachmentForClient_).filter(Boolean);
+  const targetNames = sanitizedTargets.map(t => (userMap[t] && userMap[t].name) ? userMap[t].name : '').filter(Boolean);
 
   return {
     ok: true,
@@ -1274,7 +1715,11 @@ function addCommunityWallEntry(payload) {
       userId: session.user.id,
       authorName: session.user.name || '',
       message: normalized,
-      createdAt
+      createdAt,
+      visibility,
+      targetUserIds: sanitizedTargets,
+      targetUserNames: targetNames,
+      attachments: attachmentList
     }
   };
 }
@@ -1295,15 +1740,130 @@ function removeCommunityWallEntry(payload) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     if ((row[0] || '') === postId) {
-      if (row[5]) {
+      if (row[8]) {
         return { ok: true, alreadyRemoved: true };
       }
-      sheet.getRange(i + 2, 6, 1, 2).setValues([[nowISO_(), session.user.id]]);
+      sheet.getRange(i + 2, 9, 1, 2).setValues([[nowISO_(), session.user.id]]);
       return { ok: true };
     }
   }
 
   throw new Error('Publicação não encontrada.');
+}
+
+function uploadCommunityAttachment(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const session = requireSessionUser_(token);
+
+  const base64Data = payload && payload.data ? payload.data.toString() : '';
+  const fileNameRaw = payload && payload.fileName ? payload.fileName.toString() : 'anexo';
+  const mimeType = payload && payload.mimeType ? payload.mimeType.toString() : 'application/octet-stream';
+  if (!base64Data) throw new Error('Arquivo inválido.');
+
+  const cleanName = fileNameRaw.trim() || 'anexo';
+  const parts = base64Data.split(',');
+  const encoded = parts.length > 1 ? parts[1] : parts[0];
+  let bytes;
+  try {
+    bytes = Utilities.base64Decode(encoded);
+  } catch (err) {
+    throw new Error('Não foi possível processar o arquivo enviado.');
+  }
+  if (!bytes || !bytes.length) throw new Error('Arquivo vazio.');
+  if (bytes.length > COMMUNITY_ATTACHMENT_MAX_BYTES) {
+    throw new Error('O arquivo excede o limite de 10 MB.');
+  }
+
+  let folder;
+  try {
+    folder = DriveApp.getFolderById(COMMUNITY_FILES_FOLDER_ID);
+  } catch (err) {
+    throw new Error('Pasta de armazenamento não encontrada. Verifique a configuração.');
+  }
+
+  const blob = Utilities.newBlob(bytes, mimeType, cleanName);
+  const file = folder.createFile(blob);
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (err) {
+    // ignora caso a configuração de compartilhamento não seja permitida
+  }
+
+  const attachmentId = Utilities.getUuid();
+  const fileId = file.getId();
+  const url = file.getUrl();
+  const uploadedAt = nowISO_();
+  const sheet = sh_(SHEET_WALL_ATTACHMENTS);
+  sheet.appendRow([attachmentId, '', session.user.id, fileId, cleanName, mimeType, url, bytes.length, uploadedAt, '']);
+
+  const record = {
+    attachmentId,
+    postId: '',
+    uploaderId: session.user.id,
+    fileId,
+    fileName: cleanName,
+    mimeType,
+    fileUrl: url,
+    sizeBytes: bytes.length,
+    uploadedAt,
+    linkedAt: ''
+  };
+
+  return {
+    ok: true,
+    attachment: formatAttachmentForClient_(record)
+  };
+}
+
+function discardCommunityAttachment(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const session = requireSessionUser_(token);
+  const attachmentId = payload && payload.attachmentId ? payload.attachmentId.toString().trim() : '';
+  if (!attachmentId) throw new Error('Identificador do anexo inválido.');
+
+  const map = getAllAttachmentsMap_();
+  const record = map[attachmentId];
+  if (!record) throw new Error('Anexo não encontrado.');
+  if (record.uploaderId !== session.user.id && !session.user.isAdmin) {
+    throw new Error('Você não tem permissão para remover este anexo.');
+  }
+  if (record.postId) {
+    throw new Error('O anexo já foi vinculado a uma publicação e não pode ser removido.');
+  }
+
+  try {
+    const file = DriveApp.getFileById(record.fileId);
+    file.setTrashed(true);
+  } catch (err) {
+    // ignore falhas ao mover para lixeira
+  }
+
+  sh_(SHEET_WALL_ATTACHMENTS).deleteRow(record.row);
+  return { ok: true };
+}
+
+function listShareableUsers(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const session = requireSessionUser_(token);
+  const currentId = session.user.id;
+  const rows = getAll_(sh_(SHEET_USERS));
+  const users = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const id = row[0] || '';
+    if (!id || id === currentId) continue;
+    users.push({
+      id,
+      name: row[1] || '',
+      email: row[2] || '',
+      isAdmin: !!row[4]
+    });
+  }
+  users.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  return { ok: true, users };
 }
 function setKeyUrl_(sheetName, key, url) {
   const s = sh_(sheetName);

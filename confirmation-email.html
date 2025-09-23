@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Confirme seu cadastro</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: #f7f9fb;
+      color: #0f172a;
+    }
+    .email-wrapper {
+      width: 100%;
+      padding: 32px 0;
+    }
+    .email-card {
+      max-width: 560px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 20px;
+      box-shadow: 0 25px 65px rgba(15, 23, 42, 0.12);
+      overflow: hidden;
+    }
+    .email-header {
+      background: linear-gradient(135deg, #217346, #38a169);
+      padding: 32px;
+      color: #ffffff;
+      text-align: center;
+    }
+    .email-header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .email-header p {
+      margin: 12px 0 0;
+      font-size: 14px;
+      opacity: 0.9;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .email-body {
+      padding: 32px 36px 28px;
+    }
+    .salutation {
+      font-size: 16px;
+      margin: 0 0 16px;
+    }
+    .message {
+      font-size: 15px;
+      line-height: 1.6;
+      margin: 0 0 24px;
+      color: #1f2937;
+    }
+    .code-box {
+      border-radius: 18px;
+      border: 1px solid rgba(30, 64, 175, 0.12);
+      background: linear-gradient(135deg, rgba(33, 115, 70, 0.08), rgba(56, 189, 248, 0.1));
+      padding: 28px;
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .code-label {
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #475569;
+      margin: 0 0 12px;
+    }
+    .code-value {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: 0.35em;
+      color: #0f172a;
+    }
+    .footer-note {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.5;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 18px;
+      margin-top: 18px;
+    }
+    .footer-note strong {
+      color: #1d4ed8;
+    }
+  </style>
+</head>
+<body>
+  <div class="email-wrapper">
+    <div class="email-card">
+      <div class="email-header">
+        <h1>Confirmação de acesso</h1>
+        <p>Plataforma Excel Gamificada</p>
+      </div>
+      <div class="email-body">
+        <p class="salutation">Olá, <?= name ?>!</p>
+        <p class="message">
+          Recebemos o seu cadastro na Plataforma Excel. Para ativar sua conta e liberar todas as experiências gamificadas,
+          insira o código abaixo na tela de confirmação dentro dos próximos 30 minutos.
+        </p>
+        <div class="code-box">
+          <p class="code-label">Seu código de verificação</p>
+          <div class="code-value"><?= code ?></div>
+        </div>
+        <p class="message" style="margin-bottom: 16px;">
+          Caso não tenha feito esta solicitação, basta ignorar este e-mail. Seu acesso só será liberado após a confirmação
+          manual do código acima.
+        </p>
+        <div class="footer-note">
+          <p><strong>Não responda este e-mail.</strong> Para suporte, utilize os canais oficiais informados na plataforma.</p>
+          <p>Mensagem enviada automaticamente por Plataforma Excel — todos os registros desta solicitação foram adicionados à planilha de auditoria.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
