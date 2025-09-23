@@ -1590,6 +1590,10 @@
     return parsed.toLocaleDateString('pt-BR');
   }
 
+  function formatDateShort(value) {
+    return formatShortDate(value);
+  }
+
   function hasCheckinToday() {
     if (!Array.isArray(historyState.checkins)) return false;
     const today = new Date();
