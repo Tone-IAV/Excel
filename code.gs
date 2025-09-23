@@ -84,6 +84,7 @@ const ACHIEVEMENTS = [
 ];
 
 const SESSION_DURATION_HOURS = 24 * 7; // validade de 7 dias
+const SESSION_INVALID_MESSAGE = 'Sessão inválida ou expirada. Faça login novamente.';
 
 /** =================== BOOTSTRAP =================== **/
 function onOpen() {
@@ -533,9 +534,11 @@ function processAchievementsOnProgress_(userId) {
 }
 
 function getUserAchievementsOverview(payload) {
+  const token = payload && payload.token;
   const userId = payload && payload.userId;
-  if (!userId) throw new Error('userId inválido.');
-  return buildAchievementsOverview_(userId);
+  const session = requireSessionUser_(token, userId);
+  const effectiveUserId = session.user.id;
+  return buildAchievementsOverview_(effectiveUserId);
 }
 
 /** Atualiza XP do usuário (soma delta) */
@@ -630,6 +633,24 @@ function getSessionUserByToken_(token) {
   }
 
   return { user, sessionRow: hit.row };
+}
+
+function requireSessionUser_(token, expectedUserId) {
+  const tokenStr = (token || '').toString().trim();
+  if (!tokenStr) {
+    throw new Error(SESSION_INVALID_MESSAGE);
+  }
+  const session = getSessionUserByToken_(tokenStr);
+  if (!session || !session.user) {
+    throw new Error(SESSION_INVALID_MESSAGE);
+  }
+  if (expectedUserId !== undefined && expectedUserId !== null) {
+    const expected = expectedUserId.toString().trim();
+    if (expected && session.user.id !== expected) {
+      throw new Error(SESSION_INVALID_MESSAGE);
+    }
+  }
+  return session;
 }
 
 /** =================== API PÚBLICA (chamada pelo HTML) =================== **/
@@ -766,21 +787,23 @@ function logout(token) {
 }
 
 function checkin(payload) {
-  const userId = payload.userId;
-  if (!userId) throw new Error('userId inválido.');
+  const token = payload && payload.token;
+  const userId = payload && payload.userId;
+  const session = requireSessionUser_(token, userId);
+  const effectiveUserId = session.user.id;
 
   const today = todayISO_();
   const s = sh_(SHEET_CHECKIN);
   const rows = getAll_(s);
-  const already = rows.some(r => r[0]===userId && r[1]===today);
+  const already = rows.some(r => r[0]===effectiveUserId && r[1]===today);
   if (already) return { ok:false, msg:'Presença já registrada hoje.' };
 
   const cfg = getConfig_();
   const xp = Number(cfg.xpCheckin||5);
-  s.appendRow([userId, today, xp]);
-  const newXP = addUserXP_(userId, xp);
+  s.appendRow([effectiveUserId, today, xp]);
+  const newXP = addUserXP_(effectiveUserId, xp);
 
-  const achievements = processAchievementsOnProgress_(userId);
+  const achievements = processAchievementsOnProgress_(effectiveUserId);
   const totalXP = achievements && achievements.metrics && Number.isFinite(Number(achievements.metrics.xpTotal))
     ? Number(achievements.metrics.xpTotal)
     : newXP + Number(achievements && achievements.bonusXP || 0);
@@ -809,12 +832,15 @@ function checkin(payload) {
  * EarnedXP = round(maxXP * scorePct/100). Upsert em Progress (mantém melhor score).
  */
 function submitActivity(payload) {
-  const userId   = payload.userId;
+  const token = payload && payload.token;
+  const userId   = payload && payload.userId;
+  const session = requireSessionUser_(token, userId);
+  const effectiveUserId = session.user.id;
   const moduleId = Number(payload.moduleId);
   const scorePct = Math.max(0, Math.min(100, Number(payload.scorePct||0)));
   const maxXP    = Math.max(0, Number(payload.maxXP||0));
 
-  if (!userId || !moduleId) throw new Error('Dados inválidos (userId/moduleId).');
+  if (!effectiveUserId || !moduleId) throw new Error('Dados inválidos (userId/moduleId).');
 
   const earned = Math.round(maxXP * (scorePct/100));
 
@@ -825,7 +851,7 @@ function submitActivity(payload) {
 
   for (let i=0;i<rows.length;i++){
     const r = rows[i];
-    if (r[0]===userId && Number(r[1])===moduleId){
+    if (r[0]===effectiveUserId && Number(r[1])===moduleId){
       foundRow = i+2;
       oldScore = Number(r[2]||0);
       break;
@@ -842,20 +868,20 @@ function submitActivity(payload) {
     }
   } else {
     // novo registro
-    s.appendRow([userId, moduleId, scorePct, earned, nowISO_()]);
+    s.appendRow([effectiveUserId, moduleId, scorePct, earned, nowISO_()]);
     deltaXP = earned;
   }
 
   const cfg = getConfig_();
   let finalXP = null;
   if (deltaXP > 0) {
-    finalXP = addUserXP_(userId, deltaXP);
+    finalXP = addUserXP_(effectiveUserId, deltaXP);
   }
   if (finalXP === null || finalXP === undefined) {
-    const userInfo = getUserById_(userId);
+    const userInfo = getUserById_(effectiveUserId);
     finalXP = Number(userInfo?.xp || 0);
   }
-  const achievements = processAchievementsOnProgress_(userId);
+  const achievements = processAchievementsOnProgress_(effectiveUserId);
   const totalXP = achievements && achievements.metrics && Number.isFinite(Number(achievements.metrics.xpTotal))
     ? Number(achievements.metrics.xpTotal)
     : finalXP + Number(achievements && achievements.bonusXP || 0);
@@ -898,10 +924,13 @@ function getRanking() {
 
 /** Estado do usuário (XP, level, concluídos) */
 function getUserState(payload) {
-  const userId = payload.userId;
-  const u = getUserById_(userId);
+  const token = payload && payload.token;
+  const userId = payload && payload.userId;
+  const session = requireSessionUser_(token, userId);
+  const effectiveUserId = session.user.id;
+  const u = getUserById_(effectiveUserId);
   if (!u) throw new Error('Usuário não encontrado.');
-  const prog = getAll_(sh_(SHEET_PROGRESS)).filter(r=>r[0]===userId);
+  const prog = getAll_(sh_(SHEET_PROGRESS)).filter(r=>r[0]===effectiveUserId);
   const concluidos = prog.length;
   const cfg = getConfig_();
   const levelInfo = computeLevelInfo_(u.xp, cfg);
@@ -916,9 +945,11 @@ function getUserState(payload) {
   };
 }
 
-function getCheckinHistory(userId) {
-  const id = (userId || '').toString().trim();
-  if (!id) throw new Error('userId inválido.');
+function getCheckinHistory(payload) {
+  const token = payload && typeof payload === 'object' ? payload.token : null;
+  const userId = payload && typeof payload === 'object' ? payload.userId : null;
+  const session = requireSessionUser_(token, userId);
+  const id = (session.user.id || '').toString().trim();
 
   const rows = getAll_(sh_(SHEET_CHECKIN));
   const entries = [];
@@ -951,9 +982,11 @@ function getCheckinHistory(userId) {
   return entries;
 }
 
-function getActivityHistory(userId) {
-  const id = (userId || '').toString().trim();
-  if (!id) throw new Error('userId inválido.');
+function getActivityHistory(payload) {
+  const token = payload && typeof payload === 'object' ? payload.token : null;
+  const userId = payload && typeof payload === 'object' ? payload.userId : null;
+  const session = requireSessionUser_(token, userId);
+  const id = (session.user.id || '').toString().trim();
 
   const rows = getAll_(sh_(SHEET_PROGRESS));
   const entries = [];
@@ -1015,8 +1048,8 @@ function getActivityHistory(userId) {
 function saveEmbeds(payload) {
   setup_();
   const token = payload && payload.token;
-  const session = getSessionUserByToken_(token);
-  if (!session || !session.user || !session.user.isAdmin) {
+  const session = requireSessionUser_(token);
+  if (!session.user.isAdmin) {
     throw new Error('Apenas administradores podem atualizar os materiais.');
   }
 
@@ -1081,10 +1114,7 @@ function listCommunityWallEntries() {
 function addCommunityWallEntry(payload) {
   setup_();
   const token = payload && payload.token;
-  const session = getSessionUserByToken_(token);
-  if (!session || !session.user) {
-    throw new Error('Sessão inválida. Faça login novamente.');
-  }
+  const session = requireSessionUser_(token);
 
   const rawMessage = payload && payload.message ? payload.message.toString() : '';
   const message = rawMessage.trim();
@@ -1114,8 +1144,8 @@ function addCommunityWallEntry(payload) {
 function removeCommunityWallEntry(payload) {
   setup_();
   const token = payload && payload.token;
-  const session = getSessionUserByToken_(token);
-  if (!session || !session.user || !session.user.isAdmin) {
+  const session = requireSessionUser_(token);
+  if (!session.user.isAdmin) {
     throw new Error('Apenas administradores podem remover publicações.');
   }
 
