@@ -1134,6 +1134,7 @@
     userChoice: null,
     pendingChoice: null
   }));
+  let lastPanelPollUserId = null;
 
   let adminBulletinState = {
     content: 'Semana 3 aberta! Reserve 15 minutos para revisar o bloco A antes do encontro ao vivo e registre o check-in até 22h.\n\nDica extra: quem postar um insight no mural até sexta participa do sorteio do livro “Excel na Prática”.',
@@ -1361,6 +1362,7 @@
   function renderPolls() {
     if (!panelPollListEl) return;
     panelPollListEl.innerHTML = '';
+    const hasActiveUser = !!currentUser;
     panelPollState.forEach(poll => {
       const totalVotes = poll.options.reduce((sum, option) => sum + Number(option.votes || 0), 0);
       const card = document.createElement('div');
@@ -1391,8 +1393,9 @@
         input.name = `poll-${poll.id}`;
         input.value = option.id;
         input.id = optionId;
-        input.checked = poll.pendingChoice ? poll.pendingChoice === option.id : poll.userChoice === option.id;
-        input.disabled = !currentUser;
+        const isSelected = hasActiveUser && (poll.pendingChoice ? poll.pendingChoice === option.id : poll.userChoice === option.id);
+        input.checked = isSelected;
+        input.disabled = !hasActiveUser;
         input.addEventListener('change', () => {
           poll.pendingChoice = option.id;
           renderPolls();
@@ -1427,7 +1430,7 @@
       voteButton.type = 'button';
       voteButton.className = 'btn btn-primary';
       const nextChoice = poll.pendingChoice || poll.userChoice;
-      voteButton.disabled = !currentUser || !poll.pendingChoice || poll.pendingChoice === poll.userChoice;
+      voteButton.disabled = !hasActiveUser || !poll.pendingChoice || poll.pendingChoice === poll.userChoice;
       voteButton.textContent = poll.userChoice ? 'Atualizar voto' : 'Registrar voto';
       voteButton.addEventListener('click', () => {
         if (!currentUser) {
@@ -1447,7 +1450,7 @@
         showToast({ message: 'Voto registrado! +3 XP garantidos na atualização diária.', type: 'success' });
         renderPolls();
       });
-      if (!currentUser) {
+      if (!hasActiveUser) {
         voteButton.disabled = true;
       }
       footer.append(totalBadge, voteButton);
@@ -3866,6 +3869,16 @@
     const achievementsSilent = !!(options && options.silentAchievements);
     syncNavAvailability();
     ensureRouteAfterAuthChange();
+
+    const activeUserId = currentUser?.id ?? null;
+    const hasUserChanged = activeUserId !== lastPanelPollUserId;
+    if (!currentUser || hasUserChanged) {
+      panelPollState.forEach(poll => {
+        poll.userChoice = null;
+        poll.pendingChoice = null;
+      });
+    }
+    lastPanelPollUserId = activeUserId;
 
     if (!currentUser) {
       $('#authSection').classList.remove('hidden');
