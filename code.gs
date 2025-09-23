@@ -5,7 +5,7 @@ const ADMIN_SECURITY_CODE = 'xbY4nu'; // código exigido p/ criar admins
 // Abas usadas
 const SHEET_USERS            = 'Users';            // id, name, email, passHash, isAdmin, xp, createdAt
 const SHEET_PROGRESS         = 'Progress';         // userId, moduleId, scorePct, earnedXP, completedAt
-const SHEET_CHECKIN          = 'Checkins';         // userId, dateISO, xp
+const SHEET_CHECKIN          = 'Checkins';         // userId, dateISO, xp, streak
 const SHEET_CONFIG           = 'Config';           // key, value
 const SHEET_EMBEDS           = 'Embeds';           // key, url
 const SHEET_SESSIONS         = 'Sessions';         // userId, tokenHash, expiresAt, createdAt
@@ -16,6 +16,7 @@ const CONFIG_RECOMMENDED_RESOURCES = 'recommended_resources';
 const CONFIG_UPCOMING_EVENTS       = 'upcoming_events';
 
 const COMMUNITY_WALL_CHAR_LIMIT = 240;
+const CHECKIN_STREAK_XP_CAP = 24;
 
 const ACHIEVEMENTS = [
   {
@@ -182,7 +183,7 @@ function setup_() {
 
   ensure(SHEET_USERS,            ['id','name','email','passHash','isAdmin','xp','createdAt']);
   ensure(SHEET_PROGRESS,         ['userId','moduleId','scorePct','earnedXP','completedAt']);
-  ensure(SHEET_CHECKIN,          ['userId','dateISO','xp']);
+  ensure(SHEET_CHECKIN,          ['userId','dateISO','xp','streak']);
   ensure(SHEET_CONFIG,           ['key','value']);
   ensure(SHEET_EMBEDS,           ['key','url']);
   ensure(SHEET_SESSIONS,         ['userId','tokenHash','expiresAt','createdAt']);
@@ -869,15 +870,53 @@ function checkin(payload) {
   const today = todayISO_();
   const s = sh_(SHEET_CHECKIN);
   const rows = getAll_(s);
-  const already = rows.some(r => r[0]===effectiveUserId && r[1]===today);
+  const checkinDays = [];
+  let already = false;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[0] || '') !== effectiveUserId) continue;
+
+    const parsed = parseDateValue_(row[1]);
+    let day = '';
+    if (parsed) {
+      day = Utilities.formatDate(parsed, 'UTC', 'yyyy-MM-dd');
+    } else if (row[1]) {
+      const raw = String(row[1]);
+      day = raw.length >= 10 ? raw.slice(0, 10) : raw;
+    }
+
+    if (day) {
+      checkinDays.push(day);
+      if (day === today) {
+        already = true;
+      }
+    } else if ((row[1] || '').toString() === today) {
+      already = true;
+    }
+  }
+
   if (already) return { ok:false, msg:'Presença já registrada hoje.' };
 
-  const cfg = getConfig_();
-  const xp = Number(cfg.xpCheckin||5);
-  s.appendRow([effectiveUserId, today, xp]);
+  const streakStatsBefore = calculateStreakStats_(checkinDays);
+  let previousStreak = Number(streakStatsBefore.current || 0);
+  if (!Number.isFinite(previousStreak) || previousStreak < 0) previousStreak = 0;
+
+  const daysWithToday = checkinDays.slice();
+  daysWithToday.push(today);
+  const streakStatsAfter = calculateStreakStats_(daysWithToday);
+  let currentStreak = Number(streakStatsAfter.current || 0);
+  if (!Number.isFinite(currentStreak) || currentStreak <= 0) currentStreak = 1;
+
+  const streakCap = CHECKIN_STREAK_XP_CAP;
+  const xp = Math.max(1, Math.min(currentStreak, streakCap));
+  const streakReset = previousStreak > 0 && currentStreak === 1;
+
+  s.appendRow([effectiveUserId, today, xp, currentStreak]);
   const newXP = addUserXP_(effectiveUserId, xp);
 
   const achievements = processAchievementsOnProgress_(effectiveUserId);
+  const cfg = getConfig_();
   const totalXP = achievements && achievements.metrics && Number.isFinite(Number(achievements.metrics.xpTotal))
     ? Number(achievements.metrics.xpTotal)
     : newXP + Number(achievements && achievements.bonusXP || 0);
@@ -897,7 +936,14 @@ function checkin(payload) {
       achievements: achievements.achievements,
       summary: achievements.summary,
       metrics: achievements.metrics
-    } : null
+    } : null,
+    streak: {
+      current: currentStreak,
+      previous: previousStreak,
+      reset: streakReset,
+      xpAwarded: xp,
+      cap: streakCap
+    }
   };
 }
 
@@ -1060,6 +1106,7 @@ function getCheckinHistory(payload) {
       date: iso,
       day,
       xp: Number(row[2] || 0),
+      streak: Number(row[3] || 0),
       timestamp
     });
   }
