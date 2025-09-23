@@ -22,6 +22,26 @@ const CHECKIN_STREAK_XP_CAP = 24;
 const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB por arquivo
 const COMMUNITY_FILES_FOLDER_ID = '1LBfNBUjTMjrEVL1CE-YJtA3ecW_gQMIR';
 
+function getDriveService_() {
+  let root;
+  try {
+    root = typeof globalThis !== 'undefined' ? globalThis : this;
+  } catch (err) {
+    root = this;
+  }
+  if (!root && typeof Function === 'function') {
+    try {
+      root = Function('return this')();
+    } catch (err) {
+      root = null;
+    }
+  }
+  if (root && root['DriveApp']) {
+    return root['DriveApp'];
+  }
+  return null;
+}
+
 const ACHIEVEMENTS = [
   {
     id: 'checkin_first',
@@ -1782,9 +1802,14 @@ function uploadCommunityAttachment(payload) {
     throw new Error('O arquivo excede o limite de 10 MB.');
   }
 
+  const drive = getDriveService_();
+  if (!drive) {
+    throw new Error('Integração com o Drive indisponível no momento. Tente novamente mais tarde.');
+  }
+
   let folder;
   try {
-    folder = DriveApp.getFolderById(COMMUNITY_FILES_FOLDER_ID);
+    folder = drive.getFolderById(COMMUNITY_FILES_FOLDER_ID);
   } catch (err) {
     throw new Error('Pasta de armazenamento não encontrada. Verifique a configuração.');
   }
@@ -1792,7 +1817,9 @@ function uploadCommunityAttachment(payload) {
   const blob = Utilities.newBlob(bytes, mimeType, cleanName);
   const file = folder.createFile(blob);
   try {
-    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (drive.Access && drive.Permission && typeof file.setSharing === 'function') {
+      file.setSharing(drive.Access.ANYONE_WITH_LINK, drive.Permission.VIEW);
+    }
   } catch (err) {
     // ignora caso a configuração de compartilhamento não seja permitida
   }
@@ -1840,11 +1867,16 @@ function discardCommunityAttachment(payload) {
     throw new Error('O anexo já foi vinculado a uma publicação e não pode ser removido.');
   }
 
-  try {
-    const file = DriveApp.getFileById(record.fileId);
-    file.setTrashed(true);
-  } catch (err) {
-    // ignore falhas ao mover para lixeira
+  const drive = getDriveService_();
+  if (drive) {
+    try {
+      const file = drive.getFileById(record.fileId);
+      if (file && typeof file.setTrashed === 'function') {
+        file.setTrashed(true);
+      }
+    } catch (err) {
+      // ignore falhas ao mover para lixeira
+    }
   }
 
   sh_(SHEET_WALL_ATTACHMENTS).deleteRow(record.row);
