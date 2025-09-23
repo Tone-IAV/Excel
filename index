@@ -443,24 +443,14 @@
         <div id="historyList" class="grid gap-2 text-sm"></div>
       </div>
 
-      <div class="card" id="activityCard">
-        <h3 class="text-lg font-semibold mb-2">Enviar atividade (exemplo)</h3>
-        <div class="grid md:grid-cols-4 gap-2 items-end">
-          <div>
-            <label class="text-xs">Módulo</label>
-            <input id="aModule" class="input" type="number" min="1" max="24" value="1"/>
-          </div>
-          <div>
-            <label class="text-xs">% de acerto</label>
-            <input id="aScore" class="input" type="number" min="0" max="100" value="80"/>
-          </div>
-          <div>
-            <label class="text-xs">XP máximo do módulo</label>
-            <input id="aMaxXP" class="input" type="number" min="0" value="40"/>
-          </div>
-          <button id="btnSubmitActivity" class="btn btn-ghost">Enviar resultado</button>
-        </div>
-        <div id="activityMsg" class="text-xs mt-2"></div>
+      <div class="card card-flat">
+        <h3 class="text-lg font-semibold mb-2">Pronto para praticar?</h3>
+        <p class="text-sm text-slate-600 dark:text-slate-300">
+          Acesse o quiz oficial do módulo e registre seu progresso direto na atividade real.
+        </p>
+        <button type="button" class="btn btn-primary mt-2" data-nav-target="next-lesson">
+          Ir para a próxima atividade
+        </button>
       </div>
 
       <div class="card">
@@ -3157,56 +3147,6 @@
         setTimeout(()=> $('#checkinMsg').textContent='', 3000);
       })
       .checkin({ token, userId: currentUser.id });
-  };
-
-  // Submit activity (exemplo)
-  $('#btnSubmitActivity').onclick = ()=>{
-    if (!currentUser) return showToast({ message: 'Faça login primeiro.', type: 'warning' });
-    const token = requireSessionToken();
-    if (!token) {
-      return;
-    }
-    const payload = {
-      userId: currentUser.id,
-      moduleId: Number($('#aModule').value||1),
-      scorePct: Number($('#aScore').value||0),
-      maxXP: Number($('#aMaxXP').value||0)
-    };
-    payload.token = token;
-    google.script.run
-      .withFailureHandler(err => {
-        if (handleSessionExpiredError(err, { onHandled: () => { $('#activityMsg').textContent = ''; } })) {
-          return;
-        }
-        showToast({ message: err?.message || err, type: 'error' });
-      })
-      .withSuccessHandler(res=>{
-        if (!res || !res.ok) {
-          $('#activityMsg').textContent = 'Não foi possível registrar a atividade agora.';
-          setTimeout(()=> $('#activityMsg').textContent='', 4000);
-          return;
-        }
-        const bonusXP = Number(res.achievementBonusXP || 0);
-        const unlockedAchievements = Array.isArray(res.achievementsUnlocked) ? res.achievementsUnlocked : [];
-        if (res.achievementsOverview) {
-          applyAchievementsUpdate(res.achievementsOverview, unlockedAchievements);
-        } else if (unlockedAchievements.length) {
-          handleAchievementToasts(unlockedAchievements);
-        }
-        const deltaXP = Number.isFinite(Number(res.deltaXP)) ? Number(res.deltaXP) : 0;
-        const deltaText = deltaXP > 0 ? `Você ganhou +${deltaXP} XP.` : 'Sem XP adicional desta vez.';
-        const totalXP = Number.isFinite(Number(res.totalXP)) ? Number(res.totalXP) : res.totalXP;
-        const levelInfo = Number.isFinite(Number(res.level)) ? ` (Nível ${res.level})` : '';
-        const extra = formatLevelProgressMessage(res);
-        const bonusText = bonusXP > 0 ? ` Bônus de conquistas: +${bonusXP} XP.` : '';
-        $('#activityMsg').textContent = `Enviado! ${deltaText}${bonusText} Total: ${totalXP} XP${levelInfo}.${extra}`;
-        if (Number.isFinite(Number(totalXP))) $('#xpBox').textContent = totalXP;
-        if (Number.isFinite(Number(res.level))) $('#lvlBox').textContent = res.level;
-        updateLevelIndicator(res);
-        updateUI({ keepLevelIndicator: true, skipAchievements: true, skipCommunity: true });
-        setTimeout(()=> $('#activityMsg').textContent='', 4000);
-      })
-      .submitActivity(payload);
   };
 
   // Embeds
