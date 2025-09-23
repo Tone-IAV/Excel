@@ -10,9 +10,9 @@ const SHEET_CONFIG           = 'Config';           // key, value
 const SHEET_EMBEDS           = 'Embeds';           // key, url
 const SHEET_SESSIONS         = 'Sessions';         // userId, tokenHash, expiresAt, createdAt
 const SHEET_USER_ACHIEVEMENT = 'UserAchievements'; // userId, achievementId, unlockedAt, rewardXP
-const SHEET_WALL             = 'Wall';             // id, userId, authorName, message, createdAt, visibility, targetUserIds, attachmentIds, removedAt, removedBy
+const SHEET_WALL             = 'Wall';             // id, userId, authorName, message, createdAt, visibility, targetUserIds, mentionUserIds, attachmentIds, removedAt, removedBy
 const SHEET_CONFIRMATIONS    = 'UserConfirmations';// userId, email, codeHash, createdAt, expiresAt, confirmedAt, lastSentAt, pendingName, pendingPassHash, pendingIsAdmin
-const SHEET_WALL_ATTACHMENTS = 'WallAttachments';  // attachmentId, postId, uploaderId, fileId, fileName, mimeType, fileUrl, sizeBytes, uploadedAt, linkedAt
+const SHEET_WALL_ATTACHMENTS = 'WallAttachments';  // attachmentId, postId, uploaderId, fileId, fileName, mimeType, fileUrl, sizeBytes, uploadedAt, linkedAt, folderId
 
 const CONFIG_RECOMMENDED_RESOURCES = 'recommended_resources';
 const CONFIG_UPCOMING_EVENTS       = 'upcoming_events';
@@ -21,6 +21,7 @@ const COMMUNITY_WALL_CHAR_LIMIT = 240;
 const CHECKIN_STREAK_XP_CAP = 24;
 const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB por arquivo
 const COMMUNITY_FILES_FOLDER_ID = '1LBfNBUjTMjrEVL1CE-YJtA3ecW_gQMIR';
+const COMMUNITY_FORUM_FOLDER_NAME = 'Forum da Turma';
 const CONFIG_USER_FILES_ROOT = 'user_files_root';
 const USER_MATERIAL_MAX_BYTES = 20 * 1024 * 1024; // 20 MB por arquivo
 const USER_MATERIAL_RULES = Object.freeze({
@@ -232,9 +233,9 @@ function setup_() {
   ensure(SHEET_EMBEDS,           ['key','url']);
   ensure(SHEET_SESSIONS,         ['userId','tokenHash','expiresAt','createdAt']);
   ensure(SHEET_USER_ACHIEVEMENT, ['userId','achievementId','unlockedAt','rewardXP']);
-  ensure(SHEET_WALL,             ['id','userId','authorName','message','createdAt','visibility','targetUserIds','attachmentIds','removedAt','removedBy']);
+  ensure(SHEET_WALL,             ['id','userId','authorName','message','createdAt','visibility','targetUserIds','mentionUserIds','attachmentIds','removedAt','removedBy']);
   ensure(SHEET_CONFIRMATIONS,    ['userId','email','codeHash','createdAt','expiresAt','confirmedAt','lastSentAt','pendingName','pendingPassHash','pendingIsAdmin']);
-  ensure(SHEET_WALL_ATTACHMENTS, ['attachmentId','postId','uploaderId','fileId','fileName','mimeType','fileUrl','sizeBytes','uploadedAt','linkedAt']);
+  ensure(SHEET_WALL_ATTACHMENTS, ['attachmentId','postId','uploaderId','fileId','fileName','mimeType','fileUrl','sizeBytes','uploadedAt','linkedAt','folderId']);
 
   // Defaults de config
   const cfg = getConfig_();
@@ -299,6 +300,34 @@ function splitFileName_(name) {
     return { base: safe, extension: '' };
   }
   return { base: safe.slice(0, lastDot), extension: safe.slice(lastDot) };
+}
+
+function getForumFilesFolder_(drive) {
+  if (!drive) return null;
+  let parent;
+  try {
+    parent = drive.getFolderById(COMMUNITY_FILES_FOLDER_ID);
+  } catch (err) {
+    throw new Error('Pasta de armazenamento não encontrada. Verifique a configuração.');
+  }
+  if (!parent) {
+    throw new Error('Pasta de armazenamento não encontrada. Verifique a configuração.');
+  }
+  let folder = null;
+  const iterator = parent.getFoldersByName(COMMUNITY_FORUM_FOLDER_NAME || 'Forum');
+  if (iterator) {
+    try {
+      if (iterator.hasNext()) {
+        folder = iterator.next();
+      }
+    } catch (err) {
+      folder = null;
+    }
+  }
+  if (!folder) {
+    folder = parent.createFolder(COMMUNITY_FORUM_FOLDER_NAME || 'Forum');
+  }
+  return folder;
 }
 
 function ensureUserFilesRootFolder_() {
@@ -2291,7 +2320,8 @@ function getAllAttachmentsMap_() {
       fileUrl: row[6] || '',
       sizeBytes: Number(row[7] || 0),
       uploadedAt: row[8] || '',
-      linkedAt: row[9] || ''
+      linkedAt: row[9] || '',
+      folderId: row[10] || ''
     };
   }
   return map;
@@ -2308,7 +2338,8 @@ function formatAttachmentForClient_(record) {
     url: record.fileUrl,
     sizeBytes: record.sizeBytes,
     uploadedAt: record.uploadedAt,
-    linkedAt: record.linkedAt
+    linkedAt: record.linkedAt,
+    folderId: record.folderId || ''
   };
 }
 
@@ -2368,7 +2399,7 @@ function listCommunityWallEntries(payload) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     if (!row || row.length === 0) continue;
-    const removedAt = row[8];
+    const removedAt = row[9];
     if (removedAt) continue;
     const createdAtRaw = row[4] || '';
     const createdAtDate = parseDateValue_(createdAtRaw);
@@ -2381,7 +2412,8 @@ function listCommunityWallEntries(payload) {
     const visibilityRaw = (row[5] || 'public').toString();
     const visibility = visibilityRaw === 'private' ? 'private' : 'public';
     const targetIds = deserializeIdList_(row[6]);
-    const attachmentIds = deserializeIdList_(row[7]);
+    const mentionIds = deserializeIdList_(row[7]);
+    const attachmentIds = deserializeIdList_(row[8]);
 
     if (visibility === 'private') {
       const allowedViewers = new Set([userId]);
@@ -2408,6 +2440,12 @@ function listCommunityWallEntries(payload) {
       if (info && info.name) targetNames.push(info.name);
     }
 
+    const mentionNames = [];
+    for (let m = 0; m < mentionIds.length; m++) {
+      const info = userMap[mentionIds[m]];
+      if (info && info.name) mentionNames.push(info.name);
+    }
+
     entries.push({
       id,
       userId,
@@ -2418,6 +2456,8 @@ function listCommunityWallEntries(payload) {
       visibility,
       targetUserIds: targetIds,
       targetUserNames: targetNames,
+      mentionUserIds: mentionIds,
+      mentionUserNames: mentionNames,
       attachments: attachmentList
     });
   }
@@ -2464,6 +2504,17 @@ function addCommunityWallEntry(payload) {
     throw new Error('Selecione ao menos um destinatário para a publicação privada.');
   }
 
+  const mentionsRaw = payload && (payload.mentionUserIds || payload.mentions || payload.mentionIds);
+  const mentionIdsNormalized = normalizeStringArray_(Array.isArray(mentionsRaw) ? mentionsRaw : deserializeIdList_(mentionsRaw || []));
+  const sanitizedMentions = [];
+  for (let i = 0; i < mentionIdsNormalized.length; i++) {
+    const mentionId = mentionIdsNormalized[i];
+    if (!mentionId) continue;
+    if (mentionId === session.user.id) continue;
+    if (!userMap[mentionId]) continue;
+    if (sanitizedMentions.indexOf(mentionId) === -1) sanitizedMentions.push(mentionId);
+  }
+
   const attachmentsRaw = payload && (payload.attachments || payload.attachmentIds);
   const attachmentIdList = normalizeStringArray_(Array.isArray(attachmentsRaw) ? attachmentsRaw : deserializeIdList_(attachmentsRaw || []));
   const attachmentRecords = validateAttachmentOwnership_(attachmentIdList, session.user.id);
@@ -2472,12 +2523,14 @@ function addCommunityWallEntry(payload) {
   const id = Utilities.getUuid();
   const createdAt = nowISO_();
   const serializedTargets = serializeIdList_(sanitizedTargets);
+  const serializedMentions = serializeIdList_(sanitizedMentions);
   const serializedAttachments = serializeIdList_(attachmentRecords.map(att => att.attachmentId));
-  sheet.appendRow([id, session.user.id, session.user.name || '', normalized, createdAt, visibility, serializedTargets, serializedAttachments, '', '']);
+  sheet.appendRow([id, session.user.id, session.user.name || '', normalized, createdAt, visibility, serializedTargets, serializedMentions, serializedAttachments, '', '']);
   markAttachmentsAsLinked_(attachmentRecords, id);
 
   const attachmentList = attachmentRecords.map(formatAttachmentForClient_).filter(Boolean);
   const targetNames = sanitizedTargets.map(t => (userMap[t] && userMap[t].name) ? userMap[t].name : '').filter(Boolean);
+  const mentionNames = sanitizedMentions.map(t => (userMap[t] && userMap[t].name) ? userMap[t].name : '').filter(Boolean);
 
   return {
     ok: true,
@@ -2490,6 +2543,8 @@ function addCommunityWallEntry(payload) {
       visibility,
       targetUserIds: sanitizedTargets,
       targetUserNames: targetNames,
+      mentionUserIds: sanitizedMentions,
+      mentionUserNames: mentionNames,
       attachments: attachmentList
     }
   };
@@ -2514,7 +2569,7 @@ function removeCommunityWallEntry(payload) {
       if (row[8]) {
         return { ok: true, alreadyRemoved: true };
       }
-      sheet.getRange(i + 2, 9, 1, 2).setValues([[nowISO_(), session.user.id]]);
+      sheet.getRange(i + 2, 10, 1, 2).setValues([[nowISO_(), session.user.id]]);
       return { ok: true };
     }
   }
@@ -2553,8 +2608,11 @@ function uploadCommunityAttachment(payload) {
 
   let folder;
   try {
-    folder = drive.getFolderById(COMMUNITY_FILES_FOLDER_ID);
+    folder = getForumFilesFolder_(drive);
   } catch (err) {
+    throw err;
+  }
+  if (!folder) {
     throw new Error('Pasta de armazenamento não encontrada. Verifique a configuração.');
   }
 
@@ -2572,8 +2630,9 @@ function uploadCommunityAttachment(payload) {
   const fileId = file.getId();
   const url = file.getUrl();
   const uploadedAt = nowISO_();
+  const folderId = folder.getId();
   const sheet = sh_(SHEET_WALL_ATTACHMENTS);
-  sheet.appendRow([attachmentId, '', session.user.id, fileId, cleanName, mimeType, url, bytes.length, uploadedAt, '']);
+  sheet.appendRow([attachmentId, '', session.user.id, fileId, cleanName, mimeType, url, bytes.length, uploadedAt, '', folderId]);
 
   const record = {
     attachmentId,
@@ -2585,7 +2644,8 @@ function uploadCommunityAttachment(payload) {
     fileUrl: url,
     sizeBytes: bytes.length,
     uploadedAt,
-    linkedAt: ''
+    linkedAt: '',
+    folderId
   };
 
   return {

@@ -161,6 +161,29 @@
     .dark .attachment-meta { color:#cbd5f5; }
     .attachment-remove { color:#dc2626; font-size:.75rem; font-weight:600; }
     .attachment-remove:hover { color:#b91c1c; }
+    .forum-toolbar-btn { display:inline-flex; align-items:center; gap:.45rem; padding:.45rem .9rem; border-radius:.9rem; border:1px solid rgba(148,163,184,.35); background:rgba(248,250,252,.9); color:#475569; font-size:.85rem; font-weight:600; transition:color .2s ease, border-color .2s ease, box-shadow .2s ease, background-color .2s ease; }
+    .forum-toolbar-btn:hover { color:#217346; border-color:rgba(33,115,70,.45); box-shadow:0 6px 16px rgba(33,115,70,.18); }
+    .forum-toolbar-btn span:first-child { font-size:1.05rem; }
+    .dark .forum-toolbar-btn { background:rgba(15,23,42,.7); border-color:rgba(71,85,105,.55); color:#cbd5f5; }
+    .dark .forum-toolbar-btn:hover { color:#6ee7b7; border-color:rgba(45,212,191,.45); box-shadow:0 8px 20px rgba(15,118,110,.35); }
+    .mention-panel { position:absolute; top:100%; left:0; margin-top:.6rem; min-width:240px; background:#fff; border:1px solid rgba(148,163,184,.35); border-radius:1rem; padding:1rem; box-shadow:0 18px 34px rgba(15,23,42,.18); z-index:40; }
+    .dark .mention-panel { background:rgba(15,23,42,.95); border-color:rgba(71,85,105,.65); box-shadow:0 18px 34px rgba(0,0,0,.5); }
+    .mention-option { width:100%; display:flex; flex-direction:column; gap:.2rem; align-items:flex-start; padding:.55rem .8rem; border-radius:.85rem; border:1px solid transparent; background:rgba(248,250,252,.85); color:#1f2937; font-size:.85rem; font-weight:500; transition:border-color .2s ease, background-color .2s ease, color .2s ease; }
+    .mention-option:hover { border-color:rgba(33,115,70,.45); background:rgba(222,247,236,.95); color:#14532d; }
+    .dark .mention-option { background:rgba(30,41,59,.85); color:#e2e8f0; }
+    .dark .mention-option:hover { border-color:rgba(56,189,248,.5); background:rgba(30,64,175,.4); color:#bae6fd; }
+    .mention-option-label { font-weight:600; }
+    .mention-option-meta { font-size:.75rem; color:#64748b; }
+    .dark .mention-option-meta { color:#94a3b8; }
+    .mention-chip { display:inline-flex; align-items:center; gap:.35rem; padding:.3rem .65rem; border-radius:9999px; background:rgba(33,115,70,.12); color:#14532d; font-size:.75rem; font-weight:600; }
+    .mention-chip-remove { border:0; background:transparent; color:inherit; font-weight:700; line-height:1; padding:0; cursor:pointer; }
+    .mention-chip-remove:hover { opacity:.75; }
+    .mention-tag { color:#14532d; font-weight:600; }
+    .dark .mention-chip { background:rgba(56,189,248,.2); color:#38bdf8; }
+    .dark .mention-chip-remove { color:inherit; }
+    .dark .mention-tag { color:#6ee7b7; }
+    .mention-pill { display:inline-flex; align-items:center; padding:.25rem .6rem; border-radius:9999px; background:rgba(33,115,70,.1); color:#166534; font-weight:600; }
+    .dark .mention-pill { background:rgba(56,189,248,.18); color:#bae6fd; }
     .podium-card { position:relative; border-radius:1.5rem; padding:1.5rem 1.25rem; background:linear-gradient(135deg,rgba(148,163,184,.1),rgba(226,232,240,.45)); text-align:center; box-shadow:0 14px 35px rgba(15,23,42,.12); }
     .podium-card-first { background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#78350f; box-shadow:0 24px 45px rgba(251,191,36,.35); }
     .podium-card-second { background:linear-gradient(135deg,#e2e8f0,#cbd5f5); color:#1f2937; }
@@ -211,7 +234,7 @@
     <nav aria-label="Navegação principal">
       <ul id="primaryNav" class="app-nav">
         <li><a href="/inicio" class="app-nav-link" data-app-route="inicio" data-requires-auth="true">Início</a></li>
-        <li><a href="/painel" class="app-nav-link" data-app-route="painel" data-requires-auth="true">Painel</a></li>
+        <li><a href="/forum" class="app-nav-link" data-app-route="forum" data-requires-auth="true">Fórum</a></li>
         <li><a href="/conquistas" class="app-nav-link" data-app-route="conquistas">Conquistas</a></li>
         <li><a href="/aulas" class="app-nav-link" data-app-route="aulas">Aulas &amp; Atividades</a></li>
         <li><a href="/admin" class="app-nav-link" data-app-route="admin" data-requires-auth="true" data-requires-admin="true">Admin</a></li>
@@ -555,13 +578,20 @@
   const communityPublishBtn = $('#btnCommunityPublish');
   const communityListEl = $('#communityWallList');
   const communityEmptyEl = $('#communityWallEmpty');
-  const communityEmptyDefaultText = communityEmptyEl ? communityEmptyEl.textContent : '';
+  const communityEmptyDefaultHtml = communityEmptyEl ? communityEmptyEl.innerHTML : '';
   const communityLimitBadge = $('#communityLimitBadge');
   const communityPrivacySelect = $('#communityPrivacySelect');
   const communityTargetsWrap = $('#communityTargetsWrap');
   const communityTargetsSelect = $('#communityTargets');
   const communityAttachmentInput = $('#communityAttachmentInput');
   const communityAttachmentList = $('#communityAttachmentList');
+  const communityMentionChips = $('#communityMentionChips');
+  const communityMentionToggle = $('#communityMentionToggle');
+  const communityMentionPanel = $('#communityMentionPanel');
+  const communityMentionSearch = $('#communityMentionSearch');
+  const communityMentionList = $('#communityMentionList');
+  const communityMentionEmpty = $('#communityMentionEmpty');
+  const communityMentionWrap = $('#communityMentionWrap');
   const achievementsAdminNoticeEl = $('#achievementsAdminNotice');
   const achievementsLeaderboardEl = $('#achievementsLeaderboard');
   const achievementsPodiumEl = $('#achievementsPodium');
@@ -578,7 +608,7 @@
   const aboutModuleGridEl = $('#aboutModuleGrid');
   const learningTracksContainerEl = $('#learningTracksContainer');
   const learningAssessmentsEl = $('#learningAssessments');
-  const panelPollListEl = $('#panelPollList');
+  const forumPollListEl = $('#forumPollList');
   const adminBulletinViewEl = $('#adminBulletinView');
   const adminBulletinEditorEl = $('#adminBulletinEditor');
   const adminBulletinInputEl = $('#adminBulletinInput');
@@ -618,6 +648,9 @@
   const communityState = {
     attachments: [],
     uploading: 0,
+    mentions: [],
+    mentionSearch: '',
+    mentionPickerOpen: false,
     shareableUsers: [],
     loadedShareableUsers: false,
     privacy: 'public'
@@ -743,7 +776,7 @@
       challenge: {
         title: 'Sprint Dashboard 1.0',
         xp: 45,
-        description: 'Montar um mini-dashboard com segmentações e publicar no painel de projetos.'
+        description: 'Montar um mini-dashboard com segmentações e publicar no fórum de projetos.'
       },
       quiz: {
         title: 'Quiz Busca & Referência',
@@ -783,7 +816,7 @@
       challenge: {
         title: 'Desafio Capstone',
         xp: 60,
-        description: 'Construir um painel completo conectando Power Query + Power Pivot e entregar no painel.'
+        description: 'Construir um painel completo conectando Power Query + Power Pivot e entregar no fórum.'
       },
       quiz: {
         title: 'Quiz Power Platform',
@@ -794,7 +827,7 @@
     }
   ];
 
-  const panelPolls = [
+  const forumPolls = [
     {
       id: 'poll-review',
       question: 'Qual tema merece reforço na sessão de revisão desta semana?',
@@ -835,7 +868,7 @@
       xp: 35,
       audience: 'Bloco B',
       validity: daysFromNow(3),
-      description: 'Monte uma consulta PROCX em uma base real e compartilhe a fórmula no Painel.',
+      description: 'Monte uma consulta PROCX em uma base real e compartilhe a fórmula no fórum.',
       attachments: []
     },
     {
@@ -849,7 +882,7 @@
     }
   ];
 
-  let panelPollState = panelPolls.map(poll => ({
+  let forumPollState = forumPolls.map(poll => ({
     id: poll.id,
     question: poll.question,
     audience: poll.audience,
@@ -895,22 +928,29 @@
     inicio: { slug: 'inicio' },
     sobre: { slug: 'sobre' },
     aulas: { slug: 'aulas' },
-    painel: { slug: 'painel', requiresAuth: true },
+    forum: { slug: 'forum', requiresAuth: true },
     conquistas: { slug: 'conquistas' },
     admin: { slug: 'admin', requiresAuth: true, requiresAdmin: true }
   };
+  const ROUTE_ALIASES = {
+    painel: 'forum'
+  };
   const ROUTE_SLUGS = Object.keys(ROUTE_DEFS);
+  const ROUTE_SUFFIXES = Array.from(new Set([...ROUTE_SLUGS, ...Object.keys(ROUTE_ALIASES)]));
   let currentAppRoute = 'inicio';
   let appBasePath = '/';
 
   function normalizeRoute(value) {
     const text = (value || '').toString().toLowerCase().replace(/[^a-z]/g, '');
+    if (!text) return 'inicio';
+    const alias = ROUTE_ALIASES[text];
+    if (alias && ROUTE_DEFS[alias]) return alias;
     return ROUTE_DEFS[text] ? text : 'inicio';
   }
 
   function computeBasePath(pathname) {
     let base = (pathname || '/').split('?')[0];
-    ROUTE_SLUGS.forEach(slug => {
+    ROUTE_SUFFIXES.forEach(slug => {
       const suffix = '/' + slug;
       if (base.endsWith(suffix)) {
         base = base.slice(0, -suffix.length);
@@ -924,7 +964,9 @@
   function resolveRouteFromPath(pathname) {
     const segments = (pathname || '').split('/').filter(Boolean);
     if (!segments.length) return 'inicio';
-    const last = segments[segments.length - 1].toLowerCase();
+    const last = segments[segments.length - 1].toLowerCase().replace(/[^a-z]/g, '');
+    const alias = ROUTE_ALIASES[last];
+    if (alias && ROUTE_DEFS[alias]) return alias;
     return ROUTE_DEFS[last] ? last : 'inicio';
   }
 
@@ -1083,11 +1125,11 @@
     }
   }
 
-  function renderPolls() {
-    if (!panelPollListEl) return;
-    panelPollListEl.innerHTML = '';
+  function renderForumPolls() {
+    if (!forumPollListEl) return;
+    forumPollListEl.innerHTML = '';
     const hasActiveUser = !!currentUser;
-    panelPollState.forEach(poll => {
+    forumPollState.forEach(poll => {
       const totalVotes = poll.options.reduce((sum, option) => sum + Number(option.votes || 0), 0);
       const card = document.createElement('div');
       card.className = 'card card-flat space-y-3';
@@ -1122,7 +1164,7 @@
         input.disabled = !hasActiveUser;
         input.addEventListener('change', () => {
           poll.pendingChoice = option.id;
-          renderPolls();
+          renderForumPolls();
         });
         const labelText = document.createElement('span');
         labelText.className = 'text-sm font-medium';
@@ -1172,7 +1214,7 @@
         poll.userChoice = choice;
         poll.pendingChoice = choice;
         showToast({ message: 'Voto registrado! +3 XP garantidos na atualização diária.', type: 'success' });
-        renderPolls();
+        renderForumPolls();
       });
       if (!hasActiveUser) {
         voteButton.disabled = true;
@@ -1180,15 +1222,17 @@
       footer.append(totalBadge, voteButton);
 
       card.append(header, optionsWrap, footer);
-      panelPollListEl.appendChild(card);
+      forumPollListEl.appendChild(card);
     });
   }
 
-  function renderPanelPage() {
-    renderPolls();
+  function renderForumPage() {
+    renderForumPolls();
     renderCommunityAttachments();
     setCommunityPrivacy(communityState.privacy);
     renderCommunityTargetsOptions();
+    renderCommunityMentionChips();
+    renderCommunityMentionOptions();
     if (currentUser) {
       loadShareableUsers();
     }
@@ -1200,7 +1244,7 @@
     if (!currentUser) {
       const card = document.createElement('div');
       card.className = 'rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/60 px-4 py-4 shadow-sm';
-      card.innerHTML = '<p class="text-sm text-slate-600 dark:text-slate-300">Faça login para acompanhar seu painel de conquistas e streaks.</p>';
+      card.innerHTML = '<p class="text-sm text-slate-600 dark:text-slate-300">Faça login para acompanhar suas conquistas e streaks no fórum.</p>';
       achievementsHeroStatsEl.appendChild(card);
       return;
     }
@@ -1389,8 +1433,8 @@
       renderAboutPage();
     } else if (normalized === 'aulas') {
       renderLearningTracksPage();
-    } else if (normalized === 'painel') {
-      renderPanelPage();
+    } else if (normalized === 'forum') {
+      renderForumPage();
     } else if (normalized === 'conquistas') {
       renderAchievementsShowcase();
       populateAchievementsCatalog();
@@ -2080,7 +2124,7 @@
           const unlockedAt = item.unlockedAt ? formatShortDate(item.unlockedAt) : '';
           status.textContent = unlockedAt ? `Desbloqueada em ${unlockedAt}` : 'Conquista desbloqueada';
         } else if (item.readyToUnlock) {
-          status.textContent = 'Pronto para resgatar — finalize o requisito e atualize o painel.';
+          status.textContent = 'Pronto para resgatar — finalize o requisito e atualize o fórum.';
         } else {
           status.textContent = item.progressLabel || 'Em andamento';
         }
@@ -2373,7 +2417,7 @@
     const numeric = Number(limit);
     if (!Number.isFinite(numeric) || numeric <= 0) return;
     communityCharLimit = numeric;
-    if (communityLimitBadge) communityLimitBadge.textContent = `Até ${numeric} caracteres`;
+    if (communityLimitBadge) communityLimitBadge.textContent = `Limite: ${numeric} caracteres`;
     if (communityTextarea) communityTextarea.maxLength = numeric;
     updateCommunityCounter();
   }
@@ -2401,6 +2445,10 @@
     return `${size} B`;
   }
 
+  function escapeRegExp(text) {
+    return (text || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   function getSelectedCommunityTargets() {
     if (!communityTargetsSelect) return [];
     return Array.from(communityTargetsSelect.selectedOptions || [])
@@ -2416,6 +2464,7 @@
     if (normalized === 'private') {
       loadShareableUsers();
     }
+    syncMentionTargetsSelection();
     updateCommunityPublishState();
   }
 
@@ -2425,13 +2474,14 @@
     if (!communityState.attachments.length) {
       const empty = document.createElement('li');
       empty.className = 'text-xs text-slate-500';
-      empty.textContent = 'Nenhum arquivo anexado até o momento.';
+      empty.textContent = 'Nenhum arquivo anexado no momento.';
       communityAttachmentList.appendChild(empty);
       return;
     }
     communityState.attachments.forEach(att => {
       const li = document.createElement('li');
       li.className = 'attachment-item';
+      if (att && att.fileId) li.dataset.fileId = att.fileId;
 
       const info = document.createElement('div');
       info.className = 'attachment-info';
@@ -2453,7 +2503,9 @@
       }
       const meta = document.createElement('span');
       meta.className = 'attachment-meta';
-      meta.textContent = formatFileSize(att && att.sizeBytes);
+      const sizeText = formatFileSize(att && att.sizeBytes);
+      const idText = att && att.fileId ? `ID: ${att.fileId}` : '';
+      meta.textContent = [sizeText, idText].filter(Boolean).join(' • ');
       textWrap.append(nameLink, meta);
       info.append(icon, textWrap);
 
@@ -2507,6 +2559,231 @@
       .discardCommunityAttachment({ token, attachmentId: att.id });
   }
 
+  function getCommunityMentionIds() {
+    return communityState.mentions
+      .map(mention => (mention && mention.id) ? mention.id : '')
+      .filter(Boolean);
+  }
+
+  function renderCommunityMentionChips() {
+    if (!communityMentionChips) return;
+    communityMentionChips.innerHTML = '';
+    const mentions = communityState.mentions.filter(mention => mention && mention.id);
+    if (!mentions.length) {
+      communityMentionChips.classList.add('hidden');
+      return;
+    }
+    mentions.forEach(mention => {
+      const chip = document.createElement('span');
+      chip.className = 'mention-chip';
+      chip.dataset.id = mention.id;
+      const label = document.createElement('span');
+      label.textContent = '@' + (mention.name || 'Participante');
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'mention-chip-remove';
+      removeBtn.dataset.action = 'remove-mention';
+      removeBtn.dataset.id = mention.id;
+      removeBtn.setAttribute('aria-label', `Remover ${mention.name || 'participante'} da publicação`);
+      removeBtn.textContent = '×';
+      chip.append(label, removeBtn);
+      communityMentionChips.appendChild(chip);
+    });
+    communityMentionChips.classList.remove('hidden');
+  }
+
+  function syncMentionTargetsSelection() {
+    if (!communityTargetsSelect) return;
+    const mentionIds = new Set(getCommunityMentionIds());
+    const options = Array.from(communityTargetsSelect.options || []);
+    if (communityState.privacy !== 'private') {
+      options.forEach(option => {
+        if (!option || !option.value) return;
+        if (mentionIds.has(option.value)) option.selected = false;
+      });
+      return;
+    }
+    options.forEach(option => {
+      if (!option || !option.value) return;
+      if (mentionIds.has(option.value)) {
+        option.selected = true;
+      }
+    });
+  }
+
+  function insertMentionLabel(name) {
+    if (!communityTextarea) return;
+    const input = communityTextarea;
+    const mentionLabel = '@' + (name || '');
+    const start = typeof input.selectionStart === 'number' ? input.selectionStart : input.value.length;
+    const end = typeof input.selectionEnd === 'number' ? input.selectionEnd : start;
+    const before = input.value.slice(0, start);
+    const after = input.value.slice(end);
+    const needsSpaceBefore = before && !/\s$/.test(before);
+    const needsSpaceAfter = after && !/^\s/.test(after);
+    let insertText = mentionLabel;
+    if (needsSpaceBefore) insertText = ' ' + insertText;
+    if (needsSpaceAfter) insertText += ' ';
+    input.value = before + insertText + after;
+    const caret = before.length + insertText.length;
+    try {
+      input.focus({ preventScroll: true });
+    } catch (err) {
+      input.focus();
+    }
+    if (typeof input.setSelectionRange === 'function') {
+      input.setSelectionRange(caret, caret);
+    }
+    syncMentionsFromText();
+    updateCommunityCounter();
+  }
+
+  function addCommunityMention(user) {
+    if (!user || !user.id) return;
+    if (!communityState.mentions.some(mention => mention.id === user.id)) {
+      communityState.mentions.push({
+        id: user.id,
+        name: user.name || user.email || 'Participante',
+        isAdmin: !!user.isAdmin
+      });
+    }
+    insertMentionLabel(user.name || user.email || '');
+    renderCommunityMentionChips();
+    syncMentionTargetsSelection();
+    updateCommunityPublishState();
+    renderCommunityMentionOptions();
+    setMentionPickerVisible(false);
+  }
+
+  function removeCommunityMention(id) {
+    if (!id) return;
+    const mention = communityState.mentions.find(item => item.id === id);
+    communityState.mentions = communityState.mentions.filter(item => item.id !== id);
+    if (mention && communityTextarea) {
+      const label = '@' + (mention.name || '');
+      const regex = new RegExp(escapeRegExp(label), 'g');
+      let text = communityTextarea.value.replace(regex, '');
+      text = text.replace(/ {2,}/g, ' ').replace(/\n {1,}/g, '\n').replace(/ {1,}\n/g, '\n');
+      communityTextarea.value = text;
+    }
+    if (communityTargetsSelect) {
+      Array.from(communityTargetsSelect.options || []).forEach(option => {
+        if (option && option.value === id) {
+          option.selected = false;
+        }
+      });
+    }
+    renderCommunityMentionChips();
+    renderCommunityMentionOptions();
+    syncMentionTargetsSelection();
+    syncMentionsFromText();
+    updateCommunityPublishState();
+  }
+
+  function syncMentionsFromText() {
+    if (!communityTextarea) return;
+    const text = communityTextarea.value || '';
+    const lower = text.toLowerCase();
+    const preserved = [];
+    communityState.mentions.forEach(mention => {
+      const label = '@' + (mention.name || '');
+      if (label && lower.includes(label.toLowerCase())) {
+        preserved.push(mention);
+      }
+    });
+    communityState.mentions = preserved;
+    if (communityState.shareableUsers && communityState.shareableUsers.length) {
+      communityState.shareableUsers.forEach(user => {
+        const label = '@' + (user.name || user.email || '');
+        if (!label) return;
+        if (lower.includes(label.toLowerCase()) && !communityState.mentions.some(mention => mention.id === user.id)) {
+          communityState.mentions.push({
+            id: user.id,
+            name: user.name || user.email || 'Participante',
+            isAdmin: !!user.isAdmin
+          });
+        }
+      });
+    }
+    renderCommunityMentionChips();
+    renderCommunityMentionOptions();
+    syncMentionTargetsSelection();
+    updateCommunityPublishState();
+  }
+
+  function renderCommunityMentionOptions() {
+    if (!communityMentionList) return;
+    communityMentionList.innerHTML = '';
+    const list = Array.isArray(communityState.shareableUsers) ? communityState.shareableUsers : [];
+    const search = (communityState.mentionSearch || '').toLowerCase();
+    const mentionIds = new Set(getCommunityMentionIds());
+    const filtered = list.filter(user => {
+      if (!user || !user.id) return false;
+      if (mentionIds.has(user.id)) return false;
+      if (!search) return true;
+      const haystack = `${user.name || ''} ${user.email || ''}`.toLowerCase();
+      return haystack.includes(search);
+    });
+    if (!filtered.length) {
+      if (communityMentionEmpty) communityMentionEmpty.classList.remove('hidden');
+      return;
+    }
+    if (communityMentionEmpty) communityMentionEmpty.classList.add('hidden');
+    filtered.forEach(user => {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'mention-option';
+      button.dataset.mentionId = user.id;
+      const label = document.createElement('div');
+      label.className = 'mention-option-label';
+      const labelText = user.name || user.email || 'Participante';
+      label.textContent = user.isAdmin ? `${labelText} • Coordenação` : labelText;
+      button.appendChild(label);
+      if (user.email) {
+        const meta = document.createElement('div');
+        meta.className = 'mention-option-meta';
+        meta.textContent = user.email;
+        button.appendChild(meta);
+      }
+      li.appendChild(button);
+      communityMentionList.appendChild(li);
+    });
+  }
+
+  function setMentionPickerVisible(visible) {
+    const show = !!visible;
+    communityState.mentionPickerOpen = show;
+    if (communityMentionPanel) {
+      communityMentionPanel.classList.toggle('hidden', !show);
+    }
+    if (communityMentionToggle) {
+      communityMentionToggle.setAttribute('aria-expanded', show ? 'true' : 'false');
+    }
+    if (show) {
+      communityState.mentionSearch = '';
+      if (communityMentionSearch) {
+        communityMentionSearch.value = '';
+        setTimeout(() => {
+          try {
+            communityMentionSearch.focus({ preventScroll: true });
+          } catch (err) {
+            communityMentionSearch.focus();
+          }
+        }, 0);
+      }
+      if (!communityState.loadedShareableUsers) {
+        loadShareableUsers();
+      }
+      renderCommunityMentionOptions();
+    }
+  }
+
+  function toggleMentionPicker(force) {
+    const next = typeof force === 'boolean' ? force : !communityState.mentionPickerOpen;
+    setMentionPickerVisible(next);
+  }
+
   function renderCommunityTargetsOptions() {
     if (!communityTargetsSelect) return;
     const previouslySelected = new Set(
@@ -2531,6 +2808,7 @@
       option.selected = previouslySelected.has(user.id);
       communityTargetsSelect.appendChild(option);
     });
+    syncMentionTargetsSelection();
     updateCommunityPublishState();
   }
 
@@ -2547,6 +2825,8 @@
         communityState.shareableUsers = list;
         communityState.loadedShareableUsers = true;
         renderCommunityTargetsOptions();
+        renderCommunityMentionOptions();
+        syncMentionsFromText();
       })
       .listShareableUsers({ token });
   }
@@ -2604,8 +2884,10 @@
     const hasText = !!message;
     const hasAttachments = communityState.attachments.length > 0;
     const selectedTargets = getSelectedCommunityTargets();
+    const mentionIds = getCommunityMentionIds();
     const isPrivate = communityState.privacy === 'private';
-    const invalidTargets = isPrivate && selectedTargets.length === 0;
+    const targetPool = isPrivate ? Array.from(new Set([...selectedTargets, ...mentionIds])) : selectedTargets;
+    const invalidTargets = isPrivate && targetPool.length === 0;
     const disabled = !currentUser
       || (!hasText && !hasAttachments)
       || message.length > communityCharLimit
@@ -2629,7 +2911,13 @@
       communityState.uploading = 0;
       communityState.shareableUsers = [];
       communityState.loadedShareableUsers = false;
+      communityState.mentions = [];
+      communityState.mentionSearch = '';
+      communityState.mentionPickerOpen = false;
       renderCommunityAttachments();
+      renderCommunityMentionChips();
+      renderCommunityMentionOptions();
+      setMentionPickerVisible(false);
       setCommunityPrivacy('public');
       if (communityTargetsSelect) communityTargetsSelect.innerHTML = '';
     }
@@ -2653,6 +2941,26 @@
     } catch (err) {
       return date.toISOString();
     }
+  }
+
+  function formatCommunityMessage(message, mentionNames) {
+    const original = (message || '').toString();
+    const names = Array.isArray(mentionNames) ? mentionNames.filter(Boolean) : [];
+    let processed = original;
+    const replacements = [];
+    names.forEach((name, index) => {
+      const label = '@' + name;
+      if (!label || !processed.includes(label)) return;
+      const placeholder = `__MENTION_${index}__`;
+      processed = processed.split(label).join(placeholder);
+      replacements.push({ placeholder, label });
+    });
+    let html = escapeHtml(processed).replace(/\n/g, '<br />');
+    replacements.forEach(item => {
+      const highlight = `<span class="mention-tag">${escapeHtml(item.label)}</span>`;
+      html = html.split(item.placeholder).join(highlight);
+    });
+    return html;
   }
 
   function renderCommunityWall(entries) {
@@ -2710,9 +3018,13 @@
         header.appendChild(actions);
       }
 
+      const mentionNames = entry && Array.isArray(entry.mentionUserNames)
+        ? entry.mentionUserNames.filter(Boolean)
+        : [];
       const messageEl = document.createElement('p');
-      messageEl.className = 'text-sm text-slate-700 dark:text-slate-200 whitespace-pre-line leading-relaxed';
-      messageEl.textContent = (entry && entry.message) ? entry.message : '';
+      messageEl.className = 'text-sm text-slate-700 dark:text-slate-200 leading-relaxed';
+      const formattedMessage = formatCommunityMessage(entry && entry.message ? entry.message : '', mentionNames);
+      messageEl.innerHTML = formattedMessage;
 
       card.appendChild(header);
       card.appendChild(messageEl);
@@ -2727,6 +3039,21 @@
         card.appendChild(recipients);
       }
 
+      if (mentionNames.length) {
+        const mentionRow = document.createElement('div');
+        mentionRow.className = 'flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400';
+        const label = document.createElement('span');
+        label.textContent = 'Mencionados:';
+        mentionRow.appendChild(label);
+        mentionNames.forEach(name => {
+          const pill = document.createElement('span');
+          pill.className = 'mention-pill';
+          pill.textContent = '@' + name;
+          mentionRow.appendChild(pill);
+        });
+        card.appendChild(mentionRow);
+      }
+
       const attachments = entry && Array.isArray(entry.attachments) ? entry.attachments : [];
       if (attachments.length) {
         const attachmentList = document.createElement('ul');
@@ -2735,6 +3062,7 @@
           if (!att || !att.id) return;
           const li = document.createElement('li');
           li.className = 'attachment-item';
+          if (att.fileId) li.dataset.fileId = att.fileId;
 
           const info = document.createElement('div');
           info.className = 'attachment-info';
@@ -2756,7 +3084,9 @@
           }
           const metaEl = document.createElement('span');
           metaEl.className = 'attachment-meta';
-          metaEl.textContent = formatFileSize(att.sizeBytes);
+          const sizeText = formatFileSize(att.sizeBytes);
+          const idText = att.fileId ? `ID: ${att.fileId}` : '';
+          metaEl.textContent = [sizeText, idText].filter(Boolean).join(' • ');
           textWrap.append(nameLink, metaEl);
           info.append(icon, textWrap);
 
@@ -4060,6 +4390,7 @@
     communityTextarea.addEventListener('input', () => {
       showCommunityError('');
       updateCommunityCounter();
+      syncMentionsFromText();
       updateCommunityPublishState();
     });
   }
@@ -4076,6 +4407,71 @@
       }
     });
   }
+
+  if (communityMentionToggle) {
+    communityMentionToggle.setAttribute('aria-expanded', 'false');
+    communityMentionToggle.addEventListener('click', event => {
+      event.preventDefault();
+      if (!currentUser) {
+        showToast({ message: 'Faça login para marcar colegas na publicação.', type: 'warning' });
+        return;
+      }
+      toggleMentionPicker();
+    });
+  }
+
+  if (communityMentionSearch) {
+    communityMentionSearch.addEventListener('input', event => {
+      const value = event && event.target ? event.target.value : '';
+      communityState.mentionSearch = (value || '').toString();
+      renderCommunityMentionOptions();
+    });
+    communityMentionSearch.addEventListener('keydown', event => {
+      if (event && event.key === 'Escape') {
+        setMentionPickerVisible(false);
+      }
+    });
+  }
+
+  if (communityMentionList) {
+    communityMentionList.addEventListener('click', event => {
+      const target = event.target instanceof HTMLElement
+        ? event.target.closest('[data-mention-id]')
+        : null;
+      if (!target) return;
+      event.preventDefault();
+      const id = target.getAttribute('data-mention-id') || '';
+      if (!id) return;
+      const user = (communityState.shareableUsers || []).find(item => item && item.id === id);
+      if (user) addCommunityMention(user);
+    });
+  }
+
+  if (communityMentionChips) {
+    communityMentionChips.addEventListener('click', event => {
+      const target = event.target instanceof HTMLElement
+        ? event.target.closest('[data-action="remove-mention"]')
+        : null;
+      if (!target) return;
+      event.preventDefault();
+      const id = target.getAttribute('data-id') || target.getAttribute('data-mention-id') || '';
+      if (id) removeCommunityMention(id);
+    });
+  }
+
+  document.addEventListener('click', event => {
+    if (!communityState.mentionPickerOpen) return;
+    const node = event.target instanceof Node ? event.target : null;
+    const wrap = communityMentionWrap;
+    if (wrap && node && wrap.contains(node)) return;
+    setMentionPickerVisible(false);
+  });
+
+  document.addEventListener('keydown', event => {
+    if (event && event.key === 'Escape' && communityState.mentionPickerOpen) {
+      setMentionPickerVisible(false);
+    }
+  });
 
   if (communityPrivacySelect) {
     communityPrivacySelect.addEventListener('change', event => {
@@ -4107,6 +4503,10 @@
         .filter(Boolean);
       const visibility = communityState.privacy === 'private' ? 'private' : 'public';
       const selectedTargets = getSelectedCommunityTargets();
+      const mentionIds = getCommunityMentionIds();
+      const combinedTargets = visibility === 'private'
+        ? Array.from(new Set([...selectedTargets, ...mentionIds]))
+        : [];
       if (!message) {
         showCommunityError('Escreva uma mensagem para publicar.');
         if (communityTextarea) {
@@ -4118,7 +4518,7 @@
         showCommunityError(`A mensagem deve ter até ${communityCharLimit} caracteres.`);
         return;
       }
-      if (visibility === 'private' && selectedTargets.length === 0) {
+      if (visibility === 'private' && combinedTargets.length === 0) {
         showCommunityError('Selecione ao menos um destinatário para a publicação privada.');
         if (communityTargetsSelect) {
           try { communityTargetsSelect.focus({ preventScroll: true }); } catch (err) { communityTargetsSelect.focus(); }
@@ -4142,7 +4542,11 @@
           updateCommunityPublishState();
           if (communityTextarea) communityTextarea.value = '';
           communityState.attachments = [];
+          communityState.mentions = [];
           renderCommunityAttachments();
+          renderCommunityMentionChips();
+          renderCommunityMentionOptions();
+          setMentionPickerVisible(false);
           if (visibility === 'private' && communityTargetsSelect) {
             Array.from(communityTargetsSelect.options || []).forEach(option => { option.selected = false; });
           }
@@ -4157,7 +4561,8 @@
           message,
           visibility,
           attachments,
-          targetUserIds: visibility === 'private' ? selectedTargets : []
+          targetUserIds: visibility === 'private' ? combinedTargets : [],
+          mentionUserIds: mentionIds
         });
     });
   }
@@ -4225,7 +4630,7 @@
     const activeUserId = currentUser?.id ?? null;
     const hasUserChanged = activeUserId !== lastPanelPollUserId;
     if (!currentUser || hasUserChanged) {
-      panelPollState.forEach(poll => {
+      forumPollState.forEach(poll => {
         poll.userChoice = null;
         poll.pendingChoice = null;
       });
@@ -4286,7 +4691,7 @@
       syncAdminVisibility();
       updateCommunityAccess();
       syncHeaderContext();
-      renderPolls();
+      renderForumPolls();
       renderAdminBulletin();
       renderAdminMissionList();
       if (achievementsAdminNoticeEl) {
@@ -4308,13 +4713,13 @@
     $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
     if (resourcesEmptyEl && resourcesEmptyDefaultText) resourcesEmptyEl.textContent = resourcesEmptyDefaultText;
     if (eventsEmptyEl && eventsEmptyDefaultText) eventsEmptyEl.textContent = eventsEmptyDefaultText;
-    if (communityEmptyEl && communityEmptyDefaultText) communityEmptyEl.textContent = communityEmptyDefaultText;
+    if (communityEmptyEl && communityEmptyDefaultHtml) communityEmptyEl.innerHTML = communityEmptyDefaultHtml;
     if (!hasLoadedEmbeds) {
       loadEmbeds();
     }
     setActiveSubPageButtons(activeSubPage);
     syncHeaderContext();
-    renderPolls();
+    renderForumPolls();
     loadShareableUsers();
 
     if (!keepLevelIndicator) {
@@ -5044,7 +5449,7 @@
     syncNavAvailability();
     renderAdminBulletin();
     renderAdminMissionList();
-    renderPanelPage();
+    renderForumPage();
     const stored = getStoredSession();
     if (stored && stored.token) {
       currentSessionToken = stored.token;
