@@ -501,11 +501,14 @@
   // Estado simples no front
   let currentUser = null;
   let currentSessionToken = null;
+  let sessionExpiryNotified = false;
   const STORAGE_KEY = 'excelPlatformSession';
+  const SESSION_EXPIRED_FALLBACK = 'Sessão expirada. Faça login novamente.';
 
   function persistSession(token, user) {
     if (!token || !user || !user.id) return;
     currentSessionToken = token;
+    sessionExpiryNotified = false;
     const payload = {
       token,
       userId: user.id,
@@ -550,6 +553,61 @@
       console.warn('Não foi possível ler sessão local:', err);
       return null;
     }
+  }
+
+  function extractErrorMessage(error) {
+    if (!error) return '';
+    if (typeof error === 'string') return error;
+    if (typeof error.message === 'string') return error.message;
+    if (typeof error.details === 'string') return error.details;
+    return '';
+  }
+
+  function isSessionErrorMessage(message) {
+    if (!message) return false;
+    const normalized = message.toLowerCase();
+    if (!normalized.includes('sessão')) return false;
+    return normalized.includes('expirad') || normalized.includes('inválid') || normalized.includes('inval');
+  }
+
+  function expireSession(message) {
+    const text = (message || '').toString().trim() || SESSION_EXPIRED_FALLBACK;
+    const hadUser = !!currentUser;
+    clearStoredSession();
+    currentUser = null;
+    if (hadUser) {
+      if (!sessionExpiryNotified) {
+        sessionExpiryNotified = true;
+        showToast({ message: text, type: 'warning' });
+      }
+    } else {
+      sessionExpiryNotified = false;
+    }
+    updateUI({ skipAchievements: true, skipCommunity: true, silentAchievements: true });
+  }
+
+  function handleSessionExpiredError(error, options = {}) {
+    const message = extractErrorMessage(error);
+    if (!isSessionErrorMessage(message)) return false;
+    const finalMessage = message || SESSION_EXPIRED_FALLBACK;
+    if (typeof options.onHandled === 'function') {
+      try {
+        options.onHandled(finalMessage);
+      } catch (callbackErr) {
+        console.error(callbackErr);
+      }
+    }
+    expireSession(finalMessage);
+    return true;
+  }
+
+  function requireSessionToken() {
+    const token = getSessionToken();
+    if (token) return token;
+    if (currentUser) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+    }
+    return null;
   }
 
   // Helpers
@@ -2062,12 +2120,26 @@
       resetAchievementsUI();
       return;
     }
+    const token = requireSessionToken();
+    if (!token) {
+      return;
+    }
     const expectedUserId = currentUser.id;
     achievementsState.loading = true;
     achievementsState.error = '';
     renderAchievements();
     google.script.run
       .withFailureHandler(err => {
+        if (handleSessionExpiredError(err, {
+          onHandled: () => {
+            achievementsState.loading = false;
+            achievementsState.error = '';
+            achievementsState.metrics = {};
+            renderAchievements();
+          }
+        })) {
+          return;
+        }
         if (!currentUser || currentUser.id !== expectedUserId) return;
         achievementsState.loading = false;
         achievementsState.error = err?.message || 'Não foi possível carregar as conquistas.';
@@ -2084,7 +2156,7 @@
         achievementsState.metrics = normalized.metrics || {};
         renderAchievements();
       })
-      .getUserAchievementsOverview({ userId: currentUser.id });
+      .getUserAchievementsOverview({ token, userId: currentUser.id });
   }
 
   function updateLevelIndicator(state) {
@@ -2517,6 +2589,11 @@
   function loadHistoryForCurrentUser() {
     if (!currentUser || !currentUser.id) return;
 
+    const token = requireSessionToken();
+    if (!token) {
+      return;
+    }
+
     const expectedUserId = currentUser.id;
     historyState.loading.checkins = true;
     historyState.errors.checkins = '';
@@ -2526,6 +2603,17 @@
 
     google.script.run
       .withFailureHandler(err => {
+        if (handleSessionExpiredError(err, {
+          onHandled: message => {
+            historyState.loading.checkins = false;
+            historyState.errors.checkins = message;
+            historyState.checkins = [];
+            historyState.streak = { current: 0, best: 0 };
+            renderHistory();
+          }
+        })) {
+          return;
+        }
         if (!currentUser || currentUser.id !== expectedUserId) return;
         historyState.loading.checkins = false;
         historyState.errors.checkins = err?.message || 'Não foi possível carregar o histórico de check-ins.';
@@ -2554,10 +2642,21 @@
         });
         renderHistory();
       })
-      .getCheckinHistory(currentUser.id);
+      .getCheckinHistory({ token, userId: currentUser.id });
 
     google.script.run
       .withFailureHandler(err => {
+        if (handleSessionExpiredError(err, {
+          onHandled: message => {
+            historyState.loading.activities = false;
+            historyState.errors.activities = message;
+            historyState.activities = [];
+            updateHistoryModuleFilterOptions();
+            renderHistory();
+          }
+        })) {
+          return;
+        }
         if (!currentUser || currentUser.id !== expectedUserId) return;
         historyState.loading.activities = false;
         historyState.errors.activities = err?.message || 'Não foi possível carregar o histórico de atividades.';
@@ -2573,7 +2672,7 @@
         updateHistoryModuleFilterOptions();
         renderHistory();
       })
-      .getActivityHistory(currentUser.id);
+      .getActivityHistory({ token, userId: currentUser.id });
   }
 
   const signupMessageEl = $('#signupMsg');
@@ -2714,9 +2813,8 @@
         showToast({ message: 'Entre com sua conta para publicar no mural.', type: 'warning' });
         return;
       }
-      const token = getSessionToken();
+      const token = requireSessionToken();
       if (!token) {
-        showToast({ message: 'Sessão expirada. Faça login novamente.', type: 'error' });
         return;
       }
       const message = communityTextarea ? communityTextarea.value.trim() : '';
@@ -2738,6 +2836,9 @@
         .withFailureHandler(err => {
           isPublishingCommunity = false;
           updateCommunityPublishState();
+          if (handleSessionExpiredError(err, { onHandled: message => showCommunityError(message) })) {
+            return;
+          }
           showCommunityError(err?.message || 'Não foi possível publicar agora.');
         })
         .withSuccessHandler(() => {
@@ -2766,9 +2867,8 @@
       }
       const postId = target.getAttribute('data-id') || '';
       if (!postId) return;
-      const token = getSessionToken();
+      const token = requireSessionToken();
       if (!token) {
-        showToast({ message: 'Sessão expirada. Faça login novamente.', type: 'error' });
         return;
       }
       const button = target instanceof HTMLButtonElement ? target : target.closest('button');
@@ -2781,6 +2881,9 @@
           if (button) {
             button.disabled = false;
             button.removeAttribute('aria-busy');
+          }
+          if (handleSessionExpiredError(err)) {
+            return;
           }
           showToast({ message: err?.message || 'Não foi possível remover agora.', type: 'error' });
         })
@@ -2839,8 +2942,23 @@
       loadAchievementsOverview();
     }
 
+    const token = requireSessionToken();
+    if (!token) {
+      return;
+    }
+
     google.script.run
       .withFailureHandler(err => {
+        if (handleSessionExpiredError(err, {
+          onHandled: message => {
+            if (!keepLevelIndicator) {
+              if (nextLevelTextEl) nextLevelTextEl.textContent = message;
+              if (nextLevelPctEl) nextLevelPctEl.textContent = '—';
+            }
+          }
+        })) {
+          return;
+        }
         console.error('Falha ao obter estado do usuário:', err);
         if (!keepLevelIndicator) {
           if (nextLevelTextEl) nextLevelTextEl.textContent = 'Não foi possível carregar o progresso agora.';
@@ -2862,7 +2980,7 @@
           metrics: { xpTotal: s.xp, modulesCompleted: s.concluidos }
         });
       })
-      .getUserState({ userId: currentUser.id });
+      .getUserState({ token, userId: currentUser.id });
 
     loadHistoryForCurrentUser();
     refreshRanking();
@@ -2986,6 +3104,7 @@
     const finish = () => {
       clearStoredSession();
       currentUser = null;
+      sessionExpiryNotified = false;
       updateUI();
     };
     const stored = getStoredSession();
@@ -3003,8 +3122,17 @@
   // Check-in
   $('#btnCheckin').onclick = ()=>{
     if (!currentUser) return showToast({ message: 'Faça login primeiro.', type: 'warning' });
+    const token = requireSessionToken();
+    if (!token) {
+      return;
+    }
     google.script.run
-      .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
+      .withFailureHandler(err => {
+        if (handleSessionExpiredError(err, { onHandled: () => { $('#checkinMsg').textContent = ''; } })) {
+          return;
+        }
+        showToast({ message: err?.message || err, type: 'error' });
+      })
       .withSuccessHandler(res=>{
         if (res && res.ok) {
           const bonusXP = Number(res.achievementBonusXP || 0);
@@ -3028,20 +3156,30 @@
         }
         setTimeout(()=> $('#checkinMsg').textContent='', 3000);
       })
-      .checkin({ userId: currentUser.id });
+      .checkin({ token, userId: currentUser.id });
   };
 
   // Submit activity (exemplo)
   $('#btnSubmitActivity').onclick = ()=>{
     if (!currentUser) return showToast({ message: 'Faça login primeiro.', type: 'warning' });
+    const token = requireSessionToken();
+    if (!token) {
+      return;
+    }
     const payload = {
       userId: currentUser.id,
       moduleId: Number($('#aModule').value||1),
       scorePct: Number($('#aScore').value||0),
       maxXP: Number($('#aMaxXP').value||0)
     };
+    payload.token = token;
     google.script.run
-      .withFailureHandler(err=> showToast({ message: err?.message || err, type: 'error' }))
+      .withFailureHandler(err => {
+        if (handleSessionExpiredError(err, { onHandled: () => { $('#activityMsg').textContent = ''; } })) {
+          return;
+        }
+        showToast({ message: err?.message || err, type: 'error' });
+      })
       .withSuccessHandler(res=>{
         if (!res || !res.ok) {
           $('#activityMsg').textContent = 'Não foi possível registrar a atividade agora.';
@@ -3078,9 +3216,8 @@
         showToast({ message: 'Somente administradores podem atualizar os materiais.', type: 'warning' });
         return;
       }
-      const token = getSessionToken();
+      const token = requireSessionToken();
       if (!token) {
-        showToast({ message: 'Sessão expirada. Faça login novamente.', type: 'error' });
         return;
       }
       const excel = excelLinkInput ? excelLinkInput.value.trim() : '';
@@ -3088,7 +3225,12 @@
       const recommendedResources = collectTextareaList(resourcesInputEl);
       const upcomingEvents = collectTextareaList(eventsInputEl);
       google.script.run
-        .withFailureHandler(err => showToast({ message: err?.message || err, type: 'error' }))
+        .withFailureHandler(err => {
+          if (handleSessionExpiredError(err)) {
+            return;
+          }
+          showToast({ message: err?.message || err, type: 'error' });
+        })
         .withSuccessHandler(() => {
           showToast({ message: 'Materiais atualizados com sucesso.', type: 'success' });
           loadEmbeds();
