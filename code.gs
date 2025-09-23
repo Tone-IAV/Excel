@@ -174,6 +174,13 @@ function renderStudentSubPage(payload) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
+function getActiveUserProfile() {
+  setup_();
+  const email = (Session.getActiveUser().getEmail() || '').trim();
+  const domain = email && email.includes('@') ? email.split('@')[1].toLowerCase() : '';
+  return { email, domain };
+}
+
 /** Cria abas e cabeçalhos se não existirem */
 function setup_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
