@@ -153,27 +153,21 @@ function onOpen() {
 }
 
 function doGet(e) {
-  setup_();
+  // NÃO chame setup_() aqui.
   let route = '';
   if (e && typeof e.pathInfo === 'string') {
-    const parts = e.pathInfo
-      .split('/')
-      .map(str => str.trim())
-      .filter(Boolean);
-    if (parts.length) {
-      route = parts[0];
-    }
+    const parts = e.pathInfo.split('/').map(s => s.trim()).filter(Boolean);
+    if (parts.length) route = parts[0];
   }
   const template = HtmlService.createTemplateFromFile('index');
-  const initialRoute = (route || '')
-    .toString()
-    .toLowerCase()
-    .replace(/[^a-z]/g, '');
-  template.initialRoute = initialRoute;
-  return template
-    .evaluate()
+  template.initialRoute = (route || '').toString().toLowerCase().replace(/[^a-z]/g, '');
+  return template.evaluate()
     .setTitle('Plataforma Gamificada — Curso de Excel')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function publicPing() {
+  return { ok: true, ts: Date.now() };
 }
 
 function include(filename) {
@@ -192,13 +186,6 @@ function renderStudentSubPage(payload) {
     throw new Error('Página desconhecida.');
   }
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
-}
-
-function getActiveUserProfile() {
-  setup_();
-  const email = (Session.getActiveUser().getEmail() || '').trim();
-  const domain = email && email.includes('@') ? email.split('@')[1].toLowerCase() : '';
-  return { email, domain };
 }
 
 /** Cria abas e cabeçalhos se não existirem */
@@ -926,6 +913,106 @@ function requireSessionUser_(token, expectedUserId) {
 }
 
 /** =================== API PÚBLICA (chamada pelo HTML) =================== **/
+function completeGoogleSignUp(accessToken) {
+  const token = (accessToken || '').toString().trim();
+  if (!token) throw new Error('Token inválido.');
+
+  const fetchHeaders = { Authorization: 'Bearer ' + token };
+  const baseFetchOptions = { headers: fetchHeaders, muteHttpExceptions: true };
+
+  let userInfoResponse;
+  try {
+    userInfoResponse = UrlFetchApp.fetch('https://www.googleapis.com/oauth2/v2/userinfo', baseFetchOptions);
+  } catch (err) {
+    throw new Error('Não foi possível verificar o email Google.');
+  }
+
+  const userInfoStatus = userInfoResponse.getResponseCode();
+  let userInfoData = null;
+  const userInfoBody = userInfoResponse.getContentText();
+  if (userInfoBody) {
+    try {
+      userInfoData = JSON.parse(userInfoBody);
+    } catch (err) {
+      userInfoData = null;
+    }
+  }
+
+  if (userInfoStatus !== 200 || !userInfoData) {
+    throw new Error('Não foi possível verificar o email Google.');
+  }
+
+  const email = (userInfoData.email || '').toString().trim().toLowerCase();
+  if (!email || userInfoData.verified_email !== true) {
+    throw new Error('Não foi possível verificar o email Google.');
+  }
+
+  const displayName = (userInfoData.name || '').toString().trim();
+  const usersSheet = sh_(SHEET_USERS);
+  const hit = findByEmail_(email);
+  let user;
+  let wasCreated = false;
+  if (!hit) {
+    const id = Utilities.getUuid();
+    const createdAt = nowISO_();
+    usersSheet.appendRow([id, displayName, email, '', false, 0, createdAt]);
+    user = { id, name: displayName, email, isAdmin: false, xp: 0 };
+    wasCreated = true;
+  } else {
+    const storedName = (hit.data[1] || '').toString().trim();
+    const resolvedName = storedName || displayName;
+    if (!storedName && displayName) {
+      usersSheet.getRange(hit.row, 2).setValue(displayName);
+    }
+    const xpValue = Number(hit.data[5] || 0);
+    user = {
+      id: hit.data[0],
+      name: resolvedName,
+      email: (hit.data[2] || '').toString().trim().toLowerCase() || email,
+      isAdmin: !!hit.data[4],
+      xp: Number.isFinite(xpValue) ? xpValue : 0
+    };
+  }
+
+  let driveProbeResponse;
+  try {
+    driveProbeResponse = UrlFetchApp.fetch(
+      'https://www.googleapis.com/drive/v3/files?pageSize=1&fields=files(id,name)',
+      baseFetchOptions
+    );
+  } catch (err) {
+    throw new Error('Não foi possível validar o acesso ao Drive do Google.');
+  }
+  const driveStatus = driveProbeResponse.getResponseCode();
+  if (driveStatus === 401 || driveStatus === 403) {
+    throw new Error('Permissão de Drive não concedida.');
+  }
+  if (driveStatus >= 400) {
+    throw new Error('Não foi possível validar o acesso ao Drive do Google.');
+  }
+
+  const cfg = getConfig_();
+  const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
+  const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
+  const safeXP = Number.isFinite(Number(user.xp)) ? Number(user.xp) : 0;
+  user.xp = safeXP;
+  user.level = 1 + Math.floor(safeXP / xpPerLevel);
+
+  const session = createSession_(user.id);
+  const message = wasCreated
+    ? 'Cadastro concluído com Google.'
+    : 'Login concluído com Google.';
+
+  return {
+    ok: true,
+    user,
+    token: session.token,
+    expiresAt: session.expiresAt,
+    created: wasCreated,
+    message
+  };
+}
+
 function registerUser(payload) {
   setup_();
   const nameRaw  = (payload.name || '');
