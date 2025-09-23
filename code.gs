@@ -672,25 +672,43 @@ function getSessionUserByToken_(token) {
     return null;
   }
 
-  return { user, sessionRow: hit.row };
+  const normalizedId = (user.id || '').toString().trim();
+  const normalizedUser = Object.assign({}, user, { id: normalizedId });
+
+  return { user: normalizedUser, sessionRow: hit.row };
 }
 
 function requireSessionUser_(token, expectedUserId) {
+  const throwSessionError = () => {
+    const err = new Error(SESSION_INVALID_MESSAGE);
+    err.name = 'SessionError';
+    throw err;
+  };
+
   const tokenStr = (token || '').toString().trim();
   if (!tokenStr) {
-    throw new Error(SESSION_INVALID_MESSAGE);
+    throwSessionError();
   }
+
   const session = getSessionUserByToken_(tokenStr);
   if (!session || !session.user) {
-    throw new Error(SESSION_INVALID_MESSAGE);
+    throwSessionError();
   }
+
+  const sessionUserId = (session.user.id || '').toString().trim();
+  if (!sessionUserId) {
+    throwSessionError();
+  }
+
   if (expectedUserId !== undefined && expectedUserId !== null) {
     const expected = expectedUserId.toString().trim();
-    if (expected && session.user.id !== expected) {
-      throw new Error(SESSION_INVALID_MESSAGE);
+    if (expected && expected !== sessionUserId) {
+      throwSessionError();
     }
   }
-  return session;
+
+  const normalizedUser = Object.assign({}, session.user, { id: sessionUserId });
+  return { user: normalizedUser, sessionRow: session.sessionRow };
 }
 
 /** =================== API PÚBLICA (chamada pelo HTML) =================== **/
