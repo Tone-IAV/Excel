@@ -127,9 +127,25 @@ function onOpen() {
     .addToUi();
 }
 
-function doGet() {
+function doGet(e) {
   setup_();
-  return HtmlService.createTemplateFromFile('index')
+  let route = '';
+  if (e && typeof e.pathInfo === 'string') {
+    const parts = e.pathInfo
+      .split('/')
+      .map(str => str.trim())
+      .filter(Boolean);
+    if (parts.length) {
+      route = parts[0];
+    }
+  }
+  const template = HtmlService.createTemplateFromFile('index');
+  const initialRoute = (route || '')
+    .toString()
+    .toLowerCase()
+    .replace(/[^a-z]/g, '');
+  template.initialRoute = initialRoute;
+  return template
     .evaluate()
     .setTitle('Plataforma Gamificada — Curso de Excel')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
