@@ -11,7 +11,7 @@ const SHEET_EMBEDS           = 'Embeds';           // key, url
 const SHEET_SESSIONS         = 'Sessions';         // userId, tokenHash, expiresAt, createdAt
 const SHEET_USER_ACHIEVEMENT = 'UserAchievements'; // userId, achievementId, unlockedAt, rewardXP
 const SHEET_WALL             = 'Wall';             // id, userId, authorName, message, createdAt, visibility, targetUserIds, attachmentIds, removedAt, removedBy
-const SHEET_CONFIRMATIONS    = 'UserConfirmations';// userId, email, codeHash, createdAt, expiresAt, confirmedAt, lastSentAt
+const SHEET_CONFIRMATIONS    = 'UserConfirmations';// userId, email, codeHash, createdAt, expiresAt, confirmedAt, lastSentAt, pendingName, pendingPassHash, pendingIsAdmin
 const SHEET_WALL_ATTACHMENTS = 'WallAttachments';  // attachmentId, postId, uploaderId, fileId, fileName, mimeType, fileUrl, sizeBytes, uploadedAt, linkedAt
 
 const CONFIG_RECOMMENDED_RESOURCES = 'recommended_resources';
@@ -207,7 +207,7 @@ function setup_() {
   ensure(SHEET_SESSIONS,         ['userId','tokenHash','expiresAt','createdAt']);
   ensure(SHEET_USER_ACHIEVEMENT, ['userId','achievementId','unlockedAt','rewardXP']);
   ensure(SHEET_WALL,             ['id','userId','authorName','message','createdAt','visibility','targetUserIds','attachmentIds','removedAt','removedBy']);
-  ensure(SHEET_CONFIRMATIONS,    ['userId','email','codeHash','createdAt','expiresAt','confirmedAt','lastSentAt']);
+  ensure(SHEET_CONFIRMATIONS,    ['userId','email','codeHash','createdAt','expiresAt','confirmedAt','lastSentAt','pendingName','pendingPassHash','pendingIsAdmin']);
   ensure(SHEET_WALL_ATTACHMENTS, ['attachmentId','postId','uploaderId','fileId','fileName','mimeType','fileUrl','sizeBytes','uploadedAt','linkedAt']);
 
   // Defaults de config
@@ -258,6 +258,43 @@ function hashConfirmationCode_(userId, code) {
   return sha256_(safeUser + '|' + safeCode);
 }
 
+function mapConfirmationRow_(row) {
+  if (!row) {
+    return {
+      userId: '',
+      email: '',
+      codeHash: '',
+      createdAt: '',
+      expiresAt: '',
+      confirmedAt: '',
+      lastSentAt: '',
+      pendingName: '',
+      pendingPassHash: '',
+      pendingIsAdmin: false
+    };
+  }
+  const pendingName = row.length > 7 ? row[7] || '' : '';
+  const pendingPassHash = row.length > 8 ? row[8] || '' : '';
+  const pendingIsAdminRaw = row.length > 9 ? row[9] : '';
+  const pendingIsAdmin = typeof pendingIsAdminRaw === 'boolean'
+    ? pendingIsAdminRaw
+    : (typeof pendingIsAdminRaw === 'string'
+      ? pendingIsAdminRaw.toString().toLowerCase() === 'true'
+      : !!pendingIsAdminRaw);
+  return {
+    userId: row[0] || '',
+    email: row[1] || '',
+    codeHash: row[2] || '',
+    createdAt: row[3] || '',
+    expiresAt: row[4] || '',
+    confirmedAt: row[5] || '',
+    lastSentAt: row[6] || '',
+    pendingName,
+    pendingPassHash,
+    pendingIsAdmin
+  };
+}
+
 function getConfirmationRecordByUserId_(userId) {
   if (!userId) return null;
   const rows = getAll_(sh_(SHEET_CONFIRMATIONS));
@@ -266,53 +303,91 @@ function getConfirmationRecordByUserId_(userId) {
     if ((row[0] || '') === userId) {
       return {
         row: i + 2,
-        data: {
-          userId: row[0] || '',
-          email: row[1] || '',
-          codeHash: row[2] || '',
-          createdAt: row[3] || '',
-          expiresAt: row[4] || '',
-          confirmedAt: row[5] || '',
-          lastSentAt: row[6] || ''
-        }
+        data: mapConfirmationRow_(row)
       };
     }
   }
   return null;
 }
 
-function saveConfirmationCode_(userId, email, codeHash, expiresAtISO) {
+function getConfirmationRecordByEmail_(email) {
+  const safeEmail = (email || '').toString().trim().toLowerCase();
+  if (!safeEmail) return null;
+  const rows = getAll_(sh_(SHEET_CONFIRMATIONS));
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const rowEmail = (row[1] || '').toString().trim().toLowerCase();
+    if (rowEmail && rowEmail === safeEmail) {
+      return {
+        row: i + 2,
+        data: mapConfirmationRow_(row)
+      };
+    }
+  }
+  return null;
+}
+
+function saveConfirmationCode_(userId, email, codeHash, expiresAtISO, options) {
+  const safeUserId = (userId || '').toString().trim();
+  if (!safeUserId) {
+    throw new Error('userId inválido para confirmação.');
+  }
   const sheet = sh_(SHEET_CONFIRMATIONS);
   const now = nowISO_();
-  const payload = [userId, email, codeHash, now, expiresAtISO, '', now];
-  const existing = getConfirmationRecordByUserId_(userId);
+  const opts = options || {};
+  const normalizedEmail = (email || '').toString().trim().toLowerCase();
+
+  let existing = getConfirmationRecordByUserId_(safeUserId);
+  if (!existing || (existing.data.email || '').toString().trim().toLowerCase() !== normalizedEmail) {
+    const byEmail = getConfirmationRecordByEmail_(normalizedEmail);
+    if (byEmail) {
+      existing = byEmail;
+    }
+  }
+
+  const existingData = existing ? existing.data : null;
+  const shouldResetConfirmation = opts && opts.resetConfirmedAt === true;
+  const createdAt = opts.createdAt
+    ? opts.createdAt
+    : (existingData && existingData.createdAt ? existingData.createdAt : now);
+  const confirmedAt = shouldResetConfirmation
+    ? ''
+    : (existingData && existingData.confirmedAt ? existingData.confirmedAt : '');
+  const pendingName = Object.prototype.hasOwnProperty.call(opts, 'pendingName')
+    ? opts.pendingName
+    : (Object.prototype.hasOwnProperty.call(opts, 'name') ? opts.name : (existingData ? existingData.pendingName : ''));
+  const pendingPassHash = Object.prototype.hasOwnProperty.call(opts, 'pendingPassHash')
+    ? opts.pendingPassHash
+    : (Object.prototype.hasOwnProperty.call(opts, 'passHash') ? opts.passHash : (existingData ? existingData.pendingPassHash : ''));
+  const pendingIsAdminValue = Object.prototype.hasOwnProperty.call(opts, 'pendingIsAdmin')
+    ? !!opts.pendingIsAdmin
+    : (Object.prototype.hasOwnProperty.call(opts, 'isAdmin') ? !!opts.isAdmin : !!(existingData && existingData.pendingIsAdmin));
+
+  const payload = [
+    safeUserId,
+    normalizedEmail,
+    codeHash,
+    createdAt,
+    expiresAtISO,
+    confirmedAt,
+    now,
+    pendingName || '',
+    pendingPassHash || '',
+    pendingIsAdminValue
+  ];
+
   if (existing) {
     sheet.getRange(existing.row, 1, 1, payload.length).setValues([payload]);
     return {
       row: existing.row,
-      data: {
-        userId,
-        email,
-        codeHash,
-        createdAt: now,
-        expiresAt: expiresAtISO,
-        confirmedAt: '',
-        lastSentAt: now
-      }
+      data: mapConfirmationRow_(payload)
     };
   }
+
   sheet.appendRow(payload);
   return {
     row: sheet.getLastRow(),
-    data: {
-      userId,
-      email,
-      codeHash,
-      createdAt: now,
-      expiresAt: expiresAtISO,
-      confirmedAt: '',
-      lastSentAt: now
-    }
+    data: mapConfirmationRow_(payload)
   };
 }
 
@@ -323,9 +398,10 @@ function markConfirmationAsConfirmed_(userId) {
   if (existing) {
     sheet.getRange(existing.row, 3).setValue('');
     sheet.getRange(existing.row, 6).setValue(now);
+    sheet.getRange(existing.row, 8, 1, 3).setValues([['', '', false]]);
     return { row: existing.row, confirmedAt: now };
   }
-  sheet.appendRow([userId, '', '', now, now, now, now]);
+  sheet.appendRow([userId, '', '', now, now, now, now, '', '', false]);
   return { row: sheet.getLastRow(), confirmedAt: now };
 }
 
@@ -1023,6 +1099,7 @@ function registerUser(payload) {
   const name  = nameRaw.trim();
   const email = emailRaw.trim().toLowerCase();
   const pass  = passRaw.trim();
+  const existingUser = email ? findByEmail_(email) : null;
 
   const errors = {};
   if (!name) {
@@ -1036,7 +1113,7 @@ function registerUser(payload) {
     errors.email = 'Informe o e-mail.';
   } else if (!emailPattern.test(email)) {
     errors.email = 'Formato de e-mail inválido.';
-  } else if (findByEmail_(email)) {
+  } else if (existingUser) {
     errors.email = 'E-mail já cadastrado.';
   }
 
@@ -1059,22 +1136,38 @@ function registerUser(payload) {
   const passHash = sha256_(pass);
   const isAdmin  = adminCode === ADMIN_SECURITY_CODE;
 
-  const id = Utilities.getUuid();
-  sh_(SHEET_USERS).appendRow([id, name, email, passHash, isAdmin, 0, nowISO_()]);
+  const pendingRecord = getConfirmationRecordByEmail_(email);
+  const shouldResetConfirmation = pendingRecord && pendingRecord.data.confirmedAt && !existingUser;
+
+  const now = nowISO_();
+  let userId = pendingRecord && pendingRecord.data.userId ? pendingRecord.data.userId : '';
+  if (!userId) {
+    userId = Utilities.getUuid();
+  }
 
   const confirmationCode = generateConfirmationCode_();
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
   const expiresISO = expiresAt.toISOString();
-  const codeHash = hashConfirmationCode_(id, confirmationCode);
-  saveConfirmationCode_(id, email, codeHash, expiresISO);
+  const codeHash = hashConfirmationCode_(userId, confirmationCode);
+  const createdAtForRecord = pendingRecord && pendingRecord.data.createdAt
+    ? pendingRecord.data.createdAt
+    : now;
+
+  saveConfirmationCode_(userId, email, codeHash, expiresISO, {
+    name,
+    passHash,
+    isAdmin,
+    createdAt: createdAtForRecord,
+    resetConfirmedAt: shouldResetConfirmation
+  });
   sendConfirmationEmail_(email, name, confirmationCode);
 
   return {
     ok: true,
     requiresConfirmation: true,
-    user: { id, name, email, isAdmin, xp: 0, level: 1 },
+    user: { id: userId, name, email, isAdmin, xp: 0, level: 1 },
     confirmation: {
-      userId: id,
+      userId,
       email,
       expiresAt: expiresISO
     },
@@ -1133,13 +1226,12 @@ function confirmUserRegistration(payload) {
   if (!email || !code) throw new Error('Informe e-mail e código.');
 
   const hit = findByEmail_(email);
-  if (!hit) throw new Error('Usuário não encontrado.');
-
-  const userId = hit.data[0];
-  const record = getConfirmationRecordByUserId_(userId);
-  if (!record) {
-    // Usuário antigo sem confirmação pendente
-    const session = createSession_(userId);
+  if (hit) {
+    const userId = hit.data[0];
+    const record = getConfirmationRecordByUserId_(userId);
+    const cfg = getConfig_();
+    const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
+    const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
     const user = {
       id: hit.data[0],
       name: hit.data[1],
@@ -1147,21 +1239,54 @@ function confirmUserRegistration(payload) {
       isAdmin: !!hit.data[4],
       xp: Number(hit.data[5] || 0)
     };
-    user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel || 100));
+    user.level = 1 + Math.floor(user.xp / xpPerLevel);
+
+    if (!record) {
+      const session = createSession_(userId);
+      return { ok: true, user, token: session.token, expiresAt: session.expiresAt };
+    }
+
+    if (record.data.confirmedAt) {
+      const session = createSession_(userId);
+      return { ok: true, alreadyConfirmed: true, user, token: session.token, expiresAt: session.expiresAt };
+    }
+
+    const expiresAt = record.data.expiresAt ? new Date(record.data.expiresAt) : null;
+    if (expiresAt && !isNaN(expiresAt.getTime()) && expiresAt.getTime() < Date.now()) {
+      return { ok: false, expired: true, message: 'O código informado expirou. Solicite um novo envio.' };
+    }
+
+    const expectedHash = record.data.codeHash || '';
+    const providedHash = hashConfirmationCode_(userId, code);
+    if (!expectedHash || expectedHash !== providedHash) {
+      throw new Error('Código inválido. Verifique o e-mail e tente novamente.');
+    }
+
+    markConfirmationAsConfirmed_(userId);
+    const session = createSession_(userId);
     return { ok: true, user, token: session.token, expiresAt: session.expiresAt };
   }
 
+  const record = getConfirmationRecordByEmail_(email);
+  if (!record) {
+    throw new Error('Usuário não encontrado.');
+  }
+
+  const userId = record.data.userId;
+  if (!userId) {
+    throw new Error('Usuário não encontrado.');
+  }
+
   if (record.data.confirmedAt) {
-    const session = createSession_(userId);
-    const user = {
-      id: hit.data[0],
-      name: hit.data[1],
-      email: hit.data[2],
-      isAdmin: !!hit.data[4],
-      xp: Number(hit.data[5] || 0)
-    };
-    user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel || 100));
-    return { ok: true, alreadyConfirmed: true, user, token: session.token, expiresAt: session.expiresAt };
+    const existingUser = getUserById_(userId);
+    if (existingUser) {
+      const cfg = getConfig_();
+      const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
+      const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
+      existingUser.level = 1 + Math.floor(Number(existingUser.xp || 0) / xpPerLevel);
+      const session = createSession_(existingUser.id);
+      return { ok: true, alreadyConfirmed: true, user: existingUser, token: session.token, expiresAt: session.expiresAt };
+    }
   }
 
   const expiresAt = record.data.expiresAt ? new Date(record.data.expiresAt) : null;
@@ -1175,16 +1300,30 @@ function confirmUserRegistration(payload) {
     throw new Error('Código inválido. Verifique o e-mail e tente novamente.');
   }
 
+  const pendingName = (record.data.pendingName || '').toString().trim();
+  const pendingPassHash = (record.data.pendingPassHash || '').toString().trim();
+  if (!pendingName || !pendingPassHash) {
+    throw new Error('Não foi possível concluir o cadastro. Solicite um novo registro.');
+  }
+
+  const isAdmin = !!record.data.pendingIsAdmin;
+  const createdAt = record.data.createdAt || nowISO_();
+  sh_(SHEET_USERS).appendRow([userId, pendingName, email, pendingPassHash, isAdmin, 0, createdAt]);
+
+  const cfg = getConfig_();
+  const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
+  const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
+  const user = {
+    id: userId,
+    name: pendingName,
+    email,
+    isAdmin,
+    xp: 0
+  };
+  user.level = 1 + Math.floor(user.xp / xpPerLevel);
+
   markConfirmationAsConfirmed_(userId);
   const session = createSession_(userId);
-  const user = {
-    id: hit.data[0],
-    name: hit.data[1],
-    email: hit.data[2],
-    isAdmin: !!hit.data[4],
-    xp: Number(hit.data[5] || 0)
-  };
-  user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel || 100));
   return { ok: true, user, token: session.token, expiresAt: session.expiresAt };
 }
 
@@ -1194,12 +1333,31 @@ function resendConfirmationCode(payload) {
   if (!email) throw new Error('Informe o e-mail.');
 
   const hit = findByEmail_(email);
-  if (!hit) throw new Error('Usuário não encontrado.');
+  let record = null;
+  let userId = '';
+  let displayName = '';
 
-  const userId = hit.data[0];
-  const record = getConfirmationRecordByUserId_(userId);
-  if (record && record.data.confirmedAt) {
-    return { ok: true, alreadyConfirmed: true };
+  if (hit) {
+    userId = hit.data[0];
+    displayName = hit.data[1] || '';
+    record = getConfirmationRecordByUserId_(userId);
+    if (!record || record.data.confirmedAt) {
+      return { ok: true, alreadyConfirmed: true };
+    }
+  } else {
+    record = getConfirmationRecordByEmail_(email);
+    if (!record) {
+      throw new Error('Usuário não encontrado.');
+    }
+    if (record.data.confirmedAt) {
+      return { ok: true, alreadyConfirmed: true };
+    }
+    userId = record.data.userId || '';
+    displayName = record.data.pendingName || '';
+  }
+
+  if (!userId) {
+    throw new Error('Usuário não encontrado.');
   }
 
   const code = generateConfirmationCode_();
@@ -1207,7 +1365,7 @@ function resendConfirmationCode(payload) {
   const expiresISO = expiresAt.toISOString();
   const hash = hashConfirmationCode_(userId, code);
   saveConfirmationCode_(userId, email, hash, expiresISO);
-  sendConfirmationEmail_(email, hit.data[1] || '', code);
+  sendConfirmationEmail_(email, displayName || '', code);
 
   return {
     ok: true,
