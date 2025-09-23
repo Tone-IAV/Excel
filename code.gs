@@ -83,6 +83,38 @@ const ACHIEVEMENTS = [
   }
 ];
 
+const MODULES = Object.freeze([
+  Object.freeze({ id: 1, xpMax: 30 }),
+  Object.freeze({ id: 2, xpMax: 35 }),
+  Object.freeze({ id: 3, xpMax: 35 }),
+  Object.freeze({ id: 4, xpMax: 40 }),
+  Object.freeze({ id: 5, xpMax: 35 }),
+  Object.freeze({ id: 6, xpMax: 35 }),
+  Object.freeze({ id: 7, xpMax: 40 }),
+  Object.freeze({ id: 8, xpMax: 35 }),
+  Object.freeze({ id: 9, xpMax: 45 }),
+  Object.freeze({ id: 10, xpMax: 40 }),
+  Object.freeze({ id: 11, xpMax: 35 }),
+  Object.freeze({ id: 12, xpMax: 35 }),
+  Object.freeze({ id: 13, xpMax: 40 }),
+  Object.freeze({ id: 14, xpMax: 45 }),
+  Object.freeze({ id: 15, xpMax: 40 }),
+  Object.freeze({ id: 16, xpMax: 45 }),
+  Object.freeze({ id: 17, xpMax: 50 }),
+  Object.freeze({ id: 18, xpMax: 45 }),
+  Object.freeze({ id: 19, xpMax: 50 }),
+  Object.freeze({ id: 20, xpMax: 35 }),
+  Object.freeze({ id: 21, xpMax: 50 }),
+  Object.freeze({ id: 22, xpMax: 55 }),
+  Object.freeze({ id: 23, xpMax: 60 }),
+  Object.freeze({ id: 24, xpMax: 80 })
+]);
+
+const MODULES_BY_ID = MODULES.reduce((acc, module) => {
+  acc[String(module.id)] = module;
+  return acc;
+}, {});
+
 const SESSION_DURATION_HOURS = 24 * 7; // validade de 7 dias
 const SESSION_INVALID_MESSAGE = 'Sessão inválida ou expirada. Faça login novamente.';
 
@@ -175,6 +207,14 @@ function getAll_(sheet)     { const r=sheet.getDataRange().getValues(); return r
 function findByEmail_(email){ const rows=getAll_(sh_(SHEET_USERS)); for (let i=0;i<rows.length;i++){ if ((rows[i][2]||'').toLowerCase()===email.toLowerCase()){ return { row:i+2, data:rows[i] }; } } return null; }
 function getConfig_()       { const rows=getAll_(sh_(SHEET_CONFIG)); const m={}; rows.forEach(r=>m[(r[0]||'').toString()]=(r[1]||'').toString()); return m; }
 function setConfig_(k,v)    { const s=sh_(SHEET_CONFIG); const rows=getAll_(s); for (let i=0;i<rows.length;i++){ if (rows[i][0]==k){ s.getRange(i+2,2).setValue(v); return; } } s.appendRow([k,v]); }
+
+function getModuleById_(moduleId) {
+  const numericId = Number(moduleId);
+  if (!Number.isFinite(numericId) || numericId <= 0 || !Number.isInteger(numericId)) return null;
+  const module = MODULES_BY_ID[String(numericId)];
+  if (!module) return null;
+  return { id: module.id, xpMax: module.xpMax };
+}
 
 function normalizeStringArray_(value) {
   if (!Array.isArray(value)) return [];
@@ -828,32 +868,44 @@ function checkin(payload) {
 }
 
 /** Envia resultado de uma atividade
- * payload: { userId, moduleId, scorePct (0-100), maxXP }
- * EarnedXP = round(maxXP * scorePct/100). Upsert em Progress (mantém melhor score).
+ * payload: { userId, moduleId, scorePct (0-100) }
+ * EarnedXP = round(xpOfModule * scorePct/100). Upsert em Progress (mantém melhor score).
  */
 function submitActivity(payload) {
   const token = payload && payload.token;
   const userId   = payload && payload.userId;
   const session = requireSessionUser_(token, userId);
   const effectiveUserId = session.user.id;
-  const moduleId = Number(payload.moduleId);
-  const scorePct = Math.max(0, Math.min(100, Number(payload.scorePct||0)));
-  const maxXP    = Math.max(0, Number(payload.maxXP||0));
+  const invalidDataMessage = 'Dados inválidos (userId/moduleId).';
+  if (!effectiveUserId) throw new Error(invalidDataMessage);
 
-  if (!effectiveUserId || !moduleId) throw new Error('Dados inválidos (userId/moduleId).');
+  const moduleInfo = getModuleById_(payload && payload.moduleId);
+  if (!moduleInfo) throw new Error(invalidDataMessage);
 
-  const earned = Math.round(maxXP * (scorePct/100));
+  const moduleId = Number(moduleInfo.id);
+  const xpMax = Number(moduleInfo.xpMax);
+  if (!Number.isFinite(moduleId) || moduleId <= 0) throw new Error(invalidDataMessage);
+  if (!Number.isFinite(xpMax) || xpMax < 0) throw new Error(invalidDataMessage);
+  const rawScore = Number(payload && payload.scorePct);
+  const normalizedScore = Number.isFinite(rawScore) ? rawScore : 0;
+  const scorePct = Math.max(0, Math.min(100, normalizedScore));
+
+  const earned = Math.round(xpMax * (scorePct/100));
 
   const s = sh_(SHEET_PROGRESS);
   const rows = getAll_(s);
   let foundRow = null;
   let oldScore = -1;
+  let storedEarned = 0;
 
   for (let i=0;i<rows.length;i++){
     const r = rows[i];
     if (r[0]===effectiveUserId && Number(r[1])===moduleId){
       foundRow = i+2;
       oldScore = Number(r[2]||0);
+      if (!Number.isFinite(oldScore)) oldScore = 0;
+      storedEarned = Number(r[3] || 0);
+      if (!Number.isFinite(storedEarned)) storedEarned = 0;
       break;
     }
   }
@@ -862,9 +914,14 @@ function submitActivity(payload) {
   if (foundRow){
     // Se melhorou a nota, atualiza e concede diferença de XP
     if (scorePct > oldScore){
-      const oldEarned = Math.round(maxXP * (oldScore/100));
-      deltaXP = (earned - oldEarned);
+      const oldEarned = Math.round(xpMax * (oldScore/100));
+      deltaXP = Math.max(0, earned - oldEarned);
       s.getRange(foundRow, 3, 1, 3).setValues([[scorePct, earned, nowISO_()]]); // scorePct, earnedXP, completedAt
+    } else {
+      const expectedEarned = Math.round(xpMax * (oldScore/100));
+      if (storedEarned !== expectedEarned) {
+        s.getRange(foundRow, 4).setValue(expectedEarned);
+      }
     }
   } else {
     // novo registro
@@ -1018,7 +1075,7 @@ function getActivityHistory(payload) {
 
   if (!entries.length) return entries;
 
-  const totalModules = 24;
+  const totalModules = MODULES.length;
   const asc = entries.slice().sort((a, b) => {
     const aTime = typeof a.timestamp === 'number' ? a.timestamp : Number.MAX_SAFE_INTEGER;
     const bTime = typeof b.timestamp === 'number' ? b.timestamp : Number.MAX_SAFE_INTEGER;
