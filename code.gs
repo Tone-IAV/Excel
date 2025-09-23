@@ -21,6 +21,32 @@ const COMMUNITY_WALL_CHAR_LIMIT = 240;
 const CHECKIN_STREAK_XP_CAP = 24;
 const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB por arquivo
 const COMMUNITY_FILES_FOLDER_ID = '1LBfNBUjTMjrEVL1CE-YJtA3ecW_gQMIR';
+const CONFIG_USER_FILES_ROOT = 'user_files_root';
+const USER_MATERIAL_MAX_BYTES = 20 * 1024 * 1024; // 20 MB por arquivo
+const USER_MATERIAL_RULES = Object.freeze({
+  excel: Object.freeze({
+    mimes: [
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel.sheet.macroEnabled.12',
+      'application/vnd.oasis.opendocument.spreadsheet',
+      'text/csv'
+    ],
+    extensions: Object.freeze(['.xls', '.xlsx', '.xlsm', '.ods', '.csv'])
+  }),
+  ppt: Object.freeze({
+    mimes: [
+      'application/vnd.ms-powerpoint',
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'application/vnd.openxmlformats-officedocument.presentationml.slideshow',
+      'application/vnd.ms-powerpoint.presentation.macroEnabled.12',
+      'application/vnd.ms-powerpoint.slideshow.macroEnabled.12',
+      'application/vnd.ms-powerpoint.slide.macroEnabled.12',
+      'application/vnd.oasis.opendocument.presentation'
+    ],
+    extensions: Object.freeze(['.ppt', '.pptx', '.pps', '.ppsx', '.odp'])
+  })
+});
 
 function getDriveService_() {
   let root;
@@ -199,7 +225,7 @@ function setup_() {
     sh.setFrozenRows(1);
   };
 
-  ensure(SHEET_USERS,            ['id','name','email','passHash','isAdmin','xp','createdAt']);
+  ensure(SHEET_USERS,            ['id','name','email','passHash','isAdmin','xp','createdAt','folderId']);
   ensure(SHEET_PROGRESS,         ['userId','moduleId','scorePct','earnedXP','completedAt']);
   ensure(SHEET_CHECKIN,          ['userId','dateISO','xp','streak']);
   ensure(SHEET_CONFIG,           ['key','value']);
@@ -244,6 +270,235 @@ function getAll_(sheet)     { const r=sheet.getDataRange().getValues(); return r
 function findByEmail_(email){ const rows=getAll_(sh_(SHEET_USERS)); for (let i=0;i<rows.length;i++){ if ((rows[i][2]||'').toLowerCase()===email.toLowerCase()){ return { row:i+2, data:rows[i] }; } } return null; }
 function getConfig_()       { const rows=getAll_(sh_(SHEET_CONFIG)); const m={}; rows.forEach(r=>m[(r[0]||'').toString()]=(r[1]||'').toString()); return m; }
 function setConfig_(k,v)    { const s=sh_(SHEET_CONFIG); const rows=getAll_(s); for (let i=0;i<rows.length;i++){ if (rows[i][0]==k){ s.getRange(i+2,2).setValue(v); return; } } s.appendRow([k,v]); }
+
+function sanitizeFolderName_(name, fallback) {
+  const base = (name || '').toString().trim();
+  const safe = base.replace(/[\\/:*?"<>|]/g, '').replace(/\s{2,}/g, ' ').trim();
+  if (safe) return safe.length > 80 ? safe.slice(0, 80) : safe;
+  const alt = (fallback || '').toString().trim();
+  if (alt) return alt.length > 80 ? alt.slice(0, 80) : alt;
+  return 'Participante';
+}
+
+function sanitizeFileName_(name, fallback) {
+  const base = (name || '').toString().trim();
+  const cleaned = base.replace(/[\\/:*?"<>|]/g, '').replace(/\s{2,}/g, ' ').trim();
+  if (cleaned) {
+    return cleaned.length > 120 ? cleaned.slice(0, 120) : cleaned;
+  }
+  const alt = (fallback || '').toString().trim();
+  if (alt) return alt.length > 120 ? alt.slice(0, 120) : alt;
+  return 'arquivo';
+}
+
+function splitFileName_(name) {
+  const safe = (name || '').toString().trim();
+  if (!safe) return { base: 'arquivo', extension: '' };
+  const lastDot = safe.lastIndexOf('.');
+  if (lastDot <= 0 || lastDot === safe.length - 1) {
+    return { base: safe, extension: '' };
+  }
+  return { base: safe.slice(0, lastDot), extension: safe.slice(lastDot) };
+}
+
+function ensureUserFilesRootFolder_() {
+  const drive = getDriveService_();
+  if (!drive) return null;
+  const cfg = getConfig_();
+  const existingId = cfg[CONFIG_USER_FILES_ROOT];
+  if (existingId) {
+    try {
+      const folder = drive.getFolderById(existingId);
+      return { id: existingId, folder };
+    } catch (err) {
+      // tenta recriar abaixo
+    }
+  }
+  let parent;
+  try {
+    parent = drive.getRootFolder();
+  } catch (err) {
+    return null;
+  }
+  try {
+    const folder = parent.createFolder('Plataforma Excel - Materiais dos Alunos');
+    const id = folder.getId();
+    setConfig_(CONFIG_USER_FILES_ROOT, id);
+    return { id, folder };
+  } catch (err) {
+    return null;
+  }
+}
+
+function ensureUserFolderForId_(userId, userName, options) {
+  const safeUserId = (userId || '').toString().trim();
+  if (!safeUserId) {
+    return { id: '', url: '', name: userName || '', error: 'Identificador do usuário inválido.' };
+  }
+  const drive = getDriveService_();
+  if (!drive) {
+    return { id: '', url: '', name: userName || '', error: 'Integração com o Drive indisponível no momento.' };
+  }
+  const opts = options || {};
+  const shareEmailRaw = Object.prototype.hasOwnProperty.call(opts, 'email') ? opts.email : opts.shareWith;
+  const shareEmail = shareEmailRaw ? shareEmailRaw.toString().trim().toLowerCase() : '';
+  const rootInfo = ensureUserFilesRootFolder_();
+  if (!rootInfo || !rootInfo.folder) {
+    return { id: '', url: '', name: userName || '', error: 'Pasta principal de materiais não encontrada.' };
+  }
+
+  const sheet = sh_(SHEET_USERS);
+  const rows = getAll_(sheet);
+  let rowIndex = -1;
+  let rowData = null;
+  for (let i = 0; i < rows.length; i++) {
+    if ((rows[i][0] || '') === safeUserId) {
+      rowIndex = i + 2;
+      rowData = rows[i];
+      break;
+    }
+  }
+
+  const existingFolderId = rowData && rowData.length > 7 ? (rowData[7] || '').toString().trim() : '';
+  let folderId = existingFolderId;
+  let folder = null;
+
+  if (folderId) {
+    try {
+      folder = drive.getFolderById(folderId);
+    } catch (err) {
+      folderId = '';
+      folder = null;
+    }
+  }
+
+  let shareError = '';
+
+  if (!folderId) {
+    const folderName = sanitizeFolderName_(userName, `Participante-${safeUserId.slice(0, 6)}`);
+    try {
+      folder = rootInfo.folder.createFolder(folderName);
+      folderId = folder.getId();
+      if (shareEmail) {
+        try {
+          folder.addViewer(shareEmail);
+        } catch (err) {
+          shareError = 'Pasta criada, mas não foi possível conceder acesso automático ao e-mail informado.';
+        }
+      }
+      if (rowIndex > 1) {
+        sheet.getRange(rowIndex, 8).setValue(folderId);
+      }
+    } catch (err) {
+      return { id: '', url: '', name: folderName, error: 'Não foi possível criar a pasta do usuário no Drive.' };
+    }
+  }
+
+  if (!folder && folderId) {
+    try {
+      folder = drive.getFolderById(folderId);
+    } catch (err) {
+      folder = null;
+    }
+  }
+
+  if (folder && shareEmail && !shareError) {
+    try {
+      folder.addViewer(shareEmail);
+    } catch (err) {
+      shareError = 'Arquivo enviado, porém acesso não pôde ser concedido automaticamente ao seu e-mail.';
+    }
+  }
+
+  return {
+    id: folderId,
+    url: folder ? folder.getUrl() : '',
+    name: folder ? folder.getName() : sanitizeFolderName_(userName, 'Participante'),
+    error: '',
+    shareError
+  };
+}
+
+function detectMaterialCategory_(fileName, mimeType) {
+  const lowerMime = (mimeType || '').toString().toLowerCase();
+  if (lowerMime && USER_MATERIAL_RULES.excel.mimes.includes(lowerMime)) return 'excel';
+  if (lowerMime && USER_MATERIAL_RULES.ppt.mimes.includes(lowerMime)) return 'ppt';
+  const lowerName = (fileName || '').toString().toLowerCase();
+  if (USER_MATERIAL_RULES.excel.extensions.some(ext => lowerName.endsWith(ext))) return 'excel';
+  if (USER_MATERIAL_RULES.ppt.extensions.some(ext => lowerName.endsWith(ext))) return 'ppt';
+  return '';
+}
+
+function listUserMaterials_(folderId) {
+  const drive = getDriveService_();
+  if (!drive) return { excel: [], ppt: [] };
+  const safeId = (folderId || '').toString().trim();
+  if (!safeId) return { excel: [], ppt: [] };
+  let folder;
+  try {
+    folder = drive.getFolderById(safeId);
+  } catch (err) {
+    return { excel: [], ppt: [] };
+  }
+  const filesIter = folder.getFiles();
+  const result = { excel: [], ppt: [] };
+  while (filesIter.hasNext()) {
+    const file = filesIter.next();
+    const category = detectMaterialCategory_(file.getName(), file.getMimeType());
+    if (!category || !result[category]) continue;
+    let createdAt = '';
+    let updatedAt = '';
+    try { createdAt = file.getDateCreated().toISOString(); } catch (err) { createdAt = ''; }
+    try { updatedAt = file.getLastUpdated().toISOString(); } catch (err) { updatedAt = createdAt; }
+    let size = 0;
+    try { size = Number(file.getSize()); } catch (err) { size = 0; }
+    result[category].push({
+      id: file.getId(),
+      name: file.getName(),
+      url: file.getUrl(),
+      mimeType: file.getMimeType(),
+      sizeBytes: size,
+      createdAt,
+      updatedAt,
+      sharedBy: 'Você'
+    });
+  }
+  Object.keys(result).forEach(key => {
+    result[key].sort((a, b) => {
+      const aDate = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bDate = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return bDate - aDate;
+    });
+  });
+  return result;
+}
+
+function inferMaterialNameFromUrl_(url, fallback) {
+  const safe = (url || '').toString().trim();
+  if (!safe) return fallback || 'Material compartilhado';
+  try {
+    const withoutQuery = safe.split('?')[0];
+    const segments = withoutQuery.split('/');
+    let candidate = segments.pop() || '';
+    while (candidate && (!candidate.trim() || candidate.toLowerCase() === 'view' || candidate.toLowerCase() === 'edit')) {
+      candidate = segments.pop() || '';
+    }
+    if (!candidate) return fallback || 'Material compartilhado';
+    let decoded = candidate;
+    try {
+      decoded = decodeURIComponent(candidate);
+    } catch (err) {
+      decoded = candidate.replace(/%20/g, ' ');
+    }
+    decoded = decoded.replace(/_/g, ' ').trim();
+    if (!decoded) return fallback || 'Material compartilhado';
+    const maxLength = 80;
+    if (decoded.length > maxLength) decoded = decoded.slice(0, maxLength) + '…';
+    return decoded;
+  } catch (err) {
+    return fallback || 'Material compartilhado';
+  }
+}
 
 function generateConfirmationCode_() {
   const min = 100000;
@@ -879,10 +1134,66 @@ function getUserById_(userId) {
   for (let i=0;i<rows.length;i++){
     if (rows[i][0]===userId){
       const r = rows[i];
-      return { id:r[0], name:r[1], email:r[2], isAdmin:!!r[4], xp:Number(r[5]||0) };
+      return {
+        id: r[0],
+        name: r[1],
+        email: r[2],
+        isAdmin: !!r[4],
+        xp: Number(r[5] || 0),
+        createdAt: r[6] || '',
+        folderId: r[7] || ''
+      };
     }
   }
   return null;
+}
+
+function normalizeUserForClient_(user, options) {
+  if (!user || !user.id) return null;
+  const cfg = getConfig_();
+  const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
+  const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
+  const safeId = (user.id || '').toString().trim();
+  const safeName = (user.name || '').toString().trim();
+  const safeEmail = (user.email || '').toString().trim();
+  const safeXP = Number.isFinite(Number(user.xp)) ? Number(user.xp) : 0;
+  const base = {
+    id: safeId,
+    name: safeName || 'Participante',
+    email: safeEmail,
+    isAdmin: !!user.isAdmin,
+    xp: safeXP,
+    level: 1 + Math.floor(safeXP / xpPerLevel),
+    folderId: (user.folderId || '').toString().trim()
+  };
+
+  let folderInfo = null;
+  let folderWarning = '';
+  if (options && options.folderInfo) {
+    folderInfo = options.folderInfo;
+  } else if (options && options.ensureFolder) {
+    const emailForShare = options && Object.prototype.hasOwnProperty.call(options, 'email')
+      ? options.email
+      : safeEmail;
+    folderInfo = ensureUserFolderForId_(safeId, base.name, { email: emailForShare });
+  }
+
+  if (folderInfo) {
+    if (folderInfo.id) base.folderId = folderInfo.id;
+    if (folderInfo.url) base.folderUrl = folderInfo.url;
+    if (folderInfo.error) folderWarning = folderInfo.error;
+    if (folderInfo.shareError) {
+      folderWarning = folderWarning ? `${folderWarning} ${folderInfo.shareError}` : folderInfo.shareError;
+    }
+  } else if (user.folderUrl) {
+    base.folderUrl = user.folderUrl;
+  }
+
+  if (folderWarning) {
+    base.folderWarning = folderWarning;
+  }
+
+  return base;
 }
 
 function createSession_(userId) {
@@ -1026,13 +1337,15 @@ function completeGoogleSignUp(accessToken) {
   const displayName = (userInfoData.name || '').toString().trim();
   const usersSheet = sh_(SHEET_USERS);
   const hit = findByEmail_(email);
-  let user;
   let wasCreated = false;
+  let normalizedUser;
   if (!hit) {
     const id = Utilities.getUuid();
     const createdAt = nowISO_();
-    usersSheet.appendRow([id, displayName, email, '', false, 0, createdAt]);
-    user = { id, name: displayName, email, isAdmin: false, xp: 0 };
+    usersSheet.appendRow([id, displayName, email, '', false, 0, createdAt, '']);
+    const folderInfo = ensureUserFolderForId_(id, displayName, { email });
+    const rawUser = { id, name: displayName, email, isAdmin: false, xp: 0, folderId: folderInfo && folderInfo.id ? folderInfo.id : '' };
+    normalizedUser = normalizeUserForClient_(rawUser, { folderInfo, email });
     wasCreated = true;
   } else {
     const storedName = (hit.data[1] || '').toString().trim();
@@ -1041,13 +1354,16 @@ function completeGoogleSignUp(accessToken) {
       usersSheet.getRange(hit.row, 2).setValue(displayName);
     }
     const xpValue = Number(hit.data[5] || 0);
-    user = {
+    const folderId = (hit.data[7] || '').toString().trim();
+    const rawUser = {
       id: hit.data[0],
       name: resolvedName,
       email: (hit.data[2] || '').toString().trim().toLowerCase() || email,
       isAdmin: !!hit.data[4],
-      xp: Number.isFinite(xpValue) ? xpValue : 0
+      xp: Number.isFinite(xpValue) ? xpValue : 0,
+      folderId
     };
+    normalizedUser = normalizeUserForClient_(rawUser, { ensureFolder: true, email: rawUser.email });
   }
 
   let driveProbeResponse;
@@ -1067,21 +1383,14 @@ function completeGoogleSignUp(accessToken) {
     throw new Error('Não foi possível validar o acesso ao Drive do Google.');
   }
 
-  const cfg = getConfig_();
-  const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
-  const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
-  const safeXP = Number.isFinite(Number(user.xp)) ? Number(user.xp) : 0;
-  user.xp = safeXP;
-  user.level = 1 + Math.floor(safeXP / xpPerLevel);
-
-  const session = createSession_(user.id);
+  const session = createSession_(normalizedUser.id);
   const message = wasCreated
     ? 'Cadastro concluído com Google.'
     : 'Login concluído com Google.';
 
   return {
     ok: true,
-    user,
+    user: normalizedUser,
     token: session.token,
     expiresAt: session.expiresAt,
     created: wasCreated,
@@ -1192,9 +1501,10 @@ function loginUser(payload) {
     name: hit.data[1],
     email: hit.data[2],
     isAdmin: !!hit.data[4],
-    xp: Number(hit.data[5]||0)
+    xp: Number(hit.data[5]||0),
+    folderId: (hit.data[7] || '').toString().trim()
   };
-  user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel||100));
+  const normalizedUser = normalizeUserForClient_(user, { ensureFolder: true, email: user.email });
 
   const confirmationRecord = getConfirmationRecordByUserId_(user.id);
   if (confirmationRecord && !confirmationRecord.data.confirmedAt) {
@@ -1210,10 +1520,10 @@ function loginUser(payload) {
     };
   }
 
-  const session = createSession_(user.id);
+  const session = createSession_(normalizedUser.id);
   return {
     ok: true,
-    user,
+    user: normalizedUser,
     token: session.token,
     expiresAt: session.expiresAt,
   };
@@ -1229,26 +1539,25 @@ function confirmUserRegistration(payload) {
   if (hit) {
     const userId = hit.data[0];
     const record = getConfirmationRecordByUserId_(userId);
-    const cfg = getConfig_();
-    const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
-    const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
-    const user = {
+    const folderId = (hit.data[7] || '').toString().trim();
+    const rawUser = {
       id: hit.data[0],
       name: hit.data[1],
       email: hit.data[2],
       isAdmin: !!hit.data[4],
-      xp: Number(hit.data[5] || 0)
+      xp: Number(hit.data[5] || 0),
+      folderId
     };
-    user.level = 1 + Math.floor(user.xp / xpPerLevel);
+    const normalizedUser = normalizeUserForClient_(rawUser, { ensureFolder: true, email: rawUser.email });
 
     if (!record) {
       const session = createSession_(userId);
-      return { ok: true, user, token: session.token, expiresAt: session.expiresAt };
+      return { ok: true, user: normalizedUser, token: session.token, expiresAt: session.expiresAt };
     }
 
     if (record.data.confirmedAt) {
       const session = createSession_(userId);
-      return { ok: true, alreadyConfirmed: true, user, token: session.token, expiresAt: session.expiresAt };
+      return { ok: true, alreadyConfirmed: true, user: normalizedUser, token: session.token, expiresAt: session.expiresAt };
     }
 
     const expiresAt = record.data.expiresAt ? new Date(record.data.expiresAt) : null;
@@ -1264,7 +1573,7 @@ function confirmUserRegistration(payload) {
 
     markConfirmationAsConfirmed_(userId);
     const session = createSession_(userId);
-    return { ok: true, user, token: session.token, expiresAt: session.expiresAt };
+    return { ok: true, user: normalizedUser, token: session.token, expiresAt: session.expiresAt };
   }
 
   const record = getConfirmationRecordByEmail_(email);
@@ -1280,12 +1589,9 @@ function confirmUserRegistration(payload) {
   if (record.data.confirmedAt) {
     const existingUser = getUserById_(userId);
     if (existingUser) {
-      const cfg = getConfig_();
-      const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
-      const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
-      existingUser.level = 1 + Math.floor(Number(existingUser.xp || 0) / xpPerLevel);
-      const session = createSession_(existingUser.id);
-      return { ok: true, alreadyConfirmed: true, user: existingUser, token: session.token, expiresAt: session.expiresAt };
+      const normalizedExisting = normalizeUserForClient_(existingUser, { ensureFolder: true, email });
+      const session = createSession_(normalizedExisting.id);
+      return { ok: true, alreadyConfirmed: true, user: normalizedExisting, token: session.token, expiresAt: session.expiresAt };
     }
   }
 
@@ -1308,23 +1614,14 @@ function confirmUserRegistration(payload) {
 
   const isAdmin = !!record.data.pendingIsAdmin;
   const createdAt = record.data.createdAt || nowISO_();
-  sh_(SHEET_USERS).appendRow([userId, pendingName, email, pendingPassHash, isAdmin, 0, createdAt]);
-
-  const cfg = getConfig_();
-  const xpPerLevelRaw = Number((cfg && cfg.xpPerLevel) || 100);
-  const xpPerLevel = Number.isFinite(xpPerLevelRaw) && xpPerLevelRaw > 0 ? xpPerLevelRaw : 100;
-  const user = {
-    id: userId,
-    name: pendingName,
-    email,
-    isAdmin,
-    xp: 0
-  };
-  user.level = 1 + Math.floor(user.xp / xpPerLevel);
+  sh_(SHEET_USERS).appendRow([userId, pendingName, email, pendingPassHash, isAdmin, 0, createdAt, '']);
+  const folderInfo = ensureUserFolderForId_(userId, pendingName, { email });
+  const rawUser = { id: userId, name: pendingName, email, isAdmin, xp: 0, folderId: folderInfo && folderInfo.id ? folderInfo.id : '' };
+  const normalizedUser = normalizeUserForClient_(rawUser, { folderInfo, email });
 
   markConfirmationAsConfirmed_(userId);
   const session = createSession_(userId);
-  return { ok: true, user, token: session.token, expiresAt: session.expiresAt };
+  return { ok: true, user: normalizedUser, token: session.token, expiresAt: session.expiresAt };
 }
 
 function resendConfirmationCode(payload) {
@@ -1402,8 +1699,8 @@ function resumeSession(token) {
     return null;
   }
 
-  user.level = 1 + Math.floor(user.xp / Number(getConfig_().xpPerLevel||100));
-  return user;
+  const normalizedUser = normalizeUserForClient_(user, { ensureFolder: true, email: user.email });
+  return normalizedUser;
 }
 
 function logout(token) {
@@ -1759,18 +2056,220 @@ function saveEmbeds(payload) {
 
   return { ok: true, recommendedResources: resources, upcomingEvents: events };
 }
-function getEmbeds() {
+function getEmbeds(payload) {
   setup_();
+  const token = payload && payload.token;
+  const userId = payload && payload.userId;
+  const session = requireSessionUser_(token, userId);
+  const sessionUser = session && session.user ? session.user : {};
   const rows = getAll_(sh_(SHEET_EMBEDS));
   const map = {};
-  rows.forEach(r=> map[(r[0]||'')] = (r[1]||''));
+  rows.forEach(r => {
+    const key = (r[0] || '').toString();
+    if (!key) return;
+    map[key] = (r[1] || '').toString().trim();
+  });
   const resources = getConfigList_(CONFIG_RECOMMENDED_RESOURCES);
   const events = getConfigList_(CONFIG_UPCOMING_EVENTS);
+
+  const adminMaterials = { excel: [], ppt: [] };
+  if (map.excel) {
+    adminMaterials.excel.push({
+      id: 'admin-excel-primary',
+      name: inferMaterialNameFromUrl_(map.excel, 'Planilha compartilhada'),
+      url: map.excel,
+      description: 'Conteúdo liberado pela coordenação.',
+      sharedBy: 'Coordenação'
+    });
+  }
+  if (map.ppt) {
+    adminMaterials.ppt.push({
+      id: 'admin-ppt-primary',
+      name: inferMaterialNameFromUrl_(map.ppt, 'Apresentação compartilhada'),
+      url: map.ppt,
+      description: 'Apresentação oficial da coordenação.',
+      sharedBy: 'Coordenação'
+    });
+  }
+
+  const folderInfo = ensureUserFolderForId_(sessionUser.id, sessionUser.name || 'Participante', { email: sessionUser.email || '' });
+  const userFolder = { id: '', url: '', name: '' };
+  let userMaterials = { excel: [], ppt: [] };
+  const folderMessages = [];
+  if (folderInfo) {
+    if (folderInfo.id) {
+      userFolder.id = folderInfo.id;
+      userMaterials = listUserMaterials_(folderInfo.id) || { excel: [], ppt: [] };
+    }
+    if (folderInfo.url) userFolder.url = folderInfo.url;
+    if (folderInfo.name) userFolder.name = folderInfo.name;
+    if (folderInfo.error) folderMessages.push(folderInfo.error);
+    if (folderInfo.shareError) folderMessages.push(folderInfo.shareError);
+  }
+
+  if (!userFolder.url && userFolder.id) {
+    try {
+      const drive = getDriveService_();
+      if (drive) {
+        const folder = drive.getFolderById(userFolder.id);
+        if (folder && !userFolder.url) userFolder.url = folder.getUrl();
+        if (folder && !userFolder.name) userFolder.name = folder.getName();
+      }
+    } catch (err) {
+      // ignora problemas ao obter detalhes adicionais
+    }
+  }
+
+  if (!userMaterials || typeof userMaterials !== 'object') {
+    userMaterials = { excel: [], ppt: [] };
+  } else {
+    if (!Array.isArray(userMaterials.excel)) userMaterials.excel = [];
+    if (!Array.isArray(userMaterials.ppt)) userMaterials.ppt = [];
+  }
+
+  const defaultFolderMessage = userFolder.name
+    ? `Seus uploads ficam salvos na pasta "${userFolder.name}".`
+    : 'Arquivos enviados ficam organizados na sua pasta dedicada no Google Drive.';
+  const userFolderMessage = folderMessages.length ? folderMessages.join(' ') : defaultFolderMessage;
+
   return {
-    excel: map['excel']||'',
-    ppt: map['ppt']||'',
+    excel: map.excel || '',
+    ppt: map.ppt || '',
     recommendedResources: resources,
-    upcomingEvents: events
+    upcomingEvents: events,
+    adminMaterials,
+    userMaterials,
+    userFolder,
+    userFolderMessage
+  };
+}
+
+function uploadUserMaterial(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const userId = payload && payload.userId;
+  const session = requireSessionUser_(token, userId);
+  const sessionUser = session && session.user ? session.user : {};
+
+  const categoryRaw = payload && payload.category;
+  const category = categoryRaw ? categoryRaw.toString().trim().toLowerCase() : '';
+  if (!category || !Object.prototype.hasOwnProperty.call(USER_MATERIAL_RULES, category)) {
+    throw new Error('Categoria de material inválida.');
+  }
+
+  const fileNameRaw = payload && payload.fileName;
+  const fileName = fileNameRaw ? fileNameRaw.toString().trim() : '';
+  if (!fileName) {
+    throw new Error('Informe o nome do arquivo.');
+  }
+
+  const mimeTypeRaw = payload && payload.mimeType ? payload.mimeType.toString() : '';
+  const dataRaw = payload && payload.data ? payload.data.toString() : '';
+  if (!dataRaw) {
+    throw new Error('Não foi possível processar o arquivo enviado.');
+  }
+
+  let detectedMime = mimeTypeRaw;
+  let base64Data = dataRaw;
+  const dataMatch = dataRaw.match(/^data:([^;,]+)?;base64,(.+)$/);
+  if (dataMatch) {
+    if (dataMatch[1]) detectedMime = dataMatch[1].toString();
+    base64Data = dataMatch[2];
+  }
+
+  let bytes;
+  try {
+    bytes = Utilities.base64Decode(base64Data);
+  } catch (err) {
+    throw new Error('O arquivo enviado é inválido ou está corrompido.');
+  }
+  if (!bytes || !bytes.length) {
+    throw new Error('O arquivo enviado está vazio.');
+  }
+  if (bytes.length > USER_MATERIAL_MAX_BYTES) {
+    const maxMb = Math.floor(USER_MATERIAL_MAX_BYTES / (1024 * 1024));
+    throw new Error(`O arquivo deve ter até ${maxMb} MB.`);
+  }
+
+  const sanitizedName = sanitizeFileName_(fileName, `${category}-material`);
+  const rules = USER_MATERIAL_RULES[category];
+  const normalizedMime = (detectedMime || '').toLowerCase();
+  const normalizedName = sanitizedName.toLowerCase();
+  const mimeAllowed = normalizedMime && rules.mimes.includes(normalizedMime);
+  const extAllowed = rules.extensions.some(ext => normalizedName.endsWith(ext));
+  if (!mimeAllowed && !extAllowed) {
+    throw new Error('O arquivo enviado não é suportado para esta categoria.');
+  }
+  const derivedCategory = detectMaterialCategory_(sanitizedName, normalizedMime || mimeTypeRaw);
+  if (derivedCategory && derivedCategory !== category) {
+    throw new Error('O arquivo enviado não corresponde à categoria selecionada.');
+  }
+
+  const folderInfo = ensureUserFolderForId_(sessionUser.id, sessionUser.name || 'Participante', { email: sessionUser.email || '' });
+  if (!folderInfo || !folderInfo.id) {
+    throw new Error(folderInfo && folderInfo.error ? folderInfo.error : 'Não foi possível localizar sua pasta pessoal no Drive.');
+  }
+
+  const drive = getDriveService_();
+  if (!drive) {
+    throw new Error('Integração com o Drive indisponível no momento.');
+  }
+
+  let folder;
+  try {
+    folder = drive.getFolderById(folderInfo.id);
+  } catch (err) {
+    throw new Error('Não foi possível acessar sua pasta pessoal no Drive.');
+  }
+
+  const nameParts = splitFileName_(sanitizedName);
+  let finalName = sanitizedName;
+  let attempt = 1;
+  while (folder.getFilesByName(finalName).hasNext()) {
+    attempt += 1;
+    if (attempt > 50) {
+      finalName = `${nameParts.base}-${Date.now()}${nameParts.extension}`;
+      break;
+    }
+    finalName = `${nameParts.base} (${attempt})${nameParts.extension}`;
+  }
+
+  const blob = Utilities.newBlob(bytes, detectedMime || mimeTypeRaw || 'application/octet-stream', finalName);
+  let file;
+  try {
+    file = folder.createFile(blob);
+  } catch (err) {
+    throw new Error('Não foi possível salvar o arquivo no Drive.');
+  }
+
+  let shareWarning = '';
+  const shareEmail = (sessionUser.email || '').toString().trim();
+  if (shareEmail) {
+    try {
+      file.addViewer(shareEmail);
+    } catch (err) {
+      shareWarning = 'Arquivo enviado, porém não foi possível conceder acesso automático ao seu e-mail.';
+    }
+  }
+
+  const baseMessage = 'Arquivo enviado com sucesso para sua pasta pessoal.';
+  const extraMessages = [];
+  if (folderInfo && folderInfo.shareError) extraMessages.push(folderInfo.shareError);
+  if (shareWarning) extraMessages.push(shareWarning);
+  const message = extraMessages.length ? `${baseMessage} ${extraMessages.join(' ')}` : baseMessage;
+
+  let fileUrl = '';
+  try { fileUrl = file.getUrl(); } catch (err) { fileUrl = ''; }
+
+  return {
+    ok: true,
+    message,
+    file: {
+      id: file.getId(),
+      name: file.getName(),
+      url: fileUrl,
+      category
+    }
   };
 }
 
