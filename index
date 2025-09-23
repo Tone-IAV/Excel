@@ -40,12 +40,17 @@
     .dark .card-flat { --card-bg:rgba(15,23,42,.85); --card-border:rgba(148,163,184,.25); }
     .card-transparent { --card-bg:rgba(255,255,255,.65); --card-border:rgba(148,163,184,.25); --card-shadow:none; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-radius:0.75rem; }
     .dark .card-transparent { --card-bg:rgba(15,23,42,.6); --card-border:rgba(148,163,184,.3); }
-    .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .9rem; border-radius:.7rem; border:1px solid transparent; font-weight:600; transition:background-color .2s ease,color .2s ease,box-shadow .2s ease; }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .9rem; border-radius:.7rem; border:1px solid transparent; font-weight:600; transition:background-color .2s ease,color .2s ease,box-shadow .2s ease,border-color .2s ease; }
     .btn-primary { background:#217346; color:#fff; box-shadow:0 10px 24px rgba(33,115,70,.2); }
     .btn-primary:hover { background:#1b603b; box-shadow:0 12px 28px rgba(33,115,70,.25); }
     .btn-ghost { background:transparent; color:#1f2937; }
     .btn-ghost:hover { color:#14532d; }
     .dark .btn-ghost { color:#e2e8f0; }
+    .btn-google { background:#fff; color:#1f2937; border-color:rgba(148,163,184,.45); box-shadow:0 2px 10px rgba(15,23,42,.05); }
+    .btn-google:hover { background:#f8fafc; color:#14532d; border-color:rgba(148,163,184,.6); box-shadow:0 4px 16px rgba(15,23,42,.08); }
+    .btn-google[disabled] { box-shadow:none; }
+    .dark .btn-google { background:rgba(15,23,42,.7); color:#e2e8f0; border-color:rgba(148,163,184,.35); box-shadow:0 2px 12px rgba(15,23,42,.4); }
+    .dark .btn-google:hover { background:rgba(30,41,59,.85); color:#fff; border-color:rgba(148,163,184,.55); }
     .input { width:100%; padding:.55rem .75rem; border-radius:.7rem; border:1px solid #e5e7eb; }
     .dark .input { background:#0f172a; color:#e5e7eb; border-color:#475569; }
     .pill { font-size:.75rem; padding:.2rem .6rem; border-radius:9999px; background:#f1f5f9; color:#475569; }
@@ -248,7 +253,9 @@
         <button type="button" id="toggleSignup" class="btn btn-ghost text-sm">Ainda não tenho cadastro</button>
       </div>
       <div id="loginMsg" class="feedback hidden"></div>
-      <form id="loginForm" class="grid gap-4 mt-2">
+      <button type="button" id="btnGoogleAuth" class="btn btn-google w-full justify-center">Entrar com Google corporativo</button>
+      <p class="text-xs text-slate-500 text-center mt-2">Utilize o mesmo e-mail corporativo que já acessa o Drive compartilhado.</p>
+      <form id="loginForm" class="grid gap-4 mt-4">
         <div class="grid gap-2">
           <label for="lEmail" class="text-xs font-semibold uppercase tracking-wide text-slate-500">E-mail</label>
           <input id="lEmail" class="input" placeholder="nome@empresa.com" autocomplete="email" />
@@ -881,6 +888,7 @@
   let pendingConfirmation = null;
   let confirmationTimer = null;
   let currentAuthMode = 'login';
+  let hasLoadedEmbeds = false;
   const STORAGE_KEY = 'excelPlatformSession';
   const SESSION_EXPIRED_FALLBACK = 'Sessão expirada. Faça login novamente.';
   const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
@@ -917,6 +925,7 @@
   function clearStoredSession() {
     currentSessionToken = null;
     rememberPreference = false;
+    hasLoadedEmbeds = false;
     if (typeof rememberMeCheckbox !== 'undefined' && rememberMeCheckbox) {
       rememberMeCheckbox.checked = false;
     }
@@ -1040,10 +1049,13 @@
   const resourcesEmptyEl = $('#resourcesEmpty');
   const eventsListEl = $('#eventsList');
   const eventsEmptyEl = $('#eventsEmpty');
+  const resourcesEmptyDefaultText = resourcesEmptyEl ? resourcesEmptyEl.textContent : '';
+  const eventsEmptyDefaultText = eventsEmptyEl ? eventsEmptyEl.textContent : '';
   const loginForm = $('#loginForm');
   const loginCardEl = $('#loginCard');
   const signupCardEl = $('#signupCard');
   const confirmCardEl = $('#confirmCard');
+  const btnGoogleAuth = $('#btnGoogleAuth');
   const rememberMeCheckbox = $('#rememberMe');
   const toggleSignupBtn = $('#toggleSignup');
   const toggleLoginBtn = $('#toggleLogin');
@@ -1063,6 +1075,7 @@
   const communityPublishBtn = $('#btnCommunityPublish');
   const communityListEl = $('#communityWallList');
   const communityEmptyEl = $('#communityWallEmpty');
+  const communityEmptyDefaultText = communityEmptyEl ? communityEmptyEl.textContent : '';
   const communityLimitBadge = $('#communityLimitBadge');
   const communityPrivacySelect = $('#communityPrivacySelect');
   const communityTargetsWrap = $('#communityTargetsWrap');
@@ -4172,6 +4185,45 @@
   const signupMessageEl = $('#signupMsg');
   const loginMessageEl  = $('#loginMsg');
 
+  if (btnGoogleAuth) {
+    const googleButtonDefaultLabel = btnGoogleAuth.innerHTML;
+    btnGoogleAuth.addEventListener('click', () => {
+      if (btnGoogleAuth.disabled) return;
+      clearCardMessage(loginMessageEl);
+      btnGoogleAuth.disabled = true;
+      btnGoogleAuth.setAttribute('aria-busy', 'true');
+      btnGoogleAuth.innerHTML = 'Conectando...';
+      google.script.run
+        .withFailureHandler(err => {
+          btnGoogleAuth.disabled = false;
+          btnGoogleAuth.removeAttribute('aria-busy');
+          btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
+          renderCardMessage(loginMessageEl, 'error', err?.message || 'Não foi possível conectar ao Google agora.');
+        })
+        .withSuccessHandler(profile => {
+          btnGoogleAuth.disabled = false;
+          btnGoogleAuth.removeAttribute('aria-busy');
+          btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
+          const email = profile && profile.email ? profile.email.toString().trim() : '';
+          if (email) {
+            if (loginEmailInput) {
+              loginEmailInput.value = email;
+            }
+            if (signupFields.email?.input) {
+              signupFields.email.input.value = email;
+              signupFields.email.touched = true;
+              evaluateField('email', { force: true });
+            }
+            const sanitizedEmail = escapeHtml(email);
+            renderCardMessage(loginMessageEl, 'success', `Identificamos o e-mail corporativo ${sanitizedEmail}. Informe sua senha para continuar.`);
+          } else {
+            renderCardMessage(loginMessageEl, 'error', 'Conexão realizada, mas não foi possível identificar o e-mail corporativo deste acesso.');
+          }
+        })
+        .getActiveUserProfile();
+    });
+  }
+
   function renderCardMessage(el, type, message) {
     if (!el) return;
     const text = (message || '').toString();
@@ -4586,6 +4638,24 @@
       $('#dashSection').classList.add('hidden');
       $('#userInfo').textContent = 'Visitante';
       $('#btnLogout').classList.add('hidden');
+      hasLoadedEmbeds = false;
+      if (excelFrameEl) excelFrameEl.removeAttribute('src');
+      if (pptFrameEl) pptFrameEl.removeAttribute('src');
+      if (resourcesListEl) resourcesListEl.innerHTML = '';
+      if (resourcesEmptyEl) {
+        resourcesEmptyEl.textContent = 'Faça login com seu e-mail corporativo para visualizar os materiais compartilhados.';
+        resourcesEmptyEl.classList.remove('hidden');
+      }
+      if (eventsListEl) eventsListEl.innerHTML = '';
+      if (eventsEmptyEl) {
+        eventsEmptyEl.textContent = 'Faça login com seu e-mail corporativo para acompanhar os próximos eventos.';
+        eventsEmptyEl.classList.remove('hidden');
+      }
+      renderCommunityWall([]);
+      if (communityEmptyEl) {
+        communityEmptyEl.textContent = 'Faça login com sua conta corporativa para visualizar o mural da turma.';
+        communityEmptyEl.classList.remove('hidden');
+      }
       resetStudentStoryState();
       openStudentSubPage('home');
       resetHistorySection();
@@ -4593,7 +4663,6 @@
       resetAchievementsUI();
       syncAdminVisibility();
       updateCommunityAccess();
-      if (!skipCommunity) refreshCommunityWall();
       syncHeaderContext();
       renderPolls();
       renderAdminBulletin();
@@ -4615,6 +4684,12 @@
     $('#dashSection').classList.remove('hidden');
     $('#btnLogout').classList.remove('hidden');
     $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
+    if (resourcesEmptyEl && resourcesEmptyDefaultText) resourcesEmptyEl.textContent = resourcesEmptyDefaultText;
+    if (eventsEmptyEl && eventsEmptyDefaultText) eventsEmptyEl.textContent = eventsEmptyDefaultText;
+    if (communityEmptyEl && communityEmptyDefaultText) communityEmptyEl.textContent = communityEmptyDefaultText;
+    if (!hasLoadedEmbeds) {
+      loadEmbeds();
+    }
     setActiveSubPageButtons(activeSubPage);
     syncHeaderContext();
     renderPolls();
@@ -5165,22 +5240,29 @@
     btnLoadEmbeds.addEventListener('click', () => loadEmbeds());
   }
   function loadEmbeds() {
-    google.script.run.withSuccessHandler(data => {
-      if (excelFrameEl) excelFrameEl.src = normalizeEmbed(data.excel || '');
-      if (pptFrameEl) pptFrameEl.src = normalizeEmbed(data.ppt || '');
-      if (excelLinkInput) excelLinkInput.value = data.excel || '';
-      if (pptLinkInput) pptLinkInput.value = data.ppt || '';
-      renderHighlightList(resourcesListEl, data?.recommendedResources, resourcesEmptyEl);
-      renderHighlightList(eventsListEl, data?.upcomingEvents, eventsEmptyEl);
-      if (resourcesInputEl) {
-        const list = Array.isArray(data?.recommendedResources) ? data.recommendedResources : [];
-        resourcesInputEl.value = list.join('\n');
-      }
-      if (eventsInputEl) {
-        const list = Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
-        eventsInputEl.value = list.join('\n');
-      }
-    }).getEmbeds();
+    if (!currentUser) return;
+    google.script.run
+      .withFailureHandler(err => {
+        console.error('Falha ao carregar materiais compartilhados:', err);
+      })
+      .withSuccessHandler(data => {
+        hasLoadedEmbeds = true;
+        if (excelFrameEl) excelFrameEl.src = normalizeEmbed(data.excel || '');
+        if (pptFrameEl) pptFrameEl.src = normalizeEmbed(data.ppt || '');
+        if (excelLinkInput) excelLinkInput.value = data.excel || '';
+        if (pptLinkInput) pptLinkInput.value = data.ppt || '';
+        renderHighlightList(resourcesListEl, data?.recommendedResources, resourcesEmptyEl);
+        renderHighlightList(eventsListEl, data?.upcomingEvents, eventsEmptyEl);
+        if (resourcesInputEl) {
+          const list = Array.isArray(data?.recommendedResources) ? data.recommendedResources : [];
+          resourcesInputEl.value = list.join('\n');
+        }
+        if (eventsInputEl) {
+          const list = Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
+          eventsInputEl.value = list.join('\n');
+        }
+      })
+      .getEmbeds();
   }
 
   if (btnSaveBulletinEl) {
@@ -5263,8 +5345,6 @@
     renderAdminBulletin();
     renderAdminMissionList();
     renderPanelPage();
-    loadEmbeds();
-    refreshCommunityWall();
     const stored = getStoredSession();
     if (stored && stored.token) {
       currentSessionToken = stored.token;
