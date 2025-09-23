@@ -10,6 +10,7 @@
 
   <!-- Tailwind via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script>
     tailwind.config = {
       theme: {
@@ -892,6 +893,9 @@
   const STORAGE_KEY = 'excelPlatformSession';
   const SESSION_EXPIRED_FALLBACK = 'Sessão expirada. Faça login novamente.';
   const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024;
+  const GOOGLE_OAUTH_CLIENT_ID = 'SEU_CLIENT_ID_WEB.apps.googleusercontent.com';
+  const GOOGLE_OAUTH_SCOPE = 'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.file';
+  let googleDriveTokenClient = null;
 
   function persistSession(token, user, options = {}) {
     if (!token || !user || !user.id) return;
@@ -958,6 +962,21 @@
       console.warn('Não foi possível ler sessão local:', err);
       return null;
     }
+  }
+
+  function getGoogleTokenClient() {
+    if (googleDriveTokenClient) return googleDriveTokenClient;
+    if (typeof window === 'undefined') return null;
+    const googleGlobal = window.google;
+    if (!googleGlobal || !googleGlobal.accounts || !googleGlobal.accounts.oauth2) {
+      return null;
+    }
+    googleDriveTokenClient = googleGlobal.accounts.oauth2.initTokenClient({
+      client_id: GOOGLE_OAUTH_CLIENT_ID,
+      scope: GOOGLE_OAUTH_SCOPE,
+      callback: () => {}
+    });
+    return googleDriveTokenClient;
   }
 
   function extractErrorMessage(error) {
@@ -4190,37 +4209,84 @@
     btnGoogleAuth.addEventListener('click', () => {
       if (btnGoogleAuth.disabled) return;
       clearCardMessage(loginMessageEl);
+      rememberPreference = !!(rememberMeCheckbox && rememberMeCheckbox.checked);
       btnGoogleAuth.disabled = true;
       btnGoogleAuth.setAttribute('aria-busy', 'true');
       btnGoogleAuth.innerHTML = 'Conectando...';
-      google.script.run
-        .withFailureHandler(err => {
+
+      const tokenClient = getGoogleTokenClient();
+      if (!tokenClient) {
+        btnGoogleAuth.disabled = false;
+        btnGoogleAuth.removeAttribute('aria-busy');
+        btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
+        renderCardMessage(loginMessageEl, 'error', 'Serviço de autenticação do Google indisponível. Atualize a página e tente novamente.');
+        return;
+      }
+
+      tokenClient.callback = response => {
+        if (!response || response.error) {
           btnGoogleAuth.disabled = false;
           btnGoogleAuth.removeAttribute('aria-busy');
           btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
-          renderCardMessage(loginMessageEl, 'error', err?.message || 'Não foi possível conectar ao Google agora.');
-        })
-        .withSuccessHandler(profile => {
-          btnGoogleAuth.disabled = false;
-          btnGoogleAuth.removeAttribute('aria-busy');
-          btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
-          const email = profile && profile.email ? profile.email.toString().trim() : '';
-          if (email) {
-            if (loginEmailInput) {
-              loginEmailInput.value = email;
-            }
-            if (signupFields.email?.input) {
-              signupFields.email.input.value = email;
-              signupFields.email.touched = true;
-              evaluateField('email', { force: true });
-            }
-            const sanitizedEmail = escapeHtml(email);
-            renderCardMessage(loginMessageEl, 'success', `Identificamos o e-mail corporativo ${sanitizedEmail}. Informe sua senha para continuar.`);
-          } else {
-            renderCardMessage(loginMessageEl, 'error', 'Conexão realizada, mas não foi possível identificar o e-mail corporativo deste acesso.');
+          const errorKey = response && response.error;
+          let message = 'Não foi possível concluir a autorização com o Google.';
+          if (response && typeof response.error_description === 'string' && response.error_description.trim()) {
+            message = response.error_description.trim();
+          } else if (errorKey === 'access_denied') {
+            message = 'Permissão do Google não concedida.';
+          } else if (errorKey === 'popup_closed_by_user') {
+            message = 'A janela do Google foi fechada antes da confirmação.';
           }
-        })
-        .getActiveUserProfile();
+          renderCardMessage(loginMessageEl, 'error', message);
+          return;
+        }
+
+        const accessToken = response.access_token;
+        if (!accessToken) {
+          btnGoogleAuth.disabled = false;
+          btnGoogleAuth.removeAttribute('aria-busy');
+          btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
+          renderCardMessage(loginMessageEl, 'error', 'Não recebemos a autorização do Google. Tente novamente.');
+          return;
+        }
+
+        google.script.run
+          .withFailureHandler(err => {
+            btnGoogleAuth.disabled = false;
+            btnGoogleAuth.removeAttribute('aria-busy');
+            btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
+            renderCardMessage(loginMessageEl, 'error', err?.message || err || 'Não foi possível conectar ao Google agora.');
+          })
+          .withSuccessHandler(res => {
+            btnGoogleAuth.disabled = false;
+            btnGoogleAuth.removeAttribute('aria-busy');
+            btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
+            if (res && res.ok && res.user && res.token) {
+              currentUser = res.user;
+              persistSession(res.token, res.user, { remember: rememberPreference });
+              if (res.message) {
+                renderCardMessage(loginMessageEl, 'success', res.message);
+              } else {
+                clearCardMessage(loginMessageEl);
+              }
+              updateUI();
+              return;
+            }
+            const message = (res && res.message) || 'Não foi possível concluir o cadastro com o Google.';
+            renderCardMessage(loginMessageEl, 'error', message);
+          })
+          .completeGoogleSignUp(accessToken);
+      };
+
+      try {
+        tokenClient.requestAccessToken();
+      } catch (err) {
+        console.error('Falha ao solicitar token do Google:', err);
+        btnGoogleAuth.disabled = false;
+        btnGoogleAuth.removeAttribute('aria-busy');
+        btnGoogleAuth.innerHTML = googleButtonDefaultLabel;
+        renderCardMessage(loginMessageEl, 'error', 'Não foi possível iniciar a autorização com o Google.');
+      }
     });
   }
 
