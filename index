@@ -4,29 +4,47 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Plataforma Gamificada — Curso de Excel</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <!-- Tailwind via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      theme: { extend: {
-        colors: { primary:'#007BFF', accent:'#00C9A7' },
-        boxShadow: { soft:'0 10px 30px rgba(0,0,0,.08)' },
-        borderRadius: { '2xl':'1.25rem' }
-      }},
+      theme: {
+        extend: {
+          colors: {
+            primary: '#217346',
+            accent: '#71B340',
+            ink: '#0b3d2e'
+          },
+          boxShadow: { soft:'0 10px 30px rgba(0,0,0,.08)' },
+          borderRadius: { '2xl':'1.25rem' },
+          fontFamily: {
+            sans: ['Inter','Segoe UI','system-ui','-apple-system','BlinkMacSystemFont','Roboto','sans-serif']
+          }
+        }
+      },
       darkMode: 'class'
     }
   </script>
+  <script>
+    window.__INITIAL_ROUTE__ = '<?= initialRoute ?>';
+  </script>
   <style>
-    .card { --card-bg:#fff; --card-border:transparent; --card-shadow:0 10px 30px rgba(0,0,0,.08); border-radius:1rem; padding:1.25rem; background:var(--card-bg); border:1px solid var(--card-border); box-shadow:var(--card-shadow); }
+    body { font-family:'Inter','Segoe UI','system-ui','-apple-system','BlinkMacSystemFont','Roboto','sans-serif'; }
+    .card { --card-bg:#fff; --card-border:transparent; --card-shadow:0 10px 30px rgba(0,0,0,.08); border-radius:0.75rem; padding:1.25rem; background:var(--card-bg); border:1px solid var(--card-border); box-shadow:var(--card-shadow); }
     .dark .card { --card-bg:#0f172a; --card-border:rgba(71,85,105,.45); --card-shadow:0 10px 30px rgba(15,23,42,.45); }
-    .card-flat { --card-bg:rgba(248,250,252,.95); --card-border:rgba(148,163,184,.35); --card-shadow:none; }
+    .card-flat { --card-bg:rgba(248,250,252,.95); --card-border:rgba(148,163,184,.35); --card-shadow:none; border-radius:0.75rem; }
     .dark .card-flat { --card-bg:rgba(15,23,42,.85); --card-border:rgba(148,163,184,.25); }
-    .card-transparent { --card-bg:rgba(255,255,255,.65); --card-border:rgba(148,163,184,.25); --card-shadow:none; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+    .card-transparent { --card-bg:rgba(255,255,255,.65); --card-border:rgba(148,163,184,.25); --card-shadow:none; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border-radius:0.75rem; }
     .dark .card-transparent { --card-bg:rgba(15,23,42,.6); --card-border:rgba(148,163,184,.3); }
-    .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .9rem; border-radius:.7rem; border:1px solid transparent; font-weight:600; }
-    .btn-primary { background:#007BFF; color:#fff; }
-    .btn-ghost { background:transparent; color:#334155; }
+    .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.5rem .9rem; border-radius:.7rem; border:1px solid transparent; font-weight:600; transition:background-color .2s ease,color .2s ease,box-shadow .2s ease; }
+    .btn-primary { background:#217346; color:#fff; box-shadow:0 10px 24px rgba(33,115,70,.2); }
+    .btn-primary:hover { background:#1b603b; box-shadow:0 12px 28px rgba(33,115,70,.25); }
+    .btn-ghost { background:transparent; color:#1f2937; }
+    .btn-ghost:hover { color:#14532d; }
     .dark .btn-ghost { color:#e2e8f0; }
     .input { width:100%; padding:.55rem .75rem; border-radius:.7rem; border:1px solid #e5e7eb; }
     .dark .input { background:#0f172a; color:#e5e7eb; border-color:#475569; }
@@ -47,7 +65,7 @@
     .aspect-video > iframe { position:absolute; inset:0; width:100%; height:100%; border:0; }
     .history-tab { padding:.35rem .75rem; border-radius:9999px; border:1px solid rgba(148,163,184,.4); background:#f8fafc; color:#475569; font-size:.75rem; font-weight:600; transition:background-color .2s ease,color .2s ease,border-color .2s ease; }
     .history-tab:hover { background:#e2e8f0; }
-    .history-tab-active { background:#007BFF; color:#fff; border-color:#007BFF; }
+    .history-tab-active { background:#217346; color:#fff; border-color:#217346; }
     .dark .history-tab { background:rgba(15,23,42,.9); color:#e2e8f0; border-color:rgba(148,163,184,.35); }
     .dark .history-tab:hover { background:rgba(148,163,184,.2); }
     .dark .history-tab-active { background:#2563eb; border-color:#2563eb; color:#fff; }
@@ -97,7 +115,7 @@
     .student-nav { display:flex; flex-wrap:wrap; gap:.5rem; }
     .student-nav-btn { display:inline-flex; align-items:center; gap:.4rem; padding:.45rem .95rem; border-radius:9999px; border:1px solid rgba(148,163,184,.45); background:rgba(248,250,252,.75); color:#1e293b; font-weight:600; font-size:.85rem; transition:background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease; }
     .student-nav-btn:hover { background:#e2e8f0; }
-    .student-nav-btn-active { background:#007BFF; border-color:#007BFF; color:#fff; box-shadow:0 10px 24px rgba(0,123,255,.25); }
+    .student-nav-btn-active { background:#217346; border-color:#217346; color:#fff; box-shadow:0 10px 24px rgba(33,115,70,.25); }
     .dark .student-nav-btn { background:rgba(15,23,42,.75); border-color:rgba(71,85,105,.6); color:#e2e8f0; }
     .dark .student-nav-btn:hover { background:rgba(51,65,85,.65); }
     .dark .student-nav-btn-active { background:#2563eb; border-color:#2563eb; box-shadow:0 12px 26px rgba(37,99,235,.35); }
@@ -122,22 +140,44 @@
     .dark .mission-description { color:#cbd5f5; }
     .dark .mission-status { color:#cbd5f5; }
     .dark .mission-item-complete .mission-status { color:#6ee7b7; }
+    .app-nav { display:flex; flex-wrap:wrap; gap:.5rem 1.5rem; font-size:.9rem; font-weight:600; }
+    .app-nav-link { position:relative; padding:.35rem 0; color:#1f2937; transition:color .2s ease; }
+    .app-nav-link::after { content:''; position:absolute; left:0; bottom:-.35rem; width:100%; height:3px; border-radius:999px; background:transparent; transition:background-color .2s ease, transform .2s ease; transform:scaleX(0); transform-origin:left; }
+    .app-nav-link:hover { color:#14532d; }
+    .app-nav-link-active { color:#14532d; }
+    .app-nav-link-active::after { background:#217346; transform:scaleX(1); }
+    .app-nav-link[aria-disabled="true"] { color:#94a3b8; cursor:not-allowed; }
+    .app-nav-link[aria-disabled="true"]::after { background:transparent; }
+    .app-nav-link[aria-disabled="true"]:hover { color:#94a3b8; }
   </style>
 </head>
 <body class="bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 min-h-screen">
 
   <div id="toastContainer" class="fixed top-4 inset-x-4 sm:inset-x-6 lg:inset-x-auto lg:right-12 lg:left-auto z-50 flex w-full max-w-sm flex-col gap-3 mx-auto lg:mx-0"></div>
 
-<header class="sticky top-0 z-20 bg-white/70 dark:bg-slate-900/70 backdrop-blur border-b border-slate-200 dark:border-slate-700">
-  <div class="w-full px-6 lg:px-12 py-3">
-    <div class="flex items-center gap-3">
-      <h1 class="text-lg font-bold">Plataforma — Curso de Excel</h1>
-      <div class="ml-auto flex items-center gap-2">
+<header class="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-700">
+  <div class="w-full px-6 lg:px-12 py-4 space-y-4">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-primary/70">Trilha intensiva de 24 encontros</p>
+        <h1 class="text-2xl font-semibold text-primary">Excel do Zero ao Avançado</h1>
+      </div>
+      <div class="md:ml-auto flex items-center gap-2">
         <span id="userInfo" class="pill">Visitante</span>
         <button id="btnLogout" class="btn btn-ghost hidden">Sair</button>
       </div>
     </div>
-    <nav id="headerBreadcrumbs" class="hidden mt-3 text-xs sm:text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+    <nav aria-label="Navegação principal">
+      <ul id="primaryNav" class="app-nav">
+        <li><a href="/inicio" class="app-nav-link" data-app-route="inicio" data-requires-auth="true">Início</a></li>
+        <li><a href="/sobre" class="app-nav-link" data-app-route="sobre">Sobre</a></li>
+        <li><a href="/aulas" class="app-nav-link" data-app-route="aulas">Aulas &amp; Atividades</a></li>
+        <li><a href="/painel" class="app-nav-link" data-app-route="painel" data-requires-auth="true">Painel</a></li>
+        <li><a href="/conquistas" class="app-nav-link" data-app-route="conquistas">Conquistas</a></li>
+        <li><a href="/admin" class="app-nav-link" data-app-route="admin" data-requires-auth="true" data-requires-admin="true">Admin</a></li>
+      </ul>
+    </nav>
+    <nav id="headerBreadcrumbs" class="hidden text-xs sm:text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
       <ol class="flex items-center gap-2">
         <li class="flex items-center gap-2">
           <span class="opacity-75">Início</span>
@@ -160,6 +200,7 @@
 </header>
 
 <main class="px-6 lg:px-12 py-6 space-y-8">
+  <section data-app-page="inicio" id="inicioPage" class="space-y-8">
   <!-- AUTH -->
   <section id="authSection" class="grid md:grid-cols-2 gap-4 max-w-4xl mx-auto">
     <div class="card" id="signupCard">
@@ -226,16 +267,9 @@
           <p class="text-xs mt-2 opacity-80" id="nextLessonProgressHint"></p>
         </div>
       </div>
-      <div class="grid lg:grid-cols-2 gap-6" data-home-only>
+      <div class="space-y-4" data-home-only>
         <div>
-          <div class="flex items-center justify-between gap-2 mb-3">
-            <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-200">Missões do dia</h3>
-            <span class="pill">1 check-in por dia</span>
-          </div>
-          <ul id="dailyMissionList" class="mission-list"></ul>
-        </div>
-        <div>
-          <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-200 mb-3">Continue avançando</h3>
+          <h3 class="text-sm font-semibold text-slate-600 dark:text-slate-200">Continue avançando</h3>
           <p class="text-sm text-slate-500 dark:text-slate-300" id="studentHeroGuidance">
             Mantenha o ritmo com pequenas ações diárias e abra o próximo módulo quando estiver pronto.
           </p>
@@ -377,34 +411,23 @@
         </div>
       </div>
 
-      <div class="card card-transparent" id="communityWallCard">
-        <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
-          <div>
-            <h3 class="text-lg font-semibold">Mural da comunidade</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Compartilhe dicas rápidas e conquistas com a turma.</p>
-          </div>
-          <span id="communityLimitBadge" class="pill">Até 240 caracteres</span>
-        </div>
-        <div id="communityFormWrap" class="space-y-2 mb-4 hidden">
-          <textarea id="communityMessage" class="input min-h-[96px] resize-y" maxlength="240" placeholder="Escreva uma dica ou atualização rápida..."></textarea>
-          <div class="flex items-center justify-between gap-3 text-xs text-slate-500">
-            <span id="communityFormFeedback" class="text-rose-500 hidden" aria-live="polite"></span>
-            <span id="communityCounter">0/240</span>
-          </div>
-          <div class="flex justify-end">
-            <button id="btnCommunityPublish" class="btn btn-primary">Publicar no mural</button>
-          </div>
-        </div>
-        <p id="communityGuestNotice" class="text-sm text-slate-500 mb-4 hidden">Entre com sua conta para participar do mural.</p>
-        <div id="communityWallList" class="grid gap-3 text-sm"></div>
-        <p id="communityWallEmpty" class="history-empty hidden">Ainda não há recados por aqui. Seja o primeiro a compartilhar!</p>
-      </div>
     </div>
 
       <div class="lg:col-span-4 space-y-6">
+        <div class="card" data-home-only>
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 class="text-lg font-semibold">Missões do dia</h3>
+              <p class="text-sm text-slate-500 dark:text-slate-300">Priorize ações rápidas para manter o ritmo da temporada.</p>
+            </div>
+            <span class="pill">Streak máx. 24</span>
+          </div>
+          <ul id="dailyMissionList" class="mission-list"></ul>
+        </div>
+
         <div class="card">
           <h3 class="text-lg font-semibold mb-2">Check-in diário</h3>
-          <p class="text-sm text-slate-500 mb-2">Ganhe +XP 1x ao dia.</p>
+          <p class="text-sm text-slate-500 mb-2">Ganhe +XP 1x ao dia e avance sua sequência rumo ao bônus de 300 XP.</p>
           <button id="btnCheckin" class="btn btn-primary">Confirmar presença</button>
           <div id="checkinStreakInfo" class="mt-3 text-xs text-slate-500 dark:text-slate-300 leading-relaxed"></div>
           <div id="checkinMsg" class="text-xs text-emerald-600 mt-2"></div>
@@ -484,6 +507,196 @@
       <div id="studentSubPageError" class="feedback feedback-error hidden"></div>
       <div id="studentSubPageContainer" class="space-y-4"></div>
     </section>
+  </section>
+  </section>
+
+  <section data-app-page="sobre" id="sobrePage" class="hidden space-y-6 max-w-6xl mx-auto">
+    <div class="card card-transparent space-y-4">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div class="space-y-2 max-w-3xl">
+          <p class="pill">Sobre o programa</p>
+          <h2 class="text-2xl font-semibold text-primary">24 encontros guiados para destravar o Excel no dia a dia</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+            Da alfabetização digital às automações com Power Query e Dashboards interativos, a jornada é dividida em quatro grandes blocos (A–D) com foco prático em empresas reais.
+          </p>
+        </div>
+        <div class="text-sm text-slate-600 dark:text-slate-300 max-w-xs">
+          <p>Os encontros combinam demonstrações ao vivo, desafios guiados e missões rápidas para que cada aluno aplique imediatamente o que aprendeu.</p>
+        </div>
+      </div>
+      <div id="aboutHighlights" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"></div>
+    </div>
+
+    <div class="card space-y-4">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h3 class="text-xl font-semibold">Blocos A–D</h3>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Cada bloco agrupa 6 encontros (90 minutos) com entregáveis claros e checkpoints de XP.</p>
+        </div>
+        <button type="button" class="btn btn-ghost" data-app-route="aulas">Ver trilhas completas</button>
+      </div>
+      <div id="aboutModuleGrid" class="grid gap-4 md:grid-cols-2"></div>
+    </div>
+  </section>
+
+  <section data-app-page="aulas" id="aulasPage" class="hidden space-y-6 max-w-6xl mx-auto">
+    <div class="card card-transparent space-y-3">
+      <p class="pill">Trilhas de aprendizagem</p>
+      <h2 class="text-2xl font-semibold text-primary">Do básico ao avançado com checkpoints de XP</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-300">
+        Revise as aulas, desafios e quizzes previstos em cada módulo. Os desafios práticos garantem entre 25 e 60 XP; os quizzes, até 100 XP com bônus de velocidade.
+      </p>
+    </div>
+    <div id="learningTracksContainer" class="space-y-6"></div>
+    <div class="card space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <h3 class="text-xl font-semibold">Desafios e quizzes em destaque</h3>
+        <span class="pill">XP em jogo</span>
+      </div>
+      <div id="learningAssessments" class="grid gap-4 lg:grid-cols-2"></div>
+    </div>
+  </section>
+
+  <section data-app-page="painel" id="painelPage" class="hidden space-y-6 max-w-6xl mx-auto">
+    <div class="card card-transparent space-y-3">
+      <p class="pill">Comunidade</p>
+      <h2 class="text-2xl font-semibold text-primary">Troque dúvidas, compartilhe insights e vote em enquetes semanais</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-300">O painel centraliza as postagens da turma, marcações de solução e votações rápidas lançadas pela coordenação.</p>
+    </div>
+
+    <div class="card card-transparent" id="communityWallCard">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <h3 class="text-lg font-semibold">Mural da turma</h3>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Compartilhe dúvidas, prints e conquistas. Posts úteis rendem +5 XP; soluções marcadas, +10 XP.</p>
+        </div>
+        <span id="communityLimitBadge" class="pill">Até 240 caracteres</span>
+      </div>
+      <div id="communityFormWrap" class="space-y-2 mb-4 hidden">
+        <textarea id="communityMessage" class="input min-h-[96px] resize-y" maxlength="240" placeholder="Escreva uma dica ou atualização rápida..."></textarea>
+        <div class="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <span id="communityFormFeedback" class="text-rose-500 hidden" aria-live="polite"></span>
+          <span id="communityCounter">0/240</span>
+        </div>
+        <div class="flex justify-end">
+          <button id="btnCommunityPublish" class="btn btn-primary">Publicar no mural</button>
+        </div>
+      </div>
+      <p id="communityGuestNotice" class="text-sm text-slate-500 mb-4 hidden">Entre com sua conta para participar do mural.</p>
+      <div id="communityWallList" class="grid gap-3 text-sm"></div>
+      <p id="communityWallEmpty" class="history-empty hidden">Ainda não há recados por aqui. Seja o primeiro a compartilhar!</p>
+    </div>
+
+    <div class="card space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 class="text-lg font-semibold">Enquetes ativas</h3>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Vote e acompanhe o resultado em tempo real. Cada voto registrado rende +3 XP.</p>
+        </div>
+        <span class="pill">Atualiza em tempo real</span>
+      </div>
+      <div id="panelPollList" class="space-y-4"></div>
+    </div>
+  </section>
+
+  <section data-app-page="conquistas" id="conquistasPage" class="hidden space-y-6 max-w-6xl mx-auto">
+    <div class="card card-transparent space-y-3">
+      <p class="pill">Vitrine de badges</p>
+      <h2 class="text-2xl font-semibold text-primary">Celebre cada passo rumo ao nível Mestre</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-300">Acompanhe o total de medalhas desbloqueadas, descubra o próximo troféu e monitore o progresso do seu streak.</p>
+      <div class="grid gap-3 sm:grid-cols-3" id="achievementsHeroStats"></div>
+    </div>
+
+    <div class="card" data-achievements-page data-subpage="achievements-catalog">
+      <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+        <div>
+          <h3 class="text-xl font-semibold">Catálogo completo de conquistas</h3>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Todas as medalhas disponíveis, critérios e recompensas.</p>
+        </div>
+        <span class="pill" data-role="achievement-summary">0/0 desbloqueadas</span>
+      </div>
+      <div data-role="achievement-loading" class="text-sm text-slate-500 dark:text-slate-300">Carregando conquistas...</div>
+      <div data-role="achievement-error" class="text-sm text-rose-600 dark:text-rose-300 hidden"></div>
+      <p data-role="achievement-empty" class="history-empty hidden">Faça login para acompanhar suas conquistas.</p>
+      <div data-role="achievement-list" class="achievements-grid"></div>
+    </div>
+  </section>
+
+  <section data-app-page="admin" id="adminPage" class="hidden space-y-6 max-w-6xl mx-auto">
+    <div class="card space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="pill">Informativo do administrador</p>
+          <h3 class="text-xl font-semibold">Comunicados oficiais da coordenação</h3>
+        </div>
+        <span class="pill" data-admin-only aria-hidden="true">Modo administrador</span>
+      </div>
+      <div id="adminBulletinView" class="prose prose-slate dark:prose-invert max-w-none text-sm leading-relaxed"></div>
+      <div id="adminBulletinEditor" class="space-y-3 hidden" data-admin-only aria-hidden="true">
+        <textarea id="adminBulletinInput" class="input min-h-[140px] resize-y" placeholder="Escreva o informativo a ser publicado para a turma"></textarea>
+        <div class="flex flex-wrap justify-end gap-2">
+          <button id="btnDiscardBulletin" class="btn btn-ghost">Descartar alterações</button>
+          <button id="btnSaveBulletin" class="btn btn-primary">Publicar informativo</button>
+        </div>
+      </div>
+      <p id="adminBulletinEmpty" class="text-xs text-slate-500">Nenhum informativo publicado ainda.</p>
+    </div>
+
+    <div class="card space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="pill">Lançar missões</p>
+          <h3 class="text-xl font-semibold">Distribua missões diárias ou relâmpago com XP personalizado</h3>
+        </div>
+        <span class="pill" data-admin-only aria-hidden="true">Administrador</span>
+      </div>
+      <div class="grid gap-3 lg:grid-cols-2" id="adminMissionForm">
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <label for="missionTitle" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Título da missão</label>
+            <input id="missionTitle" class="input" placeholder="Ex.: Revisão de Procv em base real" />
+          </div>
+          <div class="space-y-1">
+            <label for="missionDescription" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Descrição</label>
+            <textarea id="missionDescription" class="input min-h-[120px] resize-y" placeholder="Detalhe o objetivo, entregáveis e anexos necessários."></textarea>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label for="missionXP" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">XP</label>
+              <input id="missionXP" class="input" type="number" min="5" max="60" step="5" placeholder="Ex.: 25" />
+            </div>
+            <div class="space-y-1">
+              <label for="missionValidity" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Validade</label>
+              <input id="missionValidity" class="input" type="date" />
+            </div>
+          </div>
+          <div class="space-y-1">
+            <label for="missionAudience" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Público-alvo</label>
+            <select id="missionAudience" class="input">
+              <option value="all">Todos os alunos</option>
+              <option value="moduleA">Bloco A</option>
+              <option value="moduleB">Bloco B</option>
+              <option value="moduleC">Bloco C</option>
+              <option value="moduleD">Bloco D</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label for="missionAttachments" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Links ou anexos</label>
+            <textarea id="missionAttachments" class="input min-h-[72px] resize-y" placeholder="Cole URLs ou IDs de arquivos, um por linha."></textarea>
+          </div>
+          <div class="flex flex-wrap justify-end gap-2">
+            <button id="btnResetMission" class="btn btn-ghost">Limpar</button>
+            <button id="btnLaunchMission" class="btn btn-primary">Lançar missão</button>
+          </div>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <h4 class="text-sm font-semibold">Missões lançadas recentemente</h4>
+        <ul id="adminMissionList" class="space-y-2 text-sm"></ul>
+      </div>
+    </div>
   </section>
 </main>
 
@@ -614,6 +827,14 @@
   };
 
   const adminOnlyElements = Array.from(document.querySelectorAll('[data-admin-only]'));
+  function escapeHtml(text) {
+    return (text || '').toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
   const excelLinkInput = $('#excelLink');
   const pptLinkInput = $('#pptLink');
   const excelFrameEl = $('#excelFrame');
@@ -635,6 +856,31 @@
   const communityListEl = $('#communityWallList');
   const communityEmptyEl = $('#communityWallEmpty');
   const communityLimitBadge = $('#communityLimitBadge');
+  const primaryNavEl = $('#primaryNav');
+  const appPageSections = Array.from(document.querySelectorAll('[data-app-page]'));
+  const appNavLinks = Array.from(document.querySelectorAll('[data-app-route]'));
+  const achievementsHeroStatsEl = $('#achievementsHeroStats');
+  const aboutHighlightsEl = $('#aboutHighlights');
+  const aboutModuleGridEl = $('#aboutModuleGrid');
+  const learningTracksContainerEl = $('#learningTracksContainer');
+  const learningAssessmentsEl = $('#learningAssessments');
+  const panelPollListEl = $('#panelPollList');
+  const adminBulletinViewEl = $('#adminBulletinView');
+  const adminBulletinEditorEl = $('#adminBulletinEditor');
+  const adminBulletinInputEl = $('#adminBulletinInput');
+  const adminBulletinEmptyEl = $('#adminBulletinEmpty');
+  const btnSaveBulletinEl = $('#btnSaveBulletin');
+  const btnDiscardBulletinEl = $('#btnDiscardBulletin');
+  const adminMissionListEl = $('#adminMissionList');
+  const missionTitleInput = $('#missionTitle');
+  const missionDescriptionInput = $('#missionDescription');
+  const missionXPInput = $('#missionXP');
+  const missionValidityInput = $('#missionValidity');
+  const missionAudienceSelect = $('#missionAudience');
+  const missionAttachmentsInput = $('#missionAttachments');
+  const btnLaunchMission = $('#btnLaunchMission');
+  const btnResetMission = $('#btnResetMission');
+  const adminMissionFormEl = $('#adminMissionForm');
   const headerBreadcrumbs = $('#headerBreadcrumbs');
   const breadcrumbAdminItem = $('#breadcrumbAdmin');
   const breadcrumbSubPageItem = $('#breadcrumbSubPage');
@@ -657,6 +903,9 @@
   let isPublishingCommunity = false;
   const communityDateFormatter = typeof Intl !== 'undefined'
     ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : null;
+  const shortDateFormatter = typeof Intl !== 'undefined'
+    ? new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short' })
     : null;
 
   const toastContainer = $('#toastContainer');
@@ -713,6 +962,186 @@
     { title: 'Organizar materiais de estudo', description: 'Separe arquivos e recursos que serão úteis para o próximo módulo.' }
   ];
 
+  const aboutHighlightsData = [
+    { label: 'Encontros ao vivo', value: '24', description: 'Sessões de 60 minutos + laboratório guiado.' },
+    { label: 'Meta de XP do ciclo', value: '300 XP', description: 'Soma dos check-ins diários (1 + … + 24).' },
+    { label: 'Blocos de conteúdo', value: '4', description: 'Fundamentos, Análise, Automação e Power BI.' },
+    { label: 'Formato', value: 'Check-in diário', description: 'Missões rápidas, fórum ativo e leaderboard por temporada.' }
+  ];
+
+  function sumXpForRange(start, end) {
+    const begin = Math.min(Number(start) || 0, Number(end) || 0);
+    const finish = Math.max(Number(start) || 0, Number(end) || 0);
+    return moduleCatalog.reduce((total, module) => {
+      if (module.number >= begin && module.number <= finish) {
+        return total + Number(module.xpTarget || 0);
+      }
+      return total;
+    }, 0);
+  }
+
+  function daysFromNow(days) {
+    const base = new Date();
+    base.setHours(0, 0, 0, 0);
+    base.setDate(base.getDate() + Number(days || 0));
+    return base.toISOString();
+  }
+
+  const macroModulePlan = [
+    {
+      id: 'A',
+      title: 'Bloco A — Fundamentos & Produtividade',
+      range: [1, 6],
+      summary: 'Interface, formatação profissional, fórmulas essenciais e controle de datas.',
+      focus: ['Interface & atalhos', 'Formatação inteligente', 'Fórmulas SOMA/MÉDIA/SE'],
+      xpTarget: sumXpForRange(1, 6),
+      deliverables: ['Planilha modelo pronta para impressão', 'Checklist de atalhos favoritos'],
+      challenge: {
+        title: 'Desafio Operador Ninja',
+        xp: 30,
+        description: 'Aplicar 10 atalhos em uma planilha real e postar o antes/depois no mural.'
+      },
+      quiz: {
+        title: 'Quiz Fundamentos Express',
+        xp: 100,
+        bonus: '+15 XP se finalizar com 100% em menos de 10 minutos.'
+      },
+      keyBadges: ['Primeiro Passo', 'Atalhos Ninja', 'Sem Erros (quiz 100%)']
+    },
+    {
+      id: 'B',
+      title: 'Bloco B — Análise de Dados Essencial',
+      range: [7, 12],
+      summary: 'Funções de busca, tabelas inteligentes, gráficos e filtros avançados.',
+      focus: ['PROCX & ÍNDICE/CORRESP', 'Tabelas dinâmicas', 'Visualizações impactantes'],
+      xpTarget: sumXpForRange(7, 12),
+      deliverables: ['Dashboard 1.0 com gráficos conectados', 'Tabela dinâmica automatizada'],
+      challenge: {
+        title: 'Sprint Dashboard 1.0',
+        xp: 45,
+        description: 'Montar um mini-dashboard com segmentações e publicar no painel de projetos.'
+      },
+      quiz: {
+        title: 'Quiz Busca & Referência',
+        xp: 100,
+        bonus: '+20 XP se marcar “Sem Erros”.'
+      },
+      keyBadges: ['Procura & Referência', 'Tabela Dinâmica Starter', 'Dashboard 1.0']
+    },
+    {
+      id: 'C',
+      title: 'Bloco C — Automação & Insights avançados',
+      range: [13, 18],
+      summary: 'Cenários, Solver, dashboards interativos, macros e introdução ao VBA.',
+      focus: ['Análise de cenários', 'Solver e otimização', 'Macros e automações'],
+      xpTarget: sumXpForRange(13, 18),
+      deliverables: ['Relatório de cenários comparativos', 'Macro gravada com execução rápida'],
+      challenge: {
+        title: 'Maratona Semanal VBA Starter',
+        xp: 55,
+        description: 'Automatizar um fluxo simples via macro e compartilhar o vídeo da execução.'
+      },
+      quiz: {
+        title: 'Quiz Automação & Dashboards',
+        xp: 100,
+        bonus: '+25 XP se entregar vídeo demonstrativo.'
+      },
+      keyBadges: ['Solver & Otimização', 'Dashboards Interativos', 'Power Query – Primeiros Passos']
+    },
+    {
+      id: 'D',
+      title: 'Bloco D — Power BI no Excel & Projeto Final',
+      range: [19, 24],
+      summary: 'Integrações com Office, Power Query, Power Pivot, DAX e projeto integrador.',
+      focus: ['Integrações Office', 'Modelagem Power Pivot', 'Projeto final com apresentação'],
+      xpTarget: sumXpForRange(19, 24),
+      deliverables: ['Modelo Power Pivot com KPIs', 'Projeto final apresentado para a turma'],
+      challenge: {
+        title: 'Desafio Capstone',
+        xp: 60,
+        description: 'Construir um painel completo conectando Power Query + Power Pivot e entregar no painel.'
+      },
+      quiz: {
+        title: 'Quiz Power Platform',
+        xp: 100,
+        bonus: '+30 XP para quem subir o relatório final com storytelling.'
+      },
+      keyBadges: ['Power Query – Primeiros Passos', 'Matrizes Dinâmicas', 'Projeto Final']
+    }
+  ];
+
+  const panelPolls = [
+    {
+      id: 'poll-review',
+      question: 'Qual tema merece reforço na sessão de revisão desta semana?',
+      audience: 'Todos os blocos',
+      closesAt: daysFromNow(2),
+      options: [
+        { id: 'atalhos', label: 'Produtividade e atalhos', votes: 18 },
+        { id: 'busca', label: 'PROCX / ÍNDICE + CORRESP', votes: 24 },
+        { id: 'dash', label: 'Tabelas dinâmicas & dashboards', votes: 20 }
+      ]
+    },
+    {
+      id: 'poll-challenge',
+      question: 'Qual missão especial devemos lançar para o Bloco B?',
+      audience: 'Bloco B',
+      closesAt: daysFromNow(4),
+      options: [
+        { id: 'mini-dashboard', label: 'Mini dashboard com segmentações', votes: 12 },
+        { id: 'power-query', label: 'Limpeza de dados com Power Query', votes: 17 },
+        { id: 'colaborativo', label: 'Integração Excel + PowerPoint', votes: 9 }
+      ]
+    }
+  ];
+
+  const defaultMissionSamples = [
+    {
+      id: 'mission-atalhos',
+      title: 'Sprint de atalhos',
+      xp: 25,
+      audience: 'Todos',
+      validity: daysFromNow(1),
+      description: 'Utilize 5 atalhos diferentes na planilha do dia e registre o GIF no mural.',
+      attachments: []
+    },
+    {
+      id: 'mission-procx',
+      title: 'Caça aos PROCs',
+      xp: 35,
+      audience: 'Bloco B',
+      validity: daysFromNow(3),
+      description: 'Monte uma consulta PROCX em uma base real e compartilhe a fórmula no Painel.',
+      attachments: []
+    },
+    {
+      id: 'mission-powerquery',
+      title: 'Power Query Relâmpago',
+      xp: 40,
+      audience: 'Bloco D',
+      validity: daysFromNow(5),
+      description: 'Importe dados externos via Power Query, aplique transformações básicas e poste o antes/depois.',
+      attachments: ['https://support.microsoft.com/powerquery']
+    }
+  ];
+
+  let panelPollState = panelPolls.map(poll => ({
+    id: poll.id,
+    question: poll.question,
+    audience: poll.audience,
+    closesAt: poll.closesAt,
+    options: poll.options.map(option => ({ ...option })),
+    userChoice: null,
+    pendingChoice: null
+  }));
+
+  let adminBulletinState = {
+    content: 'Semana 3 aberta! Reserve 15 minutos para revisar o bloco A antes do encontro ao vivo e registre o check-in até 22h.\n\nDica extra: quem postar um insight no mural até sexta participa do sorteio do livro “Excel na Prática”.',
+    updatedAt: new Date()
+  };
+
+  let adminMissionsState = defaultMissionSamples.slice();
+
   const SUBPAGE_META = {
     'next-lesson': {
       title: 'Próxima aula',
@@ -737,6 +1166,42 @@
   };
 
   let activeSubPage = 'home';
+  const ROUTE_DEFS = {
+    inicio: { slug: 'inicio' },
+    sobre: { slug: 'sobre' },
+    aulas: { slug: 'aulas' },
+    painel: { slug: 'painel', requiresAuth: true },
+    conquistas: { slug: 'conquistas' },
+    admin: { slug: 'admin', requiresAuth: true, requiresAdmin: true }
+  };
+  const ROUTE_SLUGS = Object.keys(ROUTE_DEFS);
+  let currentAppRoute = 'inicio';
+  let appBasePath = '/';
+
+  function normalizeRoute(value) {
+    const text = (value || '').toString().toLowerCase().replace(/[^a-z]/g, '');
+    return ROUTE_DEFS[text] ? text : 'inicio';
+  }
+
+  function computeBasePath(pathname) {
+    let base = (pathname || '/').split('?')[0];
+    ROUTE_SLUGS.forEach(slug => {
+      const suffix = '/' + slug;
+      if (base.endsWith(suffix)) {
+        base = base.slice(0, -suffix.length);
+      }
+    });
+    if (!base) return '/';
+    if (!base.endsWith('/')) base += '/';
+    return base;
+  }
+
+  function resolveRouteFromPath(pathname) {
+    const segments = (pathname || '').split('/').filter(Boolean);
+    if (!segments.length) return 'inicio';
+    const last = segments[segments.length - 1].toLowerCase();
+    return ROUTE_DEFS[last] ? last : 'inicio';
+  }
 
   function syncAdminVisibility() {
     const isAdmin = !!(currentUser && currentUser.isAdmin);
@@ -762,6 +1227,500 @@
     if (!isLogged) {
       updateBreadcrumbSubPage(null);
     }
+  }
+
+  function renderAboutPage() {
+    if (aboutHighlightsEl) {
+      aboutHighlightsEl.innerHTML = '';
+      aboutHighlightsData.forEach(item => {
+        const box = document.createElement('div');
+        box.className = 'rounded-2xl border border-slate-200 dark:border-slate-700/70 bg-white/90 dark:bg-slate-900/50 px-4 py-4 shadow-sm';
+        const label = document.createElement('p');
+        label.className = 'text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400';
+        label.textContent = item.label;
+        const value = document.createElement('div');
+        value.className = 'text-xl font-semibold text-primary';
+        value.textContent = item.value;
+        const description = document.createElement('p');
+        description.className = 'text-sm text-slate-600 dark:text-slate-300 mt-1';
+        description.textContent = item.description;
+        box.append(label, value, description);
+        aboutHighlightsEl.appendChild(box);
+      });
+    }
+
+    if (aboutModuleGridEl) {
+      aboutModuleGridEl.innerHTML = '';
+      macroModulePlan.forEach(block => {
+        const card = document.createElement('div');
+        card.className = 'card card-flat space-y-3';
+        const header = document.createElement('div');
+        header.className = 'flex flex-wrap items-start justify-between gap-3';
+        const title = document.createElement('h4');
+        title.className = 'text-lg font-semibold';
+        title.textContent = block.title;
+        const badge = document.createElement('span');
+        badge.className = 'pill';
+        badge.textContent = `Módulos ${block.range[0]}–${block.range[1]} • ${block.xpTarget} XP`;
+        header.append(title, badge);
+
+        const summary = document.createElement('p');
+        summary.className = 'text-sm text-slate-600 dark:text-slate-300';
+        summary.textContent = block.summary;
+
+        const focusWrap = document.createElement('div');
+        focusWrap.className = 'flex flex-wrap gap-2';
+        block.focus.forEach(topic => {
+          const chip = document.createElement('span');
+          chip.className = 'pill';
+          chip.textContent = topic;
+          focusWrap.appendChild(chip);
+        });
+
+        const deliverables = document.createElement('p');
+        deliverables.className = 'text-xs text-slate-500 dark:text-slate-400';
+        deliverables.textContent = `Entregáveis sugeridos: ${block.deliverables.join('; ')}`;
+
+        const badges = document.createElement('p');
+        badges.className = 'text-xs font-semibold text-primary';
+        badges.textContent = `Badges em jogo: ${block.keyBadges.join(', ')}`;
+
+        card.append(header, summary, focusWrap, deliverables, badges);
+        aboutModuleGridEl.appendChild(card);
+      });
+    }
+  }
+
+  function renderLearningTracksPage() {
+    if (learningTracksContainerEl) {
+      learningTracksContainerEl.innerHTML = '';
+      macroModulePlan.forEach(block => {
+        const modules = moduleCatalog.filter(item => item.number >= block.range[0] && item.number <= block.range[1]);
+        const card = document.createElement('div');
+        card.className = 'card space-y-4';
+        const header = document.createElement('div');
+        header.className = 'flex flex-wrap items-start justify-between gap-3';
+        const title = document.createElement('h3');
+        title.className = 'text-lg font-semibold text-primary';
+        title.textContent = block.title;
+        const badge = document.createElement('span');
+        badge.className = 'pill';
+        badge.textContent = `${block.xpTarget} XP nos encontros ${block.range[0]}–${block.range[1]}`;
+        header.append(title, badge);
+
+        const moduleList = document.createElement('ul');
+        moduleList.className = 'space-y-2 text-sm';
+        modules.forEach(module => {
+          const li = document.createElement('li');
+          li.className = 'rounded-xl border border-slate-200 dark:border-slate-700/60 px-3 py-2 bg-white/90 dark:bg-slate-900/50 shadow-sm';
+          li.innerHTML = `<div class="flex items-start justify-between gap-2"><span class="font-semibold">Módulo ${module.number}.</span><span class="text-xs text-slate-500">${module.xpTarget} XP</span></div><p class="text-xs text-slate-600 dark:text-slate-300">${module.title}</p>`;
+          moduleList.appendChild(li);
+        });
+
+        const assessments = document.createElement('div');
+        assessments.className = 'grid gap-3 sm:grid-cols-2';
+        const challengeCard = document.createElement('div');
+        challengeCard.className = 'rounded-2xl border border-emerald-200/70 dark:border-emerald-500/30 bg-emerald-50/80 dark:bg-emerald-500/10 px-4 py-3 space-y-1';
+        challengeCard.innerHTML = `<p class="text-xs uppercase tracking-wide text-emerald-700 dark:text-emerald-300">Desafio</p><h4 class="text-sm font-semibold">${block.challenge.title}</h4><p class="text-sm text-emerald-900 dark:text-emerald-200">${block.challenge.description}</p><span class="pill">+${block.challenge.xp} XP</span>`;
+        const quizCard = document.createElement('div');
+        quizCard.className = 'rounded-2xl border border-amber-200/70 dark:border-amber-500/30 bg-amber-50/80 dark:bg-amber-500/10 px-4 py-3 space-y-1';
+        quizCard.innerHTML = `<p class="text-xs uppercase tracking-wide text-amber-700 dark:text-amber-200">Quiz</p><h4 class="text-sm font-semibold">${block.quiz.title}</h4><p class="text-sm text-amber-900 dark:text-amber-200">Vale ${block.quiz.xp} XP. ${block.quiz.bonus}</p>`;
+        assessments.append(challengeCard, quizCard);
+
+        card.append(header, moduleList, assessments);
+        learningTracksContainerEl.appendChild(card);
+      });
+    }
+
+    if (learningAssessmentsEl) {
+      learningAssessmentsEl.innerHTML = '';
+      macroModulePlan.forEach(block => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'card card-flat space-y-3';
+        const header = document.createElement('div');
+        header.className = 'flex flex-wrap items-center justify-between gap-2';
+        header.innerHTML = `<h4 class="text-lg font-semibold">${block.title}</h4><span class="pill">${block.range[0]}–${block.range[1]}</span>`;
+        const body = document.createElement('div');
+        body.className = 'grid gap-3 sm:grid-cols-2';
+
+        const challenge = document.createElement('div');
+        challenge.className = 'rounded-xl border border-emerald-200/70 dark:border-emerald-500/30 bg-white dark:bg-slate-900/60 px-3 py-3 space-y-1';
+        challenge.innerHTML = `<p class="text-xs uppercase tracking-wide text-emerald-600 dark:text-emerald-300">Desafio do bloco</p><h5 class="text-sm font-semibold">${block.challenge.title}</h5><p class="text-sm text-slate-600 dark:text-slate-300">${block.challenge.description}</p><span class="pill">+${block.challenge.xp} XP</span>`;
+
+        const quiz = document.createElement('div');
+        quiz.className = 'rounded-xl border border-amber-200/70 dark:border-amber-500/30 bg-white dark:bg-slate-900/60 px-3 py-3 space-y-1';
+        quiz.innerHTML = `<p class="text-xs uppercase tracking-wide text-amber-600 dark:text-amber-300">Quiz oficial</p><h5 class="text-sm font-semibold">${block.quiz.title}</h5><p class="text-sm text-slate-600 dark:text-slate-300">${block.quiz.bonus}</p><span class="pill">Até ${block.quiz.xp} XP</span>`;
+
+        body.append(challenge, quiz);
+        wrapper.append(header, body);
+        learningAssessmentsEl.appendChild(wrapper);
+      });
+    }
+  }
+
+  function renderPolls() {
+    if (!panelPollListEl) return;
+    panelPollListEl.innerHTML = '';
+    panelPollState.forEach(poll => {
+      const totalVotes = poll.options.reduce((sum, option) => sum + Number(option.votes || 0), 0);
+      const card = document.createElement('div');
+      card.className = 'card card-flat space-y-3';
+      const header = document.createElement('div');
+      header.className = 'flex flex-wrap items-start justify-between gap-3';
+      const info = document.createElement('div');
+      info.innerHTML = `<h4 class="text-base font-semibold">${poll.question}</h4><p class="text-xs text-slate-500 dark:text-slate-400">${poll.audience}</p>`;
+      const deadline = document.createElement('span');
+      deadline.className = 'pill';
+      const expiresText = formatDateShort(poll.closesAt) || '';
+      deadline.textContent = expiresText ? `Encerra em ${expiresText}` : 'Enquete ativa';
+      header.append(info, deadline);
+
+      const optionsWrap = document.createElement('div');
+      optionsWrap.className = 'space-y-2';
+
+      poll.options.forEach(option => {
+        const optionId = `${poll.id}-${option.id}`;
+        const optionLabel = document.createElement('label');
+        optionLabel.className = 'block rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white/95 dark:bg-slate-900/60 px-3 py-2';
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between gap-2';
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-2';
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = `poll-${poll.id}`;
+        input.value = option.id;
+        input.id = optionId;
+        input.checked = poll.pendingChoice ? poll.pendingChoice === option.id : poll.userChoice === option.id;
+        input.disabled = !currentUser;
+        input.addEventListener('change', () => {
+          poll.pendingChoice = option.id;
+          renderPolls();
+        });
+        const labelText = document.createElement('span');
+        labelText.className = 'text-sm font-medium';
+        labelText.textContent = option.label;
+        left.append(input, labelText);
+        const voteInfo = document.createElement('span');
+        voteInfo.className = 'text-xs text-slate-500';
+        voteInfo.textContent = `${option.votes || 0} voto${Number(option.votes || 0) === 1 ? '' : 's'}`;
+        row.append(left, voteInfo);
+
+        const bar = document.createElement('div');
+        bar.className = 'mt-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden';
+        const fill = document.createElement('div');
+        fill.className = 'h-full rounded-full bg-primary/80';
+        const pct = totalVotes > 0 ? Math.round((Number(option.votes || 0) / totalVotes) * 100) : 0;
+        fill.style.width = `${pct}%`;
+        bar.appendChild(fill);
+
+        optionLabel.append(row, bar);
+        optionsWrap.appendChild(optionLabel);
+      });
+
+      const footer = document.createElement('div');
+      footer.className = 'flex flex-wrap items-center justify-between gap-2';
+      const totalBadge = document.createElement('span');
+      totalBadge.className = 'text-xs text-slate-500 dark:text-slate-400';
+      totalBadge.textContent = `${totalVotes} voto${totalVotes === 1 ? '' : 's'} registrados`;
+      const voteButton = document.createElement('button');
+      voteButton.type = 'button';
+      voteButton.className = 'btn btn-primary';
+      const nextChoice = poll.pendingChoice || poll.userChoice;
+      voteButton.disabled = !currentUser || !poll.pendingChoice || poll.pendingChoice === poll.userChoice;
+      voteButton.textContent = poll.userChoice ? 'Atualizar voto' : 'Registrar voto';
+      voteButton.addEventListener('click', () => {
+        if (!currentUser) {
+          showToast({ message: 'Faça login para votar na enquete.', type: 'warning' });
+          return;
+        }
+        const choice = poll.pendingChoice;
+        if (!choice) return;
+        if (poll.userChoice) {
+          const previous = poll.options.find(opt => opt.id === poll.userChoice);
+          if (previous) previous.votes = Math.max(0, Number(previous.votes || 0) - 1);
+        }
+        const selected = poll.options.find(opt => opt.id === choice);
+        if (selected) selected.votes = Number(selected.votes || 0) + 1;
+        poll.userChoice = choice;
+        poll.pendingChoice = choice;
+        showToast({ message: 'Voto registrado! +3 XP garantidos na atualização diária.', type: 'success' });
+        renderPolls();
+      });
+      if (!currentUser) {
+        voteButton.disabled = true;
+      }
+      footer.append(totalBadge, voteButton);
+
+      card.append(header, optionsWrap, footer);
+      panelPollListEl.appendChild(card);
+    });
+  }
+
+  function renderPanelPage() {
+    renderPolls();
+  }
+
+  function renderAchievementsShowcase(summary = achievementsState.summary, metrics = achievementsState.metrics) {
+    if (!achievementsHeroStatsEl) return;
+    achievementsHeroStatsEl.innerHTML = '';
+    if (!currentUser) {
+      const card = document.createElement('div');
+      card.className = 'rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/60 px-4 py-4 shadow-sm';
+      card.innerHTML = '<p class="text-sm text-slate-600 dark:text-slate-300">Faça login para acompanhar seu painel de conquistas e streaks.</p>';
+      achievementsHeroStatsEl.appendChild(card);
+      return;
+    }
+
+    const total = Number(summary?.total || 0);
+    const unlocked = Number(summary?.unlocked || 0);
+    const currentStreak = Number(metrics?.checkinCurrentStreak || metrics?.current || 0);
+    const bestStreak = Number(metrics?.checkinBestStreak || metrics?.best || 0);
+    const totalCheckins = Number(metrics?.totalCheckins || 0);
+
+    const stats = [
+      { label: 'Badges desbloqueadas', value: `${unlocked}/${total}`, description: 'Progresso total de conquistas.' },
+      { label: 'Streak atual', value: `${currentStreak} dia${currentStreak === 1 ? '' : 's'}`, description: 'Check-ins consecutivos.', highlight: currentStreak >= 7 },
+      { label: 'Recorde pessoal', value: `${bestStreak} dia${bestStreak === 1 ? '' : 's'}`, description: `${totalCheckins} check-ins no total.` }
+    ];
+
+    stats.forEach(item => {
+      const box = document.createElement('div');
+      box.className = 'rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white/90 dark:bg-slate-900/60 px-4 py-4 shadow-sm';
+      const label = document.createElement('p');
+      label.className = 'text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400';
+      label.textContent = item.label;
+      const value = document.createElement('div');
+      value.className = 'text-xl font-semibold text-primary';
+      value.textContent = item.value;
+      if (item.highlight) value.classList.add('text-emerald-600', 'dark:text-emerald-300');
+      const desc = document.createElement('p');
+      desc.className = 'text-xs text-slate-500 dark:text-slate-400 mt-1';
+      desc.textContent = item.description;
+      box.append(label, value, desc);
+      achievementsHeroStatsEl.appendChild(box);
+    });
+  }
+
+  function formatAudienceLabel(value) {
+    switch ((value || '').toString()) {
+      case 'moduleA':
+        return 'Bloco A';
+      case 'moduleB':
+        return 'Bloco B';
+      case 'moduleC':
+        return 'Bloco C';
+      case 'moduleD':
+        return 'Bloco D';
+      case 'Todos':
+      case 'all':
+        return 'Todos os alunos';
+      default:
+        return value || 'Todos os alunos';
+    }
+  }
+
+  function renderAdminBulletin() {
+    if (!adminBulletinViewEl || !adminBulletinEmptyEl) return;
+    const content = (adminBulletinState && adminBulletinState.content) ? adminBulletinState.content.trim() : '';
+    if (content) {
+      const paragraphs = content.split(/\n{2,}/).map(par => par.trim()).filter(Boolean);
+      adminBulletinViewEl.innerHTML = paragraphs.map(par => `<p>${escapeHtml(par)}</p>`).join('');
+      adminBulletinEmptyEl.classList.add('hidden');
+    } else {
+      adminBulletinViewEl.innerHTML = '';
+      adminBulletinEmptyEl.classList.remove('hidden');
+    }
+    if (currentUser?.isAdmin && adminBulletinInputEl) {
+      adminBulletinInputEl.value = content;
+    }
+  }
+
+  function renderAdminMissionList() {
+    if (!adminMissionListEl) return;
+    adminMissionListEl.innerHTML = '';
+    if (!adminMissionsState.length) {
+      const empty = document.createElement('li');
+      empty.className = 'text-xs text-slate-500 dark:text-slate-400';
+      empty.textContent = 'Nenhuma missão lançada ainda. Utilize o formulário acima para publicar a primeira missão.';
+      adminMissionListEl.appendChild(empty);
+      return;
+    }
+    adminMissionsState
+      .slice()
+      .sort((a, b) => {
+        const aTime = parseDateValue(a.validity)?.getTime() || 0;
+        const bTime = parseDateValue(b.validity)?.getTime() || 0;
+        return aTime - bTime;
+      })
+      .forEach(mission => {
+        const li = document.createElement('li');
+        li.className = 'rounded-2xl border border-slate-200 dark:border-slate-700/60 bg-white/90 dark:bg-slate-900/60 px-4 py-3 space-y-2';
+        const header = document.createElement('div');
+        header.className = 'flex flex-wrap items-start justify-between gap-2';
+        header.innerHTML = `<h5 class="text-sm font-semibold">${escapeHtml(mission.title)}</h5><span class="pill">+${mission.xp} XP</span>`;
+        const meta = document.createElement('p');
+        meta.className = 'text-xs text-slate-500 dark:text-slate-400';
+        const validityText = formatDateShort(mission.validity);
+        meta.textContent = `${formatAudienceLabel(mission.audience)} • válido até ${validityText || '—'}`;
+        const description = document.createElement('p');
+        description.className = 'text-sm text-slate-600 dark:text-slate-300';
+        description.textContent = mission.description || '';
+        li.append(header, meta, description);
+        if (Array.isArray(mission.attachments) && mission.attachments.length) {
+          const attachList = document.createElement('ul');
+          attachList.className = 'space-y-1 text-xs';
+          mission.attachments.forEach(link => {
+            const clean = (link || '').toString().trim();
+            if (!clean) return;
+            const item = document.createElement('li');
+            item.innerHTML = `<a class="text-primary hover:underline" href="${escapeHtml(clean)}" target="_blank" rel="noopener">${escapeHtml(clean)}</a>`;
+            attachList.appendChild(item);
+          });
+          if (attachList.childElementCount > 0) {
+            const attachTitle = document.createElement('p');
+            attachTitle.className = 'text-xs font-semibold text-slate-500 dark:text-slate-400';
+            attachTitle.textContent = 'Links e anexos';
+            li.append(attachTitle, attachList);
+          }
+        }
+        adminMissionListEl.appendChild(li);
+      });
+  }
+
+  function setNavActive(route) {
+    const normalized = normalizeRoute(route);
+    appNavLinks.forEach(link => {
+      const linkRoute = normalizeRoute(link.getAttribute('data-app-route'));
+      const isActive = linkRoute === normalized;
+      link.classList.toggle('app-nav-link-active', isActive);
+      if (isActive) {
+        link.setAttribute('aria-current', 'page');
+      } else {
+        link.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  function syncNavAvailability() {
+    appNavLinks.forEach(link => {
+      const route = normalizeRoute(link.getAttribute('data-app-route'));
+      const def = ROUTE_DEFS[route];
+      const requiresAuth = !!(def && def.requiresAuth);
+      const requiresAdmin = !!(def && def.requiresAdmin);
+      const disabled = (requiresAuth && !currentUser) || (requiresAdmin && !(currentUser && currentUser.isAdmin));
+      link.setAttribute('aria-disabled', disabled ? 'true' : 'false');
+      link.tabIndex = disabled ? -1 : 0;
+    });
+  }
+
+  function ensureRouteAfterAuthChange() {
+    const def = ROUTE_DEFS[currentAppRoute] || ROUTE_DEFS.inicio;
+    if (def.requiresAdmin && !(currentUser && currentUser.isAdmin)) {
+      navigateTo(currentUser ? 'inicio' : 'sobre', { replace: true, silent: true });
+      return;
+    }
+    if (def.requiresAuth && !currentUser) {
+      navigateTo('inicio', { replace: true, silent: true });
+    }
+  }
+
+  function updateHistoryForRoute(route, replace) {
+    if (typeof window === 'undefined' || !window.history || !window.location) return;
+    const def = ROUTE_DEFS[route] || ROUTE_DEFS.inicio;
+    const slug = def.slug || 'inicio';
+    const base = appBasePath || '/';
+    const url = base + slug;
+    const state = { appRoute: route };
+    if (replace) {
+      window.history.replaceState(state, '', url);
+    } else {
+      window.history.pushState(state, '', url);
+    }
+  }
+
+  function renderRouteEntry(route) {
+    const normalized = normalizeRoute(route);
+    if (normalized === 'sobre') {
+      renderAboutPage();
+    } else if (normalized === 'aulas') {
+      renderLearningTracksPage();
+    } else if (normalized === 'painel') {
+      renderPanelPage();
+    } else if (normalized === 'conquistas') {
+      renderAchievementsShowcase();
+      populateAchievementsCatalog();
+    } else if (normalized === 'admin') {
+      renderAdminBulletin();
+      renderAdminMissionList();
+    }
+  }
+
+  function applyRoute(route, options = {}) {
+    const normalized = normalizeRoute(route);
+    const force = !!options.force;
+    if (currentAppRoute === normalized && !force) {
+      if (!options.skipHistory) updateHistoryForRoute(normalized, !!options.replaceHistory);
+      return;
+    }
+    currentAppRoute = normalized;
+    appPageSections.forEach(section => {
+      const page = normalizeRoute(section.getAttribute('data-app-page'));
+      const visible = page === normalized;
+      section.classList.toggle('hidden', !visible);
+    });
+    setNavActive(normalized);
+    if (!options.skipHistory) {
+      updateHistoryForRoute(normalized, !!options.replaceHistory);
+    }
+    renderRouteEntry(normalized);
+  }
+
+  function navigateTo(route, options = {}) {
+    const normalized = normalizeRoute(route);
+    const def = ROUTE_DEFS[normalized];
+    let target = normalized;
+    let replaceHistory = !!options.replace;
+    const silent = !!options.silent;
+    if (def?.requiresAdmin && !(currentUser && currentUser.isAdmin)) {
+      if (!silent) {
+        showToast({ message: 'Somente administradores podem acessar esta área.', type: 'warning' });
+      }
+      target = currentUser ? 'inicio' : 'sobre';
+      replaceHistory = true;
+    } else if (def?.requiresAuth && !currentUser) {
+      if (!silent) {
+        showToast({ message: 'Faça login para acessar esta área.', type: 'warning' });
+      }
+      target = 'inicio';
+      replaceHistory = true;
+    }
+    applyRoute(target, { replaceHistory, skipHistory: !!options.skipHistory, force: !!options.force });
+  }
+
+  function bootstrapRouter() {
+    if (typeof window === 'undefined') return;
+    appBasePath = computeBasePath(window.location.pathname || '/');
+    const initialRouteRaw = typeof window !== 'undefined' && window.__INITIAL_ROUTE__
+      ? window.__INITIAL_ROUTE__.toString()
+      : '';
+    const pathRoute = resolveRouteFromPath(window.location.pathname || '/');
+    const initialRoute = normalizeRoute(initialRouteRaw || pathRoute);
+    appNavLinks.forEach(link => {
+      link.addEventListener('click', event => {
+        event.preventDefault();
+        if (link.getAttribute('aria-disabled') === 'true') return;
+        const route = normalizeRoute(link.getAttribute('data-app-route'));
+        navigateTo(route);
+      });
+    });
+    applyRoute(initialRoute, { replaceHistory: true, force: true });
+    window.addEventListener('popstate', event => {
+      const stateRoute = event.state && event.state.appRoute
+        ? event.state.appRoute
+        : resolveRouteFromPath(window.location.pathname || '/');
+      applyRoute(stateRoute, { replaceHistory: true, skipHistory: true, force: true });
+    });
   }
 
   function getFirstName(name) {
@@ -833,11 +1792,14 @@
   function formatShortDate(value) {
     const parsed = parseDateValue(value);
     if (!parsed) return '';
-    try {
-      return new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' }).format(parsed);
-    } catch (err) {
-      return parsed.toLocaleDateString('pt-BR');
+    if (shortDateFormatter) {
+      try {
+        return shortDateFormatter.format(parsed);
+      } catch (err) {
+        // fallback below
+      }
     }
+    return parsed.toLocaleDateString('pt-BR');
   }
 
   function hasCheckinToday() {
@@ -1984,6 +2946,7 @@
   }
 
   function renderAchievements() {
+    renderAchievementsShowcase(achievementsState.summary, achievementsState.metrics);
     if (!achievementsCardEl) return;
 
     if (!currentUser) {
@@ -2901,6 +3864,9 @@
     const achievementsData = options && options.achievementsData;
     const achievementsUnlocked = options && options.achievementsUnlocked;
     const achievementsSilent = !!(options && options.silentAchievements);
+    syncNavAvailability();
+    ensureRouteAfterAuthChange();
+
     if (!currentUser) {
       $('#authSection').classList.remove('hidden');
       $('#dashSection').classList.add('hidden');
@@ -2915,6 +3881,9 @@
       updateCommunityAccess();
       if (!skipCommunity) refreshCommunityWall();
       syncHeaderContext();
+      renderPolls();
+      renderAdminBulletin();
+      renderAdminMissionList();
       return;
     }
 
@@ -2924,6 +3893,7 @@
     $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
     setActiveSubPageButtons(activeSubPage);
     syncHeaderContext();
+    renderPolls();
 
     if (!keepLevelIndicator) {
       setLevelIndicatorLoading();
@@ -2980,6 +3950,8 @@
     refreshRanking();
     $('#adminPanel').classList.toggle('hidden', !currentUser.isAdmin);
     syncAdminVisibility();
+    renderAdminBulletin();
+    renderAdminMissionList();
     updateCommunityAccess();
     if (!skipCommunity) refreshCommunityWall();
   }
@@ -3206,10 +4178,86 @@
     }).getEmbeds();
   }
 
+  if (btnSaveBulletinEl) {
+    btnSaveBulletinEl.addEventListener('click', () => {
+      if (!currentUser?.isAdmin) {
+        showToast({ message: 'Somente administradores podem publicar informativos.', type: 'warning' });
+        return;
+      }
+      const text = adminBulletinInputEl ? adminBulletinInputEl.value.trim() : '';
+      adminBulletinState = {
+        content: text,
+        updatedAt: new Date()
+      };
+      renderAdminBulletin();
+      showToast({ message: 'Informativo atualizado para toda a turma.', type: 'success' });
+    });
+  }
+
+  if (btnDiscardBulletinEl) {
+    btnDiscardBulletinEl.addEventListener('click', () => {
+      if (!currentUser?.isAdmin) return;
+      if (adminBulletinInputEl) adminBulletinInputEl.value = adminBulletinState?.content || '';
+      showToast({ message: 'Rascunho restaurado.', type: 'info' });
+    });
+  }
+
+  if (btnResetMission) {
+    btnResetMission.addEventListener('click', () => {
+      if (missionTitleInput) missionTitleInput.value = '';
+      if (missionDescriptionInput) missionDescriptionInput.value = '';
+      if (missionXPInput) missionXPInput.value = '';
+      if (missionValidityInput) missionValidityInput.value = '';
+      if (missionAudienceSelect) missionAudienceSelect.value = 'all';
+      if (missionAttachmentsInput) missionAttachmentsInput.value = '';
+    });
+  }
+
+  if (btnLaunchMission) {
+    btnLaunchMission.addEventListener('click', () => {
+      if (!currentUser?.isAdmin) {
+        showToast({ message: 'Somente administradores podem lançar missões.', type: 'warning' });
+        return;
+      }
+      const title = missionTitleInput ? missionTitleInput.value.trim() : '';
+      const description = missionDescriptionInput ? missionDescriptionInput.value.trim() : '';
+      const xpValue = missionXPInput ? Number(missionXPInput.value) : NaN;
+      const validity = missionValidityInput ? missionValidityInput.value : '';
+      const audience = missionAudienceSelect ? missionAudienceSelect.value : 'all';
+      const attachments = collectTextareaList(missionAttachmentsInput);
+      if (!title) {
+        showToast({ message: 'Informe um título para a missão.', type: 'error' });
+        return;
+      }
+      if (!Number.isFinite(xpValue) || xpValue < 5 || xpValue > 60) {
+        showToast({ message: 'Defina um XP entre 5 e 60 pontos.', type: 'error' });
+        return;
+      }
+      const mission = {
+        id: `mission-${Date.now()}`,
+        title,
+        description,
+        xp: Math.round(xpValue),
+        audience,
+        validity,
+        attachments
+      };
+      adminMissionsState.unshift(mission);
+      renderAdminMissionList();
+      if (btnResetMission) btnResetMission.click();
+      showToast({ message: 'Missão lançada para a turma!', type: 'success' });
+    });
+  }
+
   // Boot
   (function init(){
+    bootstrapRouter();
     syncAdminVisibility();
     updateCommunityAccess();
+    syncNavAvailability();
+    renderAdminBulletin();
+    renderAdminMissionList();
+    renderPanelPage();
     loadEmbeds();
     refreshCommunityWall();
     const stored = getStoredSession();
