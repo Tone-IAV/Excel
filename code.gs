@@ -23,6 +23,7 @@ const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB por arquivo
 const COMMUNITY_FILES_FOLDER_ID = '1LBfNBUjTMjrEVL1CE-YJtA3ecW_gQMIR';
 const COMMUNITY_FORUM_FOLDER_NAME = 'Forum da Turma';
 const CONFIG_USER_FILES_ROOT = 'user_files_root';
+const USER_FILES_PARENT_FOLDER_ID = '1LBfNBUjTMjrEVL1CE-YJtA3ecW_gQMIR';
 const USER_MATERIAL_MAX_BYTES = 20 * 1024 * 1024; // 20 MB por arquivo
 const USER_MATERIAL_RULES = Object.freeze({
   excel: Object.freeze({
@@ -334,14 +335,22 @@ function ensureUserFilesRootFolder_() {
   const drive = getDriveService_();
   if (!drive) return null;
   const cfg = getConfig_();
-  const existingId = cfg[CONFIG_USER_FILES_ROOT];
-  if (existingId) {
+  const desiredId = USER_FILES_PARENT_FOLDER_ID || cfg[CONFIG_USER_FILES_ROOT];
+  if (desiredId) {
     try {
-      const folder = drive.getFolderById(existingId);
-      return { id: existingId, folder };
+      const folder = drive.getFolderById(desiredId);
+      if (desiredId !== cfg[CONFIG_USER_FILES_ROOT]) {
+        setConfig_(CONFIG_USER_FILES_ROOT, desiredId);
+      }
+      return { id: desiredId, folder };
     } catch (err) {
-      // tenta recriar abaixo
+      if (USER_FILES_PARENT_FOLDER_ID) {
+        return null;
+      }
     }
+  }
+  if (USER_FILES_PARENT_FOLDER_ID) {
+    return null;
   }
   let parent;
   try {
@@ -359,7 +368,7 @@ function ensureUserFilesRootFolder_() {
   }
 }
 
-function ensureUserFolderForId_(userId, userName, options) {
+function ensureUserFolderForId_(userId, userName) {
   const safeUserId = (userId || '').toString().trim();
   if (!safeUserId) {
     return { id: '', url: '', name: userName || '', error: 'Identificador do usuário inválido.' };
@@ -368,9 +377,6 @@ function ensureUserFolderForId_(userId, userName, options) {
   if (!drive) {
     return { id: '', url: '', name: userName || '', error: 'Integração com o Drive indisponível no momento.' };
   }
-  const opts = options || {};
-  const shareEmailRaw = Object.prototype.hasOwnProperty.call(opts, 'email') ? opts.email : opts.shareWith;
-  const shareEmail = shareEmailRaw ? shareEmailRaw.toString().trim().toLowerCase() : '';
   const rootInfo = ensureUserFilesRootFolder_();
   if (!rootInfo || !rootInfo.folder) {
     return { id: '', url: '', name: userName || '', error: 'Pasta principal de materiais não encontrada.' };
@@ -400,21 +406,11 @@ function ensureUserFolderForId_(userId, userName, options) {
       folder = null;
     }
   }
-
-  let shareError = '';
-
   if (!folderId) {
     const folderName = sanitizeFolderName_(userName, `Participante-${safeUserId.slice(0, 6)}`);
     try {
       folder = rootInfo.folder.createFolder(folderName);
       folderId = folder.getId();
-      if (shareEmail) {
-        try {
-          folder.addViewer(shareEmail);
-        } catch (err) {
-          shareError = 'Pasta criada, mas não foi possível conceder acesso automático ao e-mail informado.';
-        }
-      }
       if (rowIndex > 1) {
         sheet.getRange(rowIndex, 8).setValue(folderId);
       }
@@ -430,21 +426,11 @@ function ensureUserFolderForId_(userId, userName, options) {
       folder = null;
     }
   }
-
-  if (folder && shareEmail && !shareError) {
-    try {
-      folder.addViewer(shareEmail);
-    } catch (err) {
-      shareError = 'Arquivo enviado, porém acesso não pôde ser concedido automaticamente ao seu e-mail.';
-    }
-  }
-
   return {
     id: folderId,
     url: folder ? folder.getUrl() : '',
     name: folder ? folder.getName() : sanitizeFolderName_(userName, 'Participante'),
-    error: '',
-    shareError
+    error: ''
   };
 }
 
@@ -1201,19 +1187,13 @@ function normalizeUserForClient_(user, options) {
   if (options && options.folderInfo) {
     folderInfo = options.folderInfo;
   } else if (options && options.ensureFolder) {
-    const emailForShare = options && Object.prototype.hasOwnProperty.call(options, 'email')
-      ? options.email
-      : safeEmail;
-    folderInfo = ensureUserFolderForId_(safeId, base.name, { email: emailForShare });
+    folderInfo = ensureUserFolderForId_(safeId, base.name);
   }
 
   if (folderInfo) {
     if (folderInfo.id) base.folderId = folderInfo.id;
     if (folderInfo.url) base.folderUrl = folderInfo.url;
     if (folderInfo.error) folderWarning = folderInfo.error;
-    if (folderInfo.shareError) {
-      folderWarning = folderWarning ? `${folderWarning} ${folderInfo.shareError}` : folderInfo.shareError;
-    }
   } else if (user.folderUrl) {
     base.folderUrl = user.folderUrl;
   }
@@ -1372,9 +1352,9 @@ function completeGoogleSignUp(accessToken) {
     const id = Utilities.getUuid();
     const createdAt = nowISO_();
     usersSheet.appendRow([id, displayName, email, '', false, 0, createdAt, '']);
-    const folderInfo = ensureUserFolderForId_(id, displayName, { email });
+    const folderInfo = ensureUserFolderForId_(id, displayName);
     const rawUser = { id, name: displayName, email, isAdmin: false, xp: 0, folderId: folderInfo && folderInfo.id ? folderInfo.id : '' };
-    normalizedUser = normalizeUserForClient_(rawUser, { folderInfo, email });
+    normalizedUser = normalizeUserForClient_(rawUser, { folderInfo });
     wasCreated = true;
   } else {
     const storedName = (hit.data[1] || '').toString().trim();
@@ -1392,7 +1372,7 @@ function completeGoogleSignUp(accessToken) {
       xp: Number.isFinite(xpValue) ? xpValue : 0,
       folderId
     };
-    normalizedUser = normalizeUserForClient_(rawUser, { ensureFolder: true, email: rawUser.email });
+    normalizedUser = normalizeUserForClient_(rawUser, { ensureFolder: true });
   }
 
   let driveProbeResponse;
@@ -1533,7 +1513,7 @@ function loginUser(payload) {
     xp: Number(hit.data[5]||0),
     folderId: (hit.data[7] || '').toString().trim()
   };
-  const normalizedUser = normalizeUserForClient_(user, { ensureFolder: true, email: user.email });
+  const normalizedUser = normalizeUserForClient_(user, { ensureFolder: true });
 
   const confirmationRecord = getConfirmationRecordByUserId_(user.id);
   if (confirmationRecord && !confirmationRecord.data.confirmedAt) {
@@ -1577,7 +1557,7 @@ function confirmUserRegistration(payload) {
       xp: Number(hit.data[5] || 0),
       folderId
     };
-    const normalizedUser = normalizeUserForClient_(rawUser, { ensureFolder: true, email: rawUser.email });
+    const normalizedUser = normalizeUserForClient_(rawUser, { ensureFolder: true });
 
     if (!record) {
       const session = createSession_(userId);
@@ -1618,7 +1598,7 @@ function confirmUserRegistration(payload) {
   if (record.data.confirmedAt) {
     const existingUser = getUserById_(userId);
     if (existingUser) {
-      const normalizedExisting = normalizeUserForClient_(existingUser, { ensureFolder: true, email });
+      const normalizedExisting = normalizeUserForClient_(existingUser, { ensureFolder: true });
       const session = createSession_(normalizedExisting.id);
       return { ok: true, alreadyConfirmed: true, user: normalizedExisting, token: session.token, expiresAt: session.expiresAt };
     }
@@ -1644,9 +1624,9 @@ function confirmUserRegistration(payload) {
   const isAdmin = !!record.data.pendingIsAdmin;
   const createdAt = record.data.createdAt || nowISO_();
   sh_(SHEET_USERS).appendRow([userId, pendingName, email, pendingPassHash, isAdmin, 0, createdAt, '']);
-  const folderInfo = ensureUserFolderForId_(userId, pendingName, { email });
+  const folderInfo = ensureUserFolderForId_(userId, pendingName);
   const rawUser = { id: userId, name: pendingName, email, isAdmin, xp: 0, folderId: folderInfo && folderInfo.id ? folderInfo.id : '' };
-  const normalizedUser = normalizeUserForClient_(rawUser, { folderInfo, email });
+  const normalizedUser = normalizeUserForClient_(rawUser, { folderInfo });
 
   markConfirmationAsConfirmed_(userId);
   const session = createSession_(userId);
@@ -1728,7 +1708,7 @@ function resumeSession(token) {
     return null;
   }
 
-  const normalizedUser = normalizeUserForClient_(user, { ensureFolder: true, email: user.email });
+  const normalizedUser = normalizeUserForClient_(user, { ensureFolder: true });
   return normalizedUser;
 }
 
@@ -2121,7 +2101,7 @@ function getEmbeds(payload) {
     });
   }
 
-  const folderInfo = ensureUserFolderForId_(sessionUser.id, sessionUser.name || 'Participante', { email: sessionUser.email || '' });
+  const folderInfo = ensureUserFolderForId_(sessionUser.id, sessionUser.name || 'Participante');
   const userFolder = { id: '', url: '', name: '' };
   let userMaterials = { excel: [], ppt: [] };
   const folderMessages = [];
@@ -2133,7 +2113,6 @@ function getEmbeds(payload) {
     if (folderInfo.url) userFolder.url = folderInfo.url;
     if (folderInfo.name) userFolder.name = folderInfo.name;
     if (folderInfo.error) folderMessages.push(folderInfo.error);
-    if (folderInfo.shareError) folderMessages.push(folderInfo.shareError);
   }
 
   if (!userFolder.url && userFolder.id) {
@@ -2234,7 +2213,7 @@ function uploadUserMaterial(payload) {
     throw new Error('O arquivo enviado não corresponde à categoria selecionada.');
   }
 
-  const folderInfo = ensureUserFolderForId_(sessionUser.id, sessionUser.name || 'Participante', { email: sessionUser.email || '' });
+  const folderInfo = ensureUserFolderForId_(sessionUser.id, sessionUser.name || 'Participante');
   if (!folderInfo || !folderInfo.id) {
     throw new Error(folderInfo && folderInfo.error ? folderInfo.error : 'Não foi possível localizar sua pasta pessoal no Drive.');
   }
@@ -2271,21 +2250,8 @@ function uploadUserMaterial(payload) {
     throw new Error('Não foi possível salvar o arquivo no Drive.');
   }
 
-  let shareWarning = '';
-  const shareEmail = (sessionUser.email || '').toString().trim();
-  if (shareEmail) {
-    try {
-      file.addViewer(shareEmail);
-    } catch (err) {
-      shareWarning = 'Arquivo enviado, porém não foi possível conceder acesso automático ao seu e-mail.';
-    }
-  }
-
   const baseMessage = 'Arquivo enviado com sucesso para sua pasta pessoal.';
-  const extraMessages = [];
-  if (folderInfo && folderInfo.shareError) extraMessages.push(folderInfo.shareError);
-  if (shareWarning) extraMessages.push(shareWarning);
-  const message = extraMessages.length ? `${baseMessage} ${extraMessages.join(' ')}` : baseMessage;
+  const message = baseMessage;
 
   let fileUrl = '';
   try { fileUrl = file.getUrl(); } catch (err) { fileUrl = ''; }
