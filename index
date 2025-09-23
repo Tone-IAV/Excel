@@ -548,6 +548,12 @@
   function extractErrorMessage(error) {
     if (!error) return '';
     if (typeof error === 'string') return error;
+    if (error && typeof error === 'object' && typeof error.error === 'string') {
+      return error.error;
+    }
+    if (error && typeof error === 'object' && error.error && typeof error.error.message === 'string') {
+      return error.error.message;
+    }
     if (typeof error.message === 'string') return error.message;
     if (typeof error.details === 'string') return error.details;
     return '';
@@ -578,7 +584,9 @@
 
   function handleSessionExpiredError(error, options = {}) {
     const message = extractErrorMessage(error);
-    if (!isSessionErrorMessage(message)) return false;
+    const isSessionError = isSessionErrorMessage(message)
+      || (error && typeof error === 'object' && error.name === 'SessionError');
+    if (!isSessionError) return false;
     const finalMessage = message || SESSION_EXPIRED_FALLBACK;
     if (typeof options.onHandled === 'function') {
       try {
@@ -589,15 +597,6 @@
     }
     expireSession(finalMessage);
     return true;
-  }
-
-  function requireSessionToken() {
-    const token = getSessionToken();
-    if (token) return token;
-    if (currentUser) {
-      expireSession(SESSION_EXPIRED_FALLBACK);
-    }
-    return null;
   }
 
   // Helpers
@@ -2110,8 +2109,9 @@
       resetAchievementsUI();
       return;
     }
-    const token = requireSessionToken();
+    const token = getSessionToken();
     if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
       return;
     }
     const expectedUserId = currentUser.id;
@@ -2579,8 +2579,9 @@
   function loadHistoryForCurrentUser() {
     if (!currentUser || !currentUser.id) return;
 
-    const token = requireSessionToken();
+    const token = getSessionToken();
     if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
       return;
     }
 
@@ -2803,8 +2804,9 @@
         showToast({ message: 'Entre com sua conta para publicar no mural.', type: 'warning' });
         return;
       }
-      const token = requireSessionToken();
+      const token = getSessionToken();
       if (!token) {
+        expireSession(SESSION_EXPIRED_FALLBACK);
         return;
       }
       const message = communityTextarea ? communityTextarea.value.trim() : '';
@@ -2857,8 +2859,9 @@
       }
       const postId = target.getAttribute('data-id') || '';
       if (!postId) return;
-      const token = requireSessionToken();
+      const token = getSessionToken();
       if (!token) {
+        expireSession(SESSION_EXPIRED_FALLBACK);
         return;
       }
       const button = target instanceof HTMLButtonElement ? target : target.closest('button');
@@ -2932,8 +2935,9 @@
       loadAchievementsOverview();
     }
 
-    const token = requireSessionToken();
+    const token = getSessionToken();
     if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
       return;
     }
 
@@ -3112,8 +3116,9 @@
   // Check-in
   $('#btnCheckin').onclick = ()=>{
     if (!currentUser) return showToast({ message: 'Faça login primeiro.', type: 'warning' });
-    const token = requireSessionToken();
+    const token = getSessionToken();
     if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
       return;
     }
     google.script.run
@@ -3156,8 +3161,9 @@
         showToast({ message: 'Somente administradores podem atualizar os materiais.', type: 'warning' });
         return;
       }
-      const token = requireSessionToken();
+      const token = getSessionToken();
       if (!token) {
+        expireSession(SESSION_EXPIRED_FALLBACK);
         return;
       }
       const excel = excelLinkInput ? excelLinkInput.value.trim() : '';
