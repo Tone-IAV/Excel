@@ -208,7 +208,8 @@ function publicPing() {
 }
 
 function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+  const template = HtmlService.createTemplateFromFile(filename);
+  return template.evaluate().getContent();
 }
 
 function renderStudentSubPage(payload) {
