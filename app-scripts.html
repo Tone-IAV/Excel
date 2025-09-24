@@ -15,6 +15,14 @@
   const USER_MATERIAL_MAX_BYTES = 20 * 1024 * 1024;
   const actionLoaderEl = document.getElementById('actionLoader');
   const actionLoaderLabelEl = document.getElementById('actionLoaderLabel');
+  const sheetUpdateInput = document.getElementById('sheetUpdateInput');
+  const sheetUpdateContainer = document.getElementById('sheetUpdateContainer');
+  const SHEET_UPDATE_POLL_INTERVAL = 20000;
+  const SHEET_UPDATE_MESSAGE_LIMIT = 110;
+  let sheetUpdateCursor = '';
+  let sheetUpdatePollTimer = null;
+  let sheetUpdateRequestPending = false;
+  let sheetUpdateInitialized = false;
   let actionLoaderDepth = 0;
 
   function startActionLoading(message) {
@@ -55,6 +63,116 @@
         actionLoaderLabelEl.textContent = text;
       }
     };
+  }
+
+  function formatSheetUpdateTimestamp(value) {
+    const parsed = parseDateValue(value);
+    if (!parsed) return '';
+    try {
+      return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(parsed);
+    } catch (err) {
+      return parsed.toLocaleString('pt-BR');
+    }
+  }
+
+  function formatSheetUpdateMessage(change) {
+    if (!change) return 'Planilha atualizada';
+    const sheetName = (change.sheet || '').toString().trim();
+    const rangeLabel = (change.range || '').toString().trim();
+    const labelParts = [];
+    if (sheetName) labelParts.push(sheetName);
+    if (rangeLabel) labelParts.push(rangeLabel);
+    const base = labelParts.length ? labelParts.join(' • ') : 'Planilha atualizada';
+    const previewRaw = (change.value || '').toString().trim();
+    if (!previewRaw) return base;
+    const normalized = previewRaw.replace(/\s+/g, ' ');
+    const limited = normalized.length > SHEET_UPDATE_MESSAGE_LIMIT
+      ? `${normalized.slice(0, SHEET_UPDATE_MESSAGE_LIMIT - 1)}…`
+      : normalized;
+    return `${base} → ${limited}`;
+  }
+
+  function updateSheetUpdateDisplay(change) {
+    if (!sheetUpdateInput) return;
+    if (!change) {
+      sheetUpdateInput.value = '';
+      sheetUpdateInput.removeAttribute('title');
+      sheetUpdateInput.removeAttribute('aria-label');
+      if (sheetUpdateContainer) {
+        sheetUpdateContainer.removeAttribute('data-last-update');
+        sheetUpdateContainer.removeAttribute('aria-label');
+      }
+      return;
+    }
+    const message = formatSheetUpdateMessage(change);
+    sheetUpdateInput.value = message;
+    const timestampLabel = formatSheetUpdateTimestamp(change.timestamp);
+    if (timestampLabel) {
+      sheetUpdateInput.title = `Última atualização registrada em ${timestampLabel}`;
+      sheetUpdateInput.setAttribute('aria-label', `${message}. ${timestampLabel}`);
+      if (sheetUpdateContainer) {
+        sheetUpdateContainer.setAttribute('aria-label', `${message}. ${timestampLabel}`);
+      }
+    } else {
+      sheetUpdateInput.removeAttribute('title');
+      sheetUpdateInput.setAttribute('aria-label', message);
+      if (sheetUpdateContainer) {
+        sheetUpdateContainer.setAttribute('aria-label', message);
+      }
+    }
+    if (sheetUpdateContainer) {
+      sheetUpdateContainer.setAttribute('data-last-update', change.timestamp || '');
+    }
+    const previousShadow = sheetUpdateInput.style.boxShadow;
+    sheetUpdateInput.style.boxShadow = '0 0 0 2px rgba(33,115,70,0.35)';
+    setTimeout(() => {
+      if (sheetUpdateInput) {
+        sheetUpdateInput.style.boxShadow = previousShadow || '';
+      }
+    }, 1500);
+  }
+
+  function handleSheetUpdateResponse(response) {
+    if (!sheetUpdateInput) return;
+    const entries = response && Array.isArray(response.changes) ? response.changes : [];
+    if (response && typeof response.cursor === 'string' && response.cursor) {
+      sheetUpdateCursor = response.cursor;
+    }
+    const hadSnapshot = sheetUpdateInitialized;
+    if (entries.length) {
+      const latest = entries[entries.length - 1];
+      updateSheetUpdateDisplay(latest);
+      if (hadSnapshot) {
+        const toastMessage = formatSheetUpdateMessage(latest);
+        showToast({ message: `Atualização detectada: ${toastMessage}`, type: 'success', duration: 5000 });
+      }
+    } else if (!hadSnapshot) {
+      updateSheetUpdateDisplay(null);
+    }
+    sheetUpdateInitialized = true;
+  }
+
+  function pollSheetChangeLog() {
+    if (!sheetUpdateInput || sheetUpdateRequestPending) return;
+    const payload = { limit: 5 };
+    if (sheetUpdateCursor) payload.since = sheetUpdateCursor;
+    sheetUpdateRequestPending = true;
+    google.script.run
+      .withFailureHandler(err => {
+        sheetUpdateRequestPending = false;
+        console.warn('Falha ao verificar atualizações da planilha:', err);
+      })
+      .withSuccessHandler(res => {
+        sheetUpdateRequestPending = false;
+        handleSheetUpdateResponse(res || {});
+      })
+      .fetchSheetChangeUpdates(payload);
+  }
+
+  function startSheetUpdateWatcher() {
+    if (!sheetUpdateInput || sheetUpdatePollTimer) return;
+    pollSheetChangeLog();
+    sheetUpdatePollTimer = setInterval(pollSheetChangeLog, SHEET_UPDATE_POLL_INTERVAL);
   }
 
   function persistSession(token, user, options = {}) {
@@ -6407,6 +6525,7 @@
     renderAdminBulletin();
     renderAdminMissionList();
     renderForumPage();
+    startSheetUpdateWatcher();
     const stored = getStoredSession();
     if (stored && stored.token) {
       currentSessionToken = stored.token;

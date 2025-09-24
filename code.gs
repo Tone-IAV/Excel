@@ -21,6 +21,11 @@ const SHEET_FORUM_POLL_VOTES = 'ForumPollVotes';   // id, pollId, userId, choice
 const SHEET_FORUM_QUESTIONS  = 'ForumQuestions';   // id, userId, authorName, subject, details, scope, visibility, targetUserIds, createdAt, status, metadata
 const SHEET_FORUM_NOTIFICATIONS = 'ForumNotifications'; // id, userId, type, entityId, message, link, createdAt, readAt, metadata
 const SHEET_FORUM_REACTIONS  = 'ForumReactions';   // id, postId, userId, reaction, createdAt, updatedAt
+const SHEET_CHANGE_LOG       = 'ChangeLog';        // timestamp, type, sheet, range, user, preview
+
+const CHANGE_LOG_HEADERS = Object.freeze(['timestamp','type','sheet','range','user','preview']);
+const CHANGE_LOG_MAX_ROWS = 500;
+const CHANGE_LOG_VALUE_PREVIEW_LIMIT = 120;
 
 const CONFIG_RECOMMENDED_RESOURCES = 'recommended_resources';
 const CONFIG_UPCOMING_EVENTS       = 'upcoming_events';
@@ -189,6 +194,18 @@ function onOpen() {
     .addToUi();
 }
 
+function onChange(e) {
+  try {
+    recordSpreadsheetChange_(e);
+  } catch (err) {
+    try {
+      console.error('Falha ao registrar alteração da planilha:', err);
+    } catch (logErr) {
+      Logger.log('Falha ao registrar alteração da planilha: ' + (err && err.message ? err.message : err));
+    }
+  }
+}
+
 function doGet(e) {
   // NÃO chame setup_() aqui.
   let route = '';
@@ -205,6 +222,47 @@ function doGet(e) {
 
 function publicPing() {
   return { ok: true, ts: Date.now() };
+}
+
+function fetchSheetChangeUpdates(payload) {
+  setup_();
+  const sheet = sh_(SHEET_CHANGE_LOG);
+  if (!sheet) {
+    return { ok: true, changes: [], cursor: '' };
+  }
+  const lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return { ok: true, changes: [], cursor: '' };
+  }
+  const dataRange = sheet.getRange(2, 1, lastRow - 1, CHANGE_LOG_HEADERS.length);
+  const rows = dataRange.getValues();
+  const sinceRaw = payload && payload.since ? payload.since.toString() : '';
+  const limitRaw = Number(payload && payload.limit);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0
+    ? Math.min(Math.floor(limitRaw), CHANGE_LOG_MAX_ROWS)
+    : 20;
+  const entries = rows.map(row => ({
+    timestamp: (row[0] || '').toString(),
+    type: (row[1] || '').toString(),
+    sheet: (row[2] || '').toString(),
+    range: (row[3] || '').toString(),
+    user: (row[4] || '').toString(),
+    value: (row[5] || '').toString()
+  }));
+  entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+  const filtered = sinceRaw
+    ? entries.filter(item => item.timestamp && item.timestamp > sinceRaw)
+    : entries.slice();
+  const limited = filtered.length > limit
+    ? filtered.slice(filtered.length - limit)
+    : filtered;
+  let cursor = sinceRaw;
+  if (limited.length) {
+    cursor = limited[limited.length - 1].timestamp || cursor;
+  } else if (!sinceRaw && entries.length) {
+    cursor = entries[entries.length - 1].timestamp || cursor;
+  }
+  return { ok: true, changes: limited, cursor };
 }
 
 function include(filename) {
@@ -255,6 +313,7 @@ function setup_() {
   ensure(SHEET_FORUM_QUESTIONS,  ['id','userId','authorName','subject','details','scope','visibility','targetUserIds','createdAt','status','metadata']);
   ensure(SHEET_FORUM_NOTIFICATIONS, ['id','userId','type','entityId','message','link','createdAt','readAt','metadata']);
   ensure(SHEET_FORUM_REACTIONS,  ['id','postId','userId','reaction','createdAt','updatedAt']);
+  ensure(SHEET_CHANGE_LOG, CHANGE_LOG_HEADERS);
 
   // Defaults de config
   const cfg = getConfig_();
@@ -290,6 +349,132 @@ function getAll_(sheet)     { const r=sheet.getDataRange().getValues(); return r
 function findByEmail_(email){ const rows=getAll_(sh_(SHEET_USERS)); for (let i=0;i<rows.length;i++){ if ((rows[i][2]||'').toLowerCase()===email.toLowerCase()){ return { row:i+2, data:rows[i] }; } } return null; }
 function getConfig_()       { const rows=getAll_(sh_(SHEET_CONFIG)); const m={}; rows.forEach(r=>m[(r[0]||'').toString()]=(r[1]||'').toString()); return m; }
 function setConfig_(k,v)    { const s=sh_(SHEET_CONFIG); const rows=getAll_(s); for (let i=0;i<rows.length;i++){ if (rows[i][0]==k){ s.getRange(i+2,2).setValue(v); return; } } s.appendRow([k,v]); }
+
+function ensureChangeLogSheet_() {
+  const ss = ss_();
+  let sheet = ss.getSheetByName(SHEET_CHANGE_LOG);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_CHANGE_LOG);
+  }
+  const headers = CHANGE_LOG_HEADERS;
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (sheet.getFrozenRows() !== 1) {
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+function getActiveUserEmail_() {
+  try {
+    const activeUser = Session.getActiveUser();
+    if (activeUser) {
+      const email = activeUser.getEmail();
+      if (email) return email;
+    }
+  } catch (err) {
+    // ignore
+  }
+  return '';
+}
+
+function buildChangePreview_(range) {
+  if (!range || typeof range.getNumRows !== 'function') return '';
+  const sampleRows = Math.min(range.getNumRows ? range.getNumRows() : 1, 3);
+  const sampleCols = Math.min(range.getNumColumns ? range.getNumColumns() : 1, 3);
+  let values;
+  try {
+    values = range.offset(0, 0, sampleRows, sampleCols).getDisplayValues();
+  } catch (err) {
+    try {
+      values = range.offset(0, 0, sampleRows, sampleCols).getValues();
+    } catch (innerErr) {
+      return '';
+    }
+  }
+  if (!Array.isArray(values) || !values.length) return '';
+  const previewParts = [];
+  for (let r = 0; r < values.length; r++) {
+    const row = values[r] || [];
+    const rowParts = [];
+    for (let c = 0; c < row.length; c++) {
+      const cell = row[c];
+      if (cell === null || typeof cell === 'undefined') continue;
+      const text = cell instanceof Date
+        ? Utilities.formatDate(cell, 'UTC', 'yyyy-MM-dd HH:mm')
+        : cell.toString();
+      const trimmed = text.trim();
+      if (trimmed) rowParts.push(trimmed);
+    }
+    const rowPreview = rowParts.join(' | ').trim();
+    if (rowPreview) previewParts.push(rowPreview);
+  }
+  let preview = previewParts.join(' / ');
+  if (!preview) {
+    const first = values[0] && values[0][0] ? values[0][0].toString().trim() : '';
+    preview = first;
+  }
+  const hasMoreCells = (range.getNumRows && range.getNumRows() > sampleRows)
+    || (range.getNumColumns && range.getNumColumns() > sampleCols);
+  if (preview && hasMoreCells) {
+    preview = `${preview} …`;
+  }
+  if (preview && preview.length > CHANGE_LOG_VALUE_PREVIEW_LIMIT) {
+    preview = `${preview.slice(0, CHANGE_LOG_VALUE_PREVIEW_LIMIT - 1)}…`;
+  }
+  return preview;
+}
+
+function trimChangeLog_(sheet) {
+  if (!sheet) return;
+  const lastRow = sheet.getLastRow();
+  const allowedRows = CHANGE_LOG_MAX_ROWS + 1; // header + entries
+  if (lastRow <= allowedRows) return;
+  const startRow = Math.max(2, lastRow - CHANGE_LOG_MAX_ROWS + 1);
+  const rowsToKeep = lastRow - startRow + 1;
+  if (rowsToKeep <= 0) {
+    sheet.getRange(2, 1, lastRow - 1, CHANGE_LOG_HEADERS.length).clearContent();
+    return;
+  }
+  const range = sheet.getRange(startRow, 1, rowsToKeep, CHANGE_LOG_HEADERS.length);
+  const values = range.getValues();
+  sheet.getRange(2, 1, lastRow - 1, CHANGE_LOG_HEADERS.length).clearContent();
+  if (values && values.length) {
+    sheet.getRange(2, 1, values.length, values[0].length).setValues(values);
+  }
+}
+
+function recordSpreadsheetChange_(event) {
+  const range = event && event.range && typeof event.range.getSheet === 'function' ? event.range : null;
+  const rangeSheet = range ? range.getSheet() : null;
+  const rangeSheetName = rangeSheet ? rangeSheet.getName() : '';
+  if (rangeSheetName === SHEET_CHANGE_LOG) return;
+
+  let sheetName = rangeSheetName;
+  if (!sheetName && event && event.source && typeof event.source.getActiveSheet === 'function') {
+    const activeSheet = event.source.getActiveSheet();
+    if (activeSheet) {
+      const activeName = activeSheet.getName();
+      if (activeName === SHEET_CHANGE_LOG) {
+        return;
+      }
+      sheetName = activeName;
+    }
+  }
+
+  const sheet = ensureChangeLogSheet_();
+  const changeType = event && event.changeType ? event.changeType.toString() : 'EDIT';
+  const preview = range ? buildChangePreview_(range) : '';
+  const entry = [
+    nowISO_(),
+    changeType,
+    sheetName || '',
+    range && typeof range.getA1Notation === 'function' ? range.getA1Notation() : '',
+    getActiveUserEmail_(),
+    preview
+  ];
+  sheet.appendRow(entry);
+  trimChangeLog_(sheet);
+}
 
 function sanitizeFolderName_(name, fallback) {
   const base = (name || '').toString().trim();
