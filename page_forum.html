@@ -1,0 +1,317 @@
+<section data-app-page="forum" id="forumPage" class="hidden space-y-8">
+    <div class="max-w-6xl mx-auto grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <div class="space-y-6">
+        <div class="card" id="communityComposerCard">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-4">
+            <div class="space-y-3">
+              <div class="flex flex-wrap items-center gap-3">
+                <p class="pill">Fórum da turma</p>
+                <button type="button" id="forumInfoToggle" class="info-toggle" aria-expanded="false" aria-controls="forumInfoPanel">i</button>
+              </div>
+              <div class="space-y-1">
+                <h2 class="text-2xl font-semibold text-primary">Compartilhe ideias, dúvidas e novidades</h2>
+                <p class="text-sm text-slate-500">Marque pessoas, anexe arquivos e escolha a visibilidade antes de publicar.</p>
+              </div>
+              <div id="forumInfoPanel" class="hidden text-sm text-slate-600 dark:text-slate-300 leading-relaxed space-y-2">
+                <p>Fórum da turma</p>
+                <p>Compartilhe ideias, dúvidas e novidades</p>
+                <p>Publique histórias, enquetes, arquivos e marque colegas com @ para que recebam as atualizações. Você escolhe se a conversa é pública ou restrita a convidados.</p>
+              </div>
+              <p id="communityModeHint" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Escreva uma atualização rápida para a turma.</p>
+            </div>
+            <span id="communityLimitBadge" class="pill">Limite: 240 caracteres</span>
+          </div>
+
+          <div id="communityModeToggle" class="flex flex-wrap items-center gap-2 mb-4">
+            <button type="button" class="forum-toolbar-btn" data-community-mode="message" aria-pressed="true"><span>✍️</span><span>Atualização</span></button>
+            <button type="button" class="forum-toolbar-btn" data-community-mode="idea" aria-pressed="false"><span>💡</span><span>Ideia</span></button>
+            <button type="button" class="forum-toolbar-btn" data-community-mode="poll" aria-pressed="false"><span>📊</span><span>Enquete</span></button>
+            <button type="button" class="forum-toolbar-btn" data-community-mode="question" aria-pressed="false"><span>❓</span><span>Dúvida</span></button>
+          </div>
+
+          <div id="communityFormWrap" class="space-y-5 hidden">
+            <div id="communityMessageForm" class="space-y-4">
+              <textarea id="communityMessage" class="input min-h-[150px] resize-y focus:ring-2 focus:ring-primary/70 border border-primary/20" maxlength="240" placeholder="Conte uma novidade, compartilhe um arquivo ou registre uma enquete para a turma..." autofocus></textarea>
+              <div id="communityMentionChips" class="flex flex-wrap gap-2 hidden"></div>
+              <div class="flex flex-wrap items-center justify-between gap-4 text-sm text-slate-500">
+                <div class="flex flex-wrap items-center gap-3">
+                  <label class="forum-toolbar-btn cursor-pointer">
+                    <span>📎</span><span>Enviar arquivo</span>
+                    <input id="communityAttachmentInput" type="file" class="hidden" multiple />
+                  </label>
+                  <div class="relative" id="communityMentionWrap">
+                    <button type="button" id="communityMentionToggle" class="forum-toolbar-btn">
+                      <span>👥</span><span>Adicionar pessoas</span>
+                    </button>
+                    <div id="communityMentionPanel" class="mention-panel hidden">
+                      <div class="space-y-2">
+                        <input id="communityMentionSearch" type="search" class="input input-sm" placeholder="Buscar participante..." autocomplete="off" />
+                        <div class="max-h-48 overflow-y-auto space-y-1">
+                          <ul id="communityMentionList" class="space-y-1 text-sm"></ul>
+                          <p id="communityMentionEmpty" class="text-xs text-slate-500 hidden">Nenhum participante encontrado.</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-3">
+                  <div class="flex items-center gap-2">
+                    <label for="communityPrivacySelect" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Visibilidade</label>
+                    <select id="communityPrivacySelect" class="input input-sm">
+                      <option value="public">Público — toda a turma visualiza</option>
+                      <option value="private">Privado — somente convidados</option>
+                    </select>
+                  </div>
+                  <span id="communityCounter" class="text-xs text-slate-400">0/240</span>
+                  <button id="btnCommunityPublish" class="btn btn-primary">Publicar</button>
+                </div>
+              </div>
+              <div id="communityFormFeedback" class="text-xs text-rose-500 hidden" aria-live="polite"></div>
+              <div id="communityTargetsWrap" class="space-y-2 hidden">
+                <label for="communityTargets" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Destinatários privados</label>
+                <select id="communityTargets" class="input min-h-[96px]" multiple></select>
+                <p class="hint">Convide pessoas específicas selecionando aqui ou marcando-as com @ na mensagem.</p>
+              </div>
+              <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/60 p-4 space-y-3">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Anexos</p>
+                <ul id="communityAttachmentList" class="space-y-2 text-sm"></ul>
+              </div>
+            </div>
+
+            <form id="forumIdeaForm" class="space-y-4 hidden">
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="space-y-1">
+                  <label for="forumIdeaTitle" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Título da ideia</label>
+                  <input id="forumIdeaTitle" class="input" placeholder="Ex.: Central de automação para relatórios" />
+                </div>
+                <div class="space-y-1">
+                  <label for="forumIdeaImpact" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Impacto esperado</label>
+                  <select id="forumIdeaImpact" class="input">
+                    <option value="Alto">Alto</option>
+                    <option value="Médio">Médio</option>
+                    <option value="Baixo">Baixo</option>
+                  </select>
+                </div>
+              </div>
+              <div class="space-y-1">
+                <label for="forumIdeaSummary" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Descrição</label>
+                <textarea id="forumIdeaSummary" class="input min-h-[120px] resize-y" placeholder="Explique o problema, a proposta de solução e os próximos passos sugeridos."></textarea>
+              </div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="space-y-1">
+                  <label for="forumIdeaBenefit" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Benefício esperado</label>
+                  <input id="forumIdeaBenefit" class="input" placeholder="Ex.: Reduzir em 30% o tempo de consolidação" />
+                </div>
+                <div class="space-y-1">
+                  <label for="forumIdeaTags" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Tags</label>
+                  <input id="forumIdeaTags" class="input" placeholder="Separe com vírgulas (ex.: automação, dashboard, BI)" />
+                </div>
+              </div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="space-y-1">
+                  <label for="forumIdeaVisibility" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Visibilidade</label>
+                  <select id="forumIdeaVisibility" class="input">
+                    <option value="public">Público — todos visualizam</option>
+                    <option value="private">Privado — somente convidados</option>
+                  </select>
+                </div>
+                <div class="space-y-1">
+                  <label for="forumIdeaTargets" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Convidar pessoas</label>
+                  <select id="forumIdeaTargets" class="input min-h-[96px]" multiple></select>
+                  <p class="hint">Selecionar nomes torna a ideia privada automaticamente para os convidados.</p>
+                </div>
+              </div>
+              <div id="forumIdeaFormFeedback" class="text-xs text-rose-500 hidden" aria-live="polite"></div>
+              <div class="flex justify-end">
+                <button type="submit" id="btnSubmitIdea" class="btn btn-primary">Registrar ideia</button>
+              </div>
+            </form>
+
+            <form id="forumPollForm" class="space-y-4 hidden">
+              <div class="space-y-1">
+                <label for="forumPollQuestion" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Pergunta da enquete</label>
+                <input id="forumPollQuestion" class="input" placeholder="Ex.: Qual será o próximo tema do laboratório?" />
+              </div>
+              <div class="space-y-1">
+                <label for="forumPollDescription" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Contexto (opcional)</label>
+                <textarea id="forumPollDescription" class="input min-h-[100px] resize-y" placeholder="Inclua detalhes, links ou critérios de escolha."></textarea>
+              </div>
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Opções de resposta</label>
+                  <button type="button" id="btnAddPollOption" class="btn btn-ghost text-xs">Adicionar opção</button>
+                </div>
+                <div id="forumPollOptions" class="space-y-2"></div>
+                <p class="hint">A enquete precisa de pelo menos duas alternativas preenchidas.</p>
+              </div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="space-y-1">
+                  <label for="forumPollAudience" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Audiência</label>
+                  <select id="forumPollAudience" class="input">
+                    <option value="all">Toda a turma</option>
+                    <option value="moduleA">Bloco A</option>
+                    <option value="moduleB">Bloco B</option>
+                    <option value="moduleC">Bloco C</option>
+                    <option value="moduleD">Bloco D</option>
+                  </select>
+                </div>
+                <div class="space-y-1">
+                  <label for="forumPollClosing" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Encerramento</label>
+                  <input id="forumPollClosing" type="date" class="input" />
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-4 text-sm">
+                <label class="inline-flex items-center gap-2">
+                  <input id="forumPollAllowMultiple" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+                  <span>Permitir múltiplas respostas</span>
+                </label>
+                <label class="inline-flex items-center gap-2">
+                  <input id="forumPollAllowUpdate" type="checkbox" class="h-4 w-4 rounded border-slate-300" checked />
+                  <span>Permitir alterar o voto</span>
+                </label>
+              </div>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="space-y-1">
+                  <label for="forumPollVisibility" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Visibilidade</label>
+                  <select id="forumPollVisibility" class="input">
+                    <option value="public">Público — aparece para todos elegíveis</option>
+                    <option value="private">Privado — visível apenas para convidados</option>
+                  </select>
+                </div>
+                <div class="space-y-1">
+                  <label for="forumPollTargets" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Convidar pessoas</label>
+                  <select id="forumPollTargets" class="input min-h-[96px]" multiple></select>
+                  <p class="hint">Se selecionar nomes, a enquete ficará restrita aos convidados.</p>
+                </div>
+              </div>
+              <div id="forumPollFormFeedback" class="text-xs text-rose-500 hidden" aria-live="polite"></div>
+              <div class="flex justify-end">
+                <button type="submit" id="btnSubmitPoll" class="btn btn-primary">Publicar enquete</button>
+              </div>
+            </form>
+
+            <form id="forumQuestionForm" class="space-y-4 hidden">
+              <div class="space-y-1">
+                <label for="forumQuestionSubject" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Assunto da dúvida</label>
+                <input id="forumQuestionSubject" class="input" placeholder="Ex.: Precisamos de suporte com tabelas dinâmicas" />
+              </div>
+              <div class="space-y-1">
+                <label for="forumQuestionDetails" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Detalhes</label>
+                <textarea id="forumQuestionDetails" class="input min-h-[120px] resize-y" placeholder="Descreva o desafio, anexos ou resultados esperados."></textarea>
+              </div>
+              <fieldset class="space-y-2">
+                <legend class="text-xs font-semibold uppercase tracking-wide text-slate-500">Destino da dúvida</legend>
+                <div class="grid gap-2 md:grid-cols-3">
+                  <label class="inline-flex items-center gap-2 text-sm">
+                    <input type="radio" name="forumQuestionScope" value="community" class="h-4 w-4 rounded border-slate-300" checked />
+                    <span>Comunidade</span>
+                  </label>
+                  <label class="inline-flex items-center gap-2 text-sm">
+                    <input type="radio" name="forumQuestionScope" value="admin" class="h-4 w-4 rounded border-slate-300" />
+                    <span>Coordenação</span>
+                  </label>
+                  <label class="inline-flex items-center gap-2 text-sm">
+                    <input type="radio" name="forumQuestionScope" value="both" class="h-4 w-4 rounded border-slate-300" />
+                    <span>Comunidade + Coordenação</span>
+                  </label>
+                </div>
+              </fieldset>
+              <div class="grid gap-4 md:grid-cols-2">
+                <div class="space-y-1">
+                  <label for="forumQuestionVisibility" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Visibilidade</label>
+                  <select id="forumQuestionVisibility" class="input">
+                    <option value="public">Público — todos podem acompanhar</option>
+                    <option value="private">Privado — somente convidados</option>
+                  </select>
+                </div>
+                <div class="space-y-1">
+                  <label for="forumQuestionTargets" class="text-xs font-semibold uppercase tracking-wide text-slate-500">Convidar pessoas</label>
+                  <select id="forumQuestionTargets" class="input min-h-[96px]" multiple></select>
+                  <p class="hint">Selecione nomes se desejar restringir a conversa a pessoas específicas.</p>
+                </div>
+              </div>
+              <div id="forumQuestionFormFeedback" class="text-xs text-rose-500 hidden" aria-live="polite"></div>
+              <div class="flex justify-end">
+                <button type="submit" id="btnSubmitQuestion" class="btn btn-primary">Enviar dúvida</button>
+              </div>
+            </form>
+          </div>
+          <p id="communityGuestNotice" class="text-sm text-slate-500 hidden">Entre com sua conta para publicar atualizações, enquetes e anexos no fórum.</p>
+        </div>
+
+        <div class="card space-y-4" id="forumIdeaCard">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold">Ideias em destaque</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Apoie iniciativas e convide colegas para construir junto.</p>
+            </div>
+            <span id="forumIdeaCount" class="pill">0 ideias registradas</span>
+          </div>
+          <div id="forumIdeaList" class="space-y-4"></div>
+          <p id="forumIdeaEmpty" class="history-empty hidden">Nenhuma ideia registrada ainda. Compartilhe a primeira!</p>
+        </div>
+
+        <div class="card space-y-4" id="forumQuestionCard">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold">Dúvidas recentes</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Acompanhe o que a turma e a coordenação estão discutindo.</p>
+            </div>
+          </div>
+          <div id="forumQuestionList" class="space-y-4 text-sm"></div>
+          <p id="forumQuestionEmpty" class="history-empty hidden">Nenhuma dúvida registrada por aqui. Abra o jogo e peça ajuda!</p>
+        </div>
+
+        <div class="card" id="communityWallCard">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 class="text-lg font-semibold">Mural da comunidade</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Reaja, comente e mantenha as conversas vivas entre os encontros.</p>
+            </div>
+          </div>
+          <div id="communityWallList" class="grid gap-4 text-sm"></div>
+          <div id="communityWallEmpty" class="history-empty hidden">
+            Ainda não temos publicações por aqui. Seja o primeiro a compartilhar uma atualização!
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+        <div class="card space-y-4" id="forumLatestCard">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="text-lg font-semibold">Últimas conversas</h3>
+            <span id="forumLatestBadge" class="pill hidden">Novidade</span>
+          </div>
+          <ul id="forumLatestList" class="space-y-3 text-sm"></ul>
+          <p id="forumLatestEmpty" class="history-empty hidden">As conversas mais recentes aparecerão aqui.</p>
+        </div>
+
+        <div class="card space-y-4" id="forumNotificationCard">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold">Notificações</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Veja o que ainda não conferiu no fórum.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <span id="forumNotificationBadge" class="pill">0 novas</span>
+              <button type="button" id="btnForumNotificationsRead" class="btn btn-ghost text-xs">Marcar como lidas</button>
+            </div>
+          </div>
+          <div id="forumNotificationList" class="space-y-3 text-sm"></div>
+          <p id="forumNotificationEmpty" class="history-empty hidden">Sem notificações pendentes por aqui.</p>
+        </div>
+
+        <div class="card space-y-4">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold">Enquetes em destaque</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Vote e acompanhe os resultados em tempo real.</p>
+            </div>
+            <span class="pill">Atualiza em tempo real</span>
+          </div>
+          <p id="forumPollSummary" class="text-xs text-slate-500 dark:text-slate-400">Entre para votar nas enquetes da turma.</p>
+          <div id="forumPollList" class="space-y-4"></div>
+        </div>
+      </div>
+    </div>
+  </section>
