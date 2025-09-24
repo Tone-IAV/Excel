@@ -5554,6 +5554,17 @@
     syncNavAvailability();
     ensureRouteAfterAuthChange();
 
+    const authSectionEl = $('#authSection');
+    const dashSectionEl = $('#dashSection');
+    const userInfoEl = $('#userInfo');
+    const logoutBtnEl = $('#btnLogout');
+    const xpBoxEl = $('#xpBox');
+    const lvlBoxEl = $('#lvlBox');
+    const doneBoxEl = $('#doneBox');
+    const pctBoxEl = $('#pctBox');
+    const barBoxEl = $('#barBox');
+    const adminPanelEl = $('#adminPanel');
+
     const activeUserId = currentUser?.id ?? null;
     const hasUserChanged = activeUserId !== lastPanelPollUserId;
     if (!currentUser || hasUserChanged) {
@@ -5562,11 +5573,11 @@
     lastPanelPollUserId = activeUserId;
 
     if (!currentUser) {
-      $('#authSection').classList.remove('hidden');
+      if (authSectionEl) authSectionEl.classList.remove('hidden');
       showAuthView('login');
-      $('#dashSection').classList.add('hidden');
-      $('#userInfo').textContent = 'Visitante';
-      $('#btnLogout').classList.add('hidden');
+      if (dashSectionEl) dashSectionEl.classList.add('hidden');
+      if (userInfoEl) userInfoEl.textContent = 'Visitante';
+      if (logoutBtnEl) logoutBtnEl.classList.add('hidden');
       hasLoadedEmbeds = false;
       if (excelFrameEl) excelFrameEl.removeAttribute('src');
       if (pptFrameEl) pptFrameEl.removeAttribute('src');
@@ -5645,10 +5656,10 @@
       return;
     }
 
-    $('#authSection').classList.add('hidden');
-    $('#dashSection').classList.remove('hidden');
-    $('#btnLogout').classList.remove('hidden');
-    $('#userInfo').textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
+    if (authSectionEl) authSectionEl.classList.add('hidden');
+    if (dashSectionEl) dashSectionEl.classList.remove('hidden');
+    if (logoutBtnEl) logoutBtnEl.classList.remove('hidden');
+    if (userInfoEl) userInfoEl.textContent = currentUser.name + (currentUser.isAdmin ? ' (Admin)' : '');
     if (resourcesEmptyEl && resourcesEmptyDefaultText) resourcesEmptyEl.textContent = resourcesEmptyDefaultText;
     if (eventsEmptyEl && eventsEmptyDefaultText) eventsEmptyEl.textContent = eventsEmptyDefaultText;
     if (communityEmptyEl && communityEmptyDefaultHtml) communityEmptyEl.innerHTML = communityEmptyDefaultHtml;
@@ -5695,12 +5706,12 @@
         }
       })
       .withSuccessHandler(s => {
-        $('#xpBox').textContent = s.xp;
-        $('#lvlBox').textContent = s.level;
-        $('#doneBox').textContent = s.concluidos;
+        if (xpBoxEl) xpBoxEl.textContent = s.xp;
+        if (lvlBoxEl) lvlBoxEl.textContent = s.level;
+        if (doneBoxEl) doneBoxEl.textContent = s.concluidos;
         const pct = Math.round((s.concluidos / TOTAL_MODULES) * 100);
-        $('#pctBox').textContent = pct + '%';
-        $('#barBox').style.width = pct + '%';
+        if (pctBoxEl) pctBoxEl.textContent = pct + '%';
+        if (barBoxEl) barBoxEl.style.width = pct + '%';
         updateLevelIndicator(s);
         updateStudentStoryState({
           xp: s.xp,
@@ -5713,7 +5724,7 @@
 
     loadHistoryForCurrentUser();
     refreshRanking();
-    $('#adminPanel').classList.toggle('hidden', !currentUser.isAdmin);
+    if (adminPanelEl) adminPanelEl.classList.toggle('hidden', !currentUser.isAdmin);
     syncAdminVisibility();
     renderAdminBulletin();
     renderAdminMissionList();
