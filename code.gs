@@ -13,6 +13,14 @@ const SHEET_USER_ACHIEVEMENT = 'UserAchievements'; // userId, achievementId, unl
 const SHEET_WALL             = 'Wall';             // id, userId, authorName, message, createdAt, visibility, targetUserIds, mentionUserIds, attachmentIds, removedAt, removedBy
 const SHEET_CONFIRMATIONS    = 'UserConfirmations';// userId, email, codeHash, createdAt, expiresAt, confirmedAt, lastSentAt, pendingName, pendingPassHash, pendingIsAdmin
 const SHEET_WALL_ATTACHMENTS = 'WallAttachments';  // attachmentId, postId, uploaderId, fileId, fileName, mimeType, fileUrl, sizeBytes, uploadedAt, linkedAt, folderId
+const SHEET_FORUM_IDEAS      = 'ForumIdeas';       // id, userId, authorName, title, summary, impact, benefit, visibility, targetUserIds, tags, createdAt, status
+const SHEET_FORUM_IDEA_FEEDBACK = 'ForumIdeaFeedback'; // id, ideaId, userId, type, message, createdAt
+const SHEET_FORUM_POLLS      = 'ForumPolls';       // id, creatorId, question, description, allowMultiple, allowUpdates, visibility, audience, closesAt, createdAt, targetUserIds, metadata
+const SHEET_FORUM_POLL_OPTIONS = 'ForumPollOptions'; // id, pollId, label, order, createdAt
+const SHEET_FORUM_POLL_VOTES = 'ForumPollVotes';   // id, pollId, userId, choiceIds, createdAt, updatedAt
+const SHEET_FORUM_QUESTIONS  = 'ForumQuestions';   // id, userId, authorName, subject, details, scope, visibility, targetUserIds, createdAt, status, metadata
+const SHEET_FORUM_NOTIFICATIONS = 'ForumNotifications'; // id, userId, type, entityId, message, link, createdAt, readAt, metadata
+const SHEET_FORUM_REACTIONS  = 'ForumReactions';   // id, postId, userId, reaction, createdAt, updatedAt
 
 const CONFIG_RECOMMENDED_RESOURCES = 'recommended_resources';
 const CONFIG_UPCOMING_EVENTS       = 'upcoming_events';
@@ -22,6 +30,7 @@ const CHECKIN_STREAK_XP_CAP = 24;
 const COMMUNITY_ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB por arquivo
 const COMMUNITY_FILES_FOLDER_ID = '1LBfNBUjTMjrEVL1CE-YJtA3ecW_gQMIR';
 const COMMUNITY_FORUM_FOLDER_NAME = 'Forum da Turma';
+const COMMUNITY_REACTION_TYPES = Object.freeze(['like', 'insight', 'celebrate', 'resolve']);
 const CONFIG_USER_FILES_ROOT = 'user_files_root';
 const USER_FILES_PARENT_FOLDER_ID = '1LBfNBUjTMjrEVL1CE-YJtA3ecW_gQMIR';
 const USER_MATERIAL_MAX_BYTES = 20 * 1024 * 1024; // 20 MB por arquivo
@@ -237,6 +246,14 @@ function setup_() {
   ensure(SHEET_WALL,             ['id','userId','authorName','message','createdAt','visibility','targetUserIds','mentionUserIds','attachmentIds','removedAt','removedBy']);
   ensure(SHEET_CONFIRMATIONS,    ['userId','email','codeHash','createdAt','expiresAt','confirmedAt','lastSentAt','pendingName','pendingPassHash','pendingIsAdmin']);
   ensure(SHEET_WALL_ATTACHMENTS, ['attachmentId','postId','uploaderId','fileId','fileName','mimeType','fileUrl','sizeBytes','uploadedAt','linkedAt','folderId']);
+  ensure(SHEET_FORUM_IDEAS,      ['id','userId','authorName','title','summary','impact','benefit','visibility','targetUserIds','tags','createdAt','status']);
+  ensure(SHEET_FORUM_IDEA_FEEDBACK, ['id','ideaId','userId','type','message','createdAt']);
+  ensure(SHEET_FORUM_POLLS,      ['id','creatorId','question','description','allowMultiple','allowUpdates','visibility','audience','closesAt','createdAt','targetUserIds','metadata']);
+  ensure(SHEET_FORUM_POLL_OPTIONS, ['id','pollId','label','order','createdAt']);
+  ensure(SHEET_FORUM_POLL_VOTES, ['id','pollId','userId','choiceIds','createdAt','updatedAt']);
+  ensure(SHEET_FORUM_QUESTIONS,  ['id','userId','authorName','subject','details','scope','visibility','targetUserIds','createdAt','status','metadata']);
+  ensure(SHEET_FORUM_NOTIFICATIONS, ['id','userId','type','entityId','message','link','createdAt','readAt','metadata']);
+  ensure(SHEET_FORUM_REACTIONS,  ['id','postId','userId','reaction','createdAt','updatedAt']);
 
   // Defaults de config
   const cfg = getConfig_();
@@ -802,6 +819,222 @@ function getUserMap_() {
       isAdmin: !!row[4],
       xp: Number(row[5] || 0)
     };
+  }
+  return map;
+}
+
+function getAdminUsers_() {
+  const rows = getAll_(sh_(SHEET_USERS));
+  const admins = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row[0]) continue;
+    if (row[4]) {
+      admins.push({ id: row[0], name: row[1] || '', email: row[2] || '' });
+    }
+  }
+  return admins;
+}
+
+function filterValidUserIds_(ids, userMap) {
+  const normalized = normalizeStringArray_(ids);
+  const map = userMap || getUserMap_();
+  const result = [];
+  for (let i = 0; i < normalized.length; i++) {
+    const id = normalized[i];
+    if (!id) continue;
+    if (map && !map[id]) continue;
+    if (result.indexOf(id) === -1) result.push(id);
+  }
+  return result;
+}
+
+function truncateText_(text, limit) {
+  const str = (text || '').toString().trim();
+  const max = Number(limit) || 0;
+  if (!max || str.length <= max) return str;
+  const slice = str.slice(0, Math.max(0, max - 1)).trimEnd();
+  return slice ? slice + '…' : str.slice(0, max);
+}
+
+function parseNotificationMetadata_(value) {
+  if (!value && value !== 0) return {};
+  if (typeof value === 'object' && value !== null) return value;
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === 'object') return parsed;
+  } catch (err) {
+    // ignora
+  }
+  return {};
+}
+
+function normalizePollChoiceList_(value) {
+  if (Array.isArray(value)) return normalizeStringArray_(value);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return normalizeStringArray_(parsed);
+    } catch (err) {
+      // fallback simples
+    }
+    return normalizeStringArray_(trimmed.split(/[,;\s]+/));
+  }
+  return [];
+}
+
+function sendForumNotificationEmail_(email, subject, body) {
+  const to = (email || '').toString().trim();
+  const message = (body || '').toString().trim();
+  const mailSubject = (subject || '').toString().trim() || 'Atualização no fórum da turma';
+  if (!to || !message) return;
+  try {
+    MailApp.sendEmail({
+      to,
+      subject: mailSubject,
+      body: message + '\n\nAcesse o painel do fórum para mais detalhes.',
+      name: 'Plataforma Excel',
+      noReply: true
+    });
+  } catch (err) {
+    // evita que falhas de envio interrompam o fluxo principal
+    console.error('Falha ao enviar notificação por e-mail:', err);
+  }
+}
+
+function createNotifications_(userIds, options) {
+  const recipients = filterValidUserIds_(userIds, options && options.userMap);
+  if (!recipients.length) return [];
+  const sheet = sh_(SHEET_FORUM_NOTIFICATIONS);
+  if (!sheet) return [];
+  const now = nowISO_();
+  const type = (options && options.type ? options.type : '').toString();
+  const entityId = (options && options.entityId ? options.entityId : '').toString();
+  const message = (options && options.message ? options.message : '').toString();
+  const link = (options && options.link ? options.link : '').toString();
+  const metadata = options && options.metadata ? JSON.stringify(options.metadata) : '';
+  const rows = [];
+  recipients.forEach(userId => {
+    if (!userId) return;
+    rows.push([Utilities.getUuid(), userId, type, entityId, message, link, now, '', metadata]);
+  });
+  if (!rows.length) return [];
+  const start = sheet.getLastRow() + 1;
+  sheet.getRange(start, 1, rows.length, rows[0].length).setValues(rows);
+  if (options && options.sendEmail) {
+    const userMap = options.userMap || getUserMap_();
+    const subject = options.emailSubject || 'Atualização no fórum da turma';
+    const emailBody = options.emailMessage || message;
+    recipients.forEach(userId => {
+      const info = userMap[userId];
+      if (!info || !info.email) return;
+      sendForumNotificationEmail_(info.email, subject, emailBody);
+    });
+  }
+  return rows.map(row => ({ id: row[0], userId: row[1] }));
+}
+
+function notifyForumMentions_(mentionIds, payload) {
+  if (!Array.isArray(mentionIds) || !mentionIds.length) return;
+  const userMap = getUserMap_();
+  const cleanIds = filterValidUserIds_(mentionIds, userMap);
+  if (!cleanIds.length) return;
+  const authorId = payload && payload.authorId ? payload.authorId.toString() : '';
+  const recipients = cleanIds.filter(id => id && id !== authorId);
+  if (!recipients.length) return;
+  const authorName = (payload && payload.authorName ? payload.authorName : 'Um colega');
+  const snippet = truncateText_(payload && payload.message, 140);
+  const message = `${authorName} mencionou você no fórum.` + (snippet ? ` "${snippet}"` : '');
+  const emailMessage = `${authorName} mencionou você no fórum da turma.` + (snippet ? `\n\n${snippet}` : '');
+  createNotifications_(recipients, {
+    type: 'mention',
+    entityId: payload && payload.postId ? payload.postId : '',
+    message,
+    link: 'forum',
+    metadata: { postId: payload && payload.postId ? payload.postId : '' },
+    sendEmail: true,
+    emailSubject: 'Você foi mencionado no fórum da turma',
+    emailMessage
+  });
+}
+
+function notifyForumTargets_(targetIds, mentionIds, payload) {
+  if (!Array.isArray(targetIds) || !targetIds.length) return;
+  const userMap = getUserMap_();
+  const mentionSet = new Set(mentionIds || []);
+  const authorId = payload && payload.authorId ? payload.authorId.toString() : '';
+  const filtered = filterValidUserIds_(targetIds, userMap).filter(id => id && id !== authorId && !mentionSet.has(id));
+  if (!filtered.length) return;
+  const authorName = (payload && payload.authorName ? payload.authorName : 'Um colega');
+  const baseMessage = `${authorName} compartilhou uma atualização com você.`;
+  const snippet = truncateText_(payload && payload.message, 140);
+  const message = snippet ? `${baseMessage} "${snippet}"` : baseMessage;
+  const emailMessage = snippet ? `${baseMessage}\n\n${snippet}` : `${baseMessage}\n\nAcesse o painel do fórum para acompanhar.`;
+  createNotifications_(filtered, {
+    type: 'direct-share',
+    entityId: payload && payload.postId ? payload.postId : '',
+    message,
+    link: 'forum',
+    metadata: { postId: payload && payload.postId ? payload.postId : '', visibility: payload && payload.visibility ? payload.visibility : '' },
+    sendEmail: payload && payload.visibility === 'private',
+    emailSubject: 'Você recebeu uma atualização no fórum',
+    emailMessage
+  });
+}
+
+function notifyIdeaAuthor_(ideaId, actor, type, message) {
+  if (!ideaId || !actor || !actor.id) return;
+  const sheet = sh_(SHEET_FORUM_IDEAS);
+  const rows = sheet ? getAll_(sheet) : [];
+  let record = null;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[0] || '') === ideaId) {
+      record = row;
+      break;
+    }
+  }
+  if (!record) return;
+  const authorId = record[1] || '';
+  if (!authorId || authorId === actor.id) return;
+  const title = record[3] || 'Ideia';
+  const actorName = actor.name || 'Um colega';
+  let messageText = '';
+  const snippet = truncateText_(message, 140);
+  if (type === 'comment') {
+    messageText = `${actorName} comentou na sua ideia "${title}".` + (snippet ? ` "${snippet}"` : '');
+  } else if (type === 'support') {
+    messageText = `${actorName} apoiou a sua ideia "${title}".`;
+  } else if (type === 'volunteer') {
+    messageText = `${actorName} quer participar da sua ideia "${title}".`;
+  } else {
+    messageText = `${actorName} interagiu com a sua ideia "${title}".`;
+  }
+  createNotifications_([authorId], {
+    type: 'idea-feedback',
+    entityId: ideaId,
+    message: messageText,
+    link: 'forum',
+    metadata: { ideaId }
+  });
+}
+
+function getReactionSummaryMap_() {
+  const sheet = sh_(SHEET_FORUM_REACTIONS);
+  const rows = sheet ? getAll_(sheet) : [];
+  const map = {};
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const postId = row[1] || '';
+    const userId = row[2] || '';
+    const reaction = row[3] || '';
+    if (!postId || !userId || !reaction) continue;
+    if (!map[postId]) map[postId] = { totals: {}, byUser: {} };
+    const totals = map[postId].totals;
+    totals[reaction] = (totals[reaction] || 0) + 1;
+    map[postId].byUser[userId] = reaction;
   }
   return map;
 }
@@ -2360,6 +2593,7 @@ function listCommunityWallEntries(payload) {
   const rows = getAll_(sh_(SHEET_WALL));
   const attachmentsMap = getAllAttachmentsMap_();
   const userMap = getUserMap_();
+  const reactionMap = getReactionSummaryMap_();
   const entries = [];
 
   for (let i = 0; i < rows.length; i++) {
@@ -2412,6 +2646,15 @@ function listCommunityWallEntries(payload) {
       if (info && info.name) mentionNames.push(info.name);
     }
 
+    const reactionInfo = reactionMap[id] || { totals: {}, byUser: {} };
+    const reactionTotals = [];
+    const totals = reactionInfo && reactionInfo.totals ? reactionInfo.totals : {};
+    Object.keys(totals).forEach(key => {
+      reactionTotals.push({ type: key, count: Number(totals[key] || 0) });
+    });
+    reactionTotals.sort((a, b) => Number(b.count || 0) - Number(a.count || 0));
+    const viewerReaction = viewerId && reactionInfo && reactionInfo.byUser ? reactionInfo.byUser[viewerId] || '' : '';
+
     entries.push({
       id,
       userId,
@@ -2424,7 +2667,11 @@ function listCommunityWallEntries(payload) {
       targetUserNames: targetNames,
       mentionUserIds: mentionIds,
       mentionUserNames: mentionNames,
-      attachments: attachmentList
+      attachments: attachmentList,
+      reactions: {
+        totals: reactionTotals,
+        viewerReaction
+      }
     });
   }
 
@@ -2481,6 +2728,13 @@ function addCommunityWallEntry(payload) {
     if (sanitizedMentions.indexOf(mentionId) === -1) sanitizedMentions.push(mentionId);
   }
 
+  if (visibility === 'private') {
+    for (let i = 0; i < sanitizedMentions.length; i++) {
+      const mentionId = sanitizedMentions[i];
+      if (sanitizedTargets.indexOf(mentionId) === -1) sanitizedTargets.push(mentionId);
+    }
+  }
+
   const attachmentsRaw = payload && (payload.attachments || payload.attachmentIds);
   const attachmentIdList = normalizeStringArray_(Array.isArray(attachmentsRaw) ? attachmentsRaw : deserializeIdList_(attachmentsRaw || []));
   const attachmentRecords = validateAttachmentOwnership_(attachmentIdList, session.user.id);
@@ -2497,6 +2751,16 @@ function addCommunityWallEntry(payload) {
   const attachmentList = attachmentRecords.map(formatAttachmentForClient_).filter(Boolean);
   const targetNames = sanitizedTargets.map(t => (userMap[t] && userMap[t].name) ? userMap[t].name : '').filter(Boolean);
   const mentionNames = sanitizedMentions.map(t => (userMap[t] && userMap[t].name) ? userMap[t].name : '').filter(Boolean);
+
+  const context = {
+    postId: id,
+    authorId: session.user.id,
+    authorName: session.user.name || '',
+    message: normalized,
+    visibility
+  };
+  notifyForumMentions_(sanitizedMentions, context);
+  notifyForumTargets_(sanitizedTargets, sanitizedMentions, context);
 
   return {
     ok: true,
@@ -2682,3 +2946,735 @@ function setKeyUrl_(sheetName, key, url) {
   }
   s.appendRow([key, url]);
 }
+
+function submitForumIdea(payload) {
+  setup_();
+  const session = requireSessionUser_(payload && payload.token);
+  const title = (payload && payload.title ? payload.title.toString() : '').trim();
+  if (!title) throw new Error('Informe o título da ideia.');
+  const summary = (payload && payload.summary ? payload.summary.toString() : '').trim();
+  if (!summary) throw new Error('Descreva a ideia com alguns detalhes.');
+  const impactRaw = (payload && payload.impact ? payload.impact.toString() : '').trim();
+  const impact = impactRaw || 'Médio';
+  const benefit = (payload && payload.benefit ? payload.benefit.toString() : '').trim();
+  const tagsRaw = (payload && payload.tags ? payload.tags.toString() : '').trim();
+  const tagsList = tagsRaw ? normalizeStringArray_(tagsRaw.split(',')) : [];
+  const visibility = (payload && payload.visibility === 'private') ? 'private' : 'public';
+  const userMap = getUserMap_();
+  const targetRaw = payload && (payload.targetUserIds || payload.targets);
+  const targetIds = visibility === 'private'
+    ? filterValidUserIds_(Array.isArray(targetRaw) ? targetRaw : deserializeIdList_(targetRaw || []), userMap)
+    : [];
+  const filteredTargets = targetIds.filter(id => id && id !== session.user.id);
+  if (visibility === 'private' && !filteredTargets.length) {
+    throw new Error('Selecione ao menos um convidado para ideias privadas.');
+  }
+  const sheet = sh_(SHEET_FORUM_IDEAS);
+  const id = Utilities.getUuid();
+  const createdAt = nowISO_();
+  sheet.appendRow([
+    id,
+    session.user.id,
+    session.user.name || '',
+    title,
+    summary,
+    impact,
+    benefit,
+    visibility,
+    serializeIdList_(filteredTargets),
+    tagsList.length ? JSON.stringify(tagsList) : '[]',
+    createdAt,
+    'open'
+  ]);
+  if (filteredTargets.length) {
+    const authorName = session.user.name || 'Um colega';
+    const message = `${authorName} compartilhou a ideia "${title}" com você.`;
+    createNotifications_(filteredTargets, {
+      type: 'idea',
+      entityId: id,
+      message,
+      link: 'forum',
+      metadata: { ideaId: id },
+      sendEmail: visibility === 'private',
+      emailSubject: 'Nova ideia compartilhada com você',
+      emailMessage: `${message}
+
+Acesse o painel do fórum para comentar.`
+    });
+  }
+  return { ok: true, idea: { id } };
+}
+
+function listForumIdeas(payload) {
+  setup_();
+  let viewerId = null;
+  let viewerIsAdmin = false;
+  if (payload && payload.token) {
+    try {
+      const session = requireSessionUser_(payload.token);
+      viewerId = session.user.id;
+      viewerIsAdmin = !!session.user.isAdmin;
+    } catch (err) {
+      viewerId = null;
+      viewerIsAdmin = false;
+    }
+  }
+  const sheet = sh_(SHEET_FORUM_IDEAS);
+  const rows = sheet ? getAll_(sheet) : [];
+  const feedbackSheet = sh_(SHEET_FORUM_IDEA_FEEDBACK);
+  const feedbackRows = feedbackSheet ? getAll_(feedbackSheet) : [];
+  const userMap = getUserMap_();
+  const feedbackByIdea = {};
+  for (let i = 0; i < feedbackRows.length; i++) {
+    const row = feedbackRows[i];
+    if (!row || !row[1]) continue;
+    const list = feedbackByIdea[row[1]] || (feedbackByIdea[row[1]] = []);
+    list.push({
+      id: row[0] || '',
+      ideaId: row[1] || '',
+      userId: row[2] || '',
+      type: row[3] || '',
+      message: row[4] || '',
+      createdAt: row[5] || ''
+    });
+  }
+  const ideas = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row[0]) continue;
+    const id = row[0];
+    const authorId = row[1] || '';
+    const authorName = row[2] || '';
+    const title = row[3] || '';
+    const summary = row[4] || '';
+    const impact = row[5] || '';
+    const benefit = row[6] || '';
+    const visibility = (row[7] || '') === 'private' ? 'private' : 'public';
+    const targetUserIds = deserializeIdList_(row[8]);
+    const tagsRawStored = row[9] || '[]';
+    let tags = [];
+    try {
+      const parsed = JSON.parse(tagsRawStored);
+      if (Array.isArray(parsed)) tags = normalizeStringArray_(parsed);
+    } catch (err) {
+      tags = normalizeStringArray_(tagsRawStored.split(','));
+    }
+    const createdAtRaw = row[10] || '';
+    const createdAtDate = parseDateValue_(createdAtRaw);
+    const createdAt = createdAtDate ? createdAtDate.toISOString() : createdAtRaw.toString();
+    const status = row[11] || 'open';
+
+    let allowed = visibility !== 'private';
+    if (!allowed) {
+      allowed = viewerIsAdmin || viewerId === authorId || targetUserIds.indexOf(viewerId) !== -1;
+    }
+    if (!allowed) continue;
+
+    const feedbackList = feedbackByIdea[id] || [];
+    const supporters = new Set();
+    const volunteers = new Set();
+    const comments = [];
+    for (let j = 0; j < feedbackList.length; j++) {
+      const feedback = feedbackList[j];
+      const feedbackDate = parseDateValue_(feedback.createdAt);
+      if (feedback.type === 'support') {
+        supporters.add(feedback.userId);
+      } else if (feedback.type === 'volunteer') {
+        volunteers.add(feedback.userId);
+      } else if (feedback.type === 'comment') {
+        comments.push({
+          id: feedback.id,
+          userId: feedback.userId,
+          authorName: userMap[feedback.userId] ? userMap[feedback.userId].name : 'Participante',
+          message: feedback.message || '',
+          createdAt: feedbackDate ? feedbackDate.toISOString() : (feedback.createdAt || '')
+        });
+      }
+    }
+    comments.sort((a, b) => {
+      const aTime = parseDateValue_(a.createdAt)?.getTime() || 0;
+      const bTime = parseDateValue_(b.createdAt)?.getTime() || 0;
+      return bTime - aTime;
+    });
+
+    ideas.push({
+      id,
+      authorId,
+      authorName,
+      title,
+      summary,
+      impact,
+      benefit,
+      visibility,
+      status,
+      targetUserIds,
+      targetUserNames: targetUserIds.map(t => (userMap[t] && userMap[t].name) ? userMap[t].name : '').filter(Boolean),
+      tags,
+      createdAt,
+      supporters: supporters.size,
+      volunteers: volunteers.size,
+      viewerSupport: viewerId ? supporters.has(viewerId) : false,
+      viewerVolunteer: viewerId ? volunteers.has(viewerId) : false,
+      comments: comments.slice(0, 5),
+      isOwner: viewerId === authorId
+    });
+  }
+  ideas.sort((a, b) => {
+    const aTime = parseDateValue_(a.createdAt)?.getTime() || 0;
+    const bTime = parseDateValue_(b.createdAt)?.getTime() || 0;
+    return bTime - aTime;
+  });
+  return { ideas };
+}
+
+function submitForumIdeaFeedback(payload) {
+  setup_();
+  const session = requireSessionUser_(payload && payload.token);
+  const ideaId = (payload && payload.ideaId ? payload.ideaId.toString() : '').trim();
+  if (!ideaId) throw new Error('Ideia inválida.');
+  const typeRaw = (payload && payload.type ? payload.type.toString() : '').toLowerCase();
+  if (!['support', 'volunteer', 'comment'].includes(typeRaw)) {
+    throw new Error('Tipo de interação inválido.');
+  }
+  const sheet = sh_(SHEET_FORUM_IDEA_FEEDBACK);
+  const rows = sheet ? getAll_(sheet) : [];
+  if (typeRaw === 'comment') {
+    const message = (payload && payload.message ? payload.message.toString() : '').trim();
+    if (!message) throw new Error('Escreva um comentário antes de enviar.');
+    const createdAt = nowISO_();
+    const id = Utilities.getUuid();
+    sheet.appendRow([id, ideaId, session.user.id, typeRaw, message, createdAt]);
+    notifyIdeaAuthor_(ideaId, session.user, typeRaw, message);
+    return { ok: true };
+  }
+  let existingIndex = -1;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[1] || '') === ideaId && (row[2] || '') === session.user.id && (row[3] || '') === typeRaw) {
+      existingIndex = i + 2;
+      break;
+    }
+  }
+  if (existingIndex > -1) {
+    sheet.deleteRow(existingIndex);
+    return { ok: true, removed: true };
+  }
+  const createdAt = nowISO_();
+  sheet.appendRow([Utilities.getUuid(), ideaId, session.user.id, typeRaw, '', createdAt]);
+  notifyIdeaAuthor_(ideaId, session.user, typeRaw, '');
+  return { ok: true, created: true };
+}
+
+function createForumPoll(payload) {
+  setup_();
+  const session = requireSessionUser_(payload && payload.token);
+  const question = (payload && payload.question ? payload.question.toString() : '').trim();
+  if (!question) throw new Error('Informe a pergunta da enquete.');
+  const description = (payload && payload.description ? payload.description.toString() : '').trim();
+  const optionsInput = Array.isArray(payload && payload.options) ? payload.options : [];
+  const sanitizedOptions = [];
+  optionsInput.forEach(option => {
+    const text = (option || '').toString().trim();
+    if (!text) return;
+    if (sanitizedOptions.indexOf(text) === -1) sanitizedOptions.push(text);
+  });
+  if (sanitizedOptions.length < 2) {
+    throw new Error('A enquete precisa de pelo menos duas alternativas.');
+  }
+  const allowMultiple = !!(payload && payload.allowMultiple);
+  const allowUpdates = payload && Object.prototype.hasOwnProperty.call(payload, 'allowUpdates') ? !!payload.allowUpdates : true;
+  const audience = (payload && payload.audience ? payload.audience.toString() : 'all');
+  const closesAtRaw = (payload && payload.closesAt ? payload.closesAt.toString() : '').trim();
+  let closesAt = '';
+  if (closesAtRaw) {
+    const date = parseDateValue_(closesAtRaw);
+    closesAt = date ? date.toISOString() : closesAtRaw;
+  }
+  const visibility = (payload && payload.visibility === 'private') ? 'private' : 'public';
+  const userMap = getUserMap_();
+  const targetRaw = payload && (payload.targetUserIds || payload.targets);
+  const targetIds = visibility === 'private'
+    ? filterValidUserIds_(Array.isArray(targetRaw) ? targetRaw : deserializeIdList_(targetRaw || []), userMap)
+    : [];
+  const filteredTargets = targetIds.filter(id => id && id !== session.user.id);
+  if (visibility === 'private' && !filteredTargets.length) {
+    throw new Error('Selecione ao menos um participante para enquetes privadas.');
+  }
+  const sheet = sh_(SHEET_FORUM_POLLS);
+  const pollId = Utilities.getUuid();
+  const createdAt = nowISO_();
+  const metadata = { allowMultiple: !!allowMultiple, allowUpdates: !!allowUpdates };
+  sheet.appendRow([
+    pollId,
+    session.user.id,
+    question,
+    description,
+    !!allowMultiple,
+    !!allowUpdates,
+    visibility,
+    audience,
+    closesAt,
+    createdAt,
+    serializeIdList_(filteredTargets),
+    JSON.stringify(metadata)
+  ]);
+  const optionSheet = sh_(SHEET_FORUM_POLL_OPTIONS);
+  for (let i = 0; i < sanitizedOptions.length; i++) {
+    optionSheet.appendRow([Utilities.getUuid(), pollId, sanitizedOptions[i], i, createdAt]);
+  }
+  if (filteredTargets.length) {
+    const authorName = session.user.name || 'Um colega';
+    const message = `${authorName} convidou você para votar na enquete "${question}".`;
+    createNotifications_(filteredTargets, {
+      type: 'poll',
+      entityId: pollId,
+      message,
+      link: 'forum',
+      metadata: { pollId },
+      sendEmail: visibility === 'private',
+      emailSubject: 'Nova enquete disponível',
+      emailMessage: `${message}
+
+Acesse o painel do fórum e registre seu voto.`
+    });
+  }
+  return { ok: true, poll: { id: pollId } };
+}
+
+function listForumPolls(payload) {
+  setup_();
+  let viewerId = null;
+  let viewerIsAdmin = false;
+  if (payload && payload.token) {
+    try {
+      const session = requireSessionUser_(payload.token);
+      viewerId = session.user.id;
+      viewerIsAdmin = !!session.user.isAdmin;
+    } catch (err) {
+      viewerId = null;
+      viewerIsAdmin = false;
+    }
+  }
+  const pollSheet = sh_(SHEET_FORUM_POLLS);
+  const pollRows = pollSheet ? getAll_(pollSheet) : [];
+  const optionRows = getAll_(sh_(SHEET_FORUM_POLL_OPTIONS));
+  const voteRows = getAll_(sh_(SHEET_FORUM_POLL_VOTES));
+  const userMap = getUserMap_();
+  const optionsByPoll = {};
+  for (let i = 0; i < optionRows.length; i++) {
+    const row = optionRows[i];
+    const pollId = row[1] || '';
+    if (!pollId) continue;
+    const list = optionsByPoll[pollId] || (optionsByPoll[pollId] = []);
+    list.push({
+      id: row[0] || '',
+      label: row[2] || '',
+      order: Number(row[3] || 0)
+    });
+  }
+  Object.keys(optionsByPoll).forEach(pollId => {
+    optionsByPoll[pollId].sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  });
+  const votesByPoll = {};
+  for (let i = 0; i < voteRows.length; i++) {
+    const row = voteRows[i];
+    const pollId = row[1] || '';
+    const userId = row[2] || '';
+    if (!pollId || !userId) continue;
+    const choices = normalizePollChoiceList_(row[3]);
+    const createdAt = row[4] || '';
+    const updatedAt = row[5] || createdAt;
+    const list = votesByPoll[pollId] || (votesByPoll[pollId] = []);
+    list.push({ userId, choices, createdAt, updatedAt });
+  }
+  const polls = [];
+  for (let i = 0; i < pollRows.length; i++) {
+    const row = pollRows[i];
+    if (!row || !row[0]) continue;
+    const id = row[0];
+    const creatorId = row[1] || '';
+    const question = row[2] || '';
+    const description = row[3] || '';
+    const allowMultiple = row[4] === true || row[4] === 'TRUE';
+    const allowUpdates = row[5] === false || row[5] === 'FALSE' ? false : true;
+    const visibility = (row[6] || '') === 'private' ? 'private' : 'public';
+    const audience = row[7] || 'all';
+    const closesAtRaw = row[8] || '';
+    const createdAtRaw = row[9] || '';
+    const targetUserIds = deserializeIdList_(row[10]);
+    const metadata = parseNotificationMetadata_(row[11]);
+
+    let allowed = visibility !== 'private';
+    if (!allowed) {
+      allowed = viewerIsAdmin || viewerId === creatorId || targetUserIds.indexOf(viewerId) !== -1;
+    }
+    if (!allowed) continue;
+
+    const closesAtDate = parseDateValue_(closesAtRaw);
+    const closesAt = closesAtDate ? closesAtDate.toISOString() : (closesAtRaw || '');
+    const createdAt = parseDateValue_(createdAtRaw)?.toISOString() || (createdAtRaw || '');
+    const optionList = optionsByPoll[id] || [];
+    const voteEntries = votesByPoll[id] || [];
+    const totals = optionList.map(option => {
+      const votes = voteEntries.reduce((sum, entry) => sum + (entry.choices.indexOf(option.id) !== -1 ? 1 : 0), 0);
+      return { id: option.id, label: option.label, votes };
+    });
+    const totalResponses = voteEntries.length;
+    let userChoices = [];
+    if (viewerId) {
+      for (let j = 0; j < voteEntries.length; j++) {
+        if (voteEntries[j].userId === viewerId) {
+          userChoices = voteEntries[j].choices.slice();
+          break;
+        }
+      }
+    }
+    const responded = userChoices.length > 0;
+    const closed = !!(closesAtDate && closesAtDate.getTime() < Date.now());
+
+    polls.push({
+      id,
+      creatorId,
+      creatorName: userMap[creatorId] ? userMap[creatorId].name : 'Participante',
+      question,
+      description,
+      allowMultiple: metadata && Object.prototype.hasOwnProperty.call(metadata, 'allowMultiple') ? !!metadata.allowMultiple : !!allowMultiple,
+      allowUpdates: metadata && Object.prototype.hasOwnProperty.call(metadata, 'allowUpdates') ? !!metadata.allowUpdates : !!allowUpdates,
+      visibility,
+      audience,
+      closesAt,
+      createdAt,
+      options: totals,
+      totalResponses,
+      userChoices,
+      responded,
+      closed,
+      targetUserIds
+    });
+  }
+  polls.sort((a, b) => {
+    const aTime = parseDateValue_(a.createdAt)?.getTime() || 0;
+    const bTime = parseDateValue_(b.createdAt)?.getTime() || 0;
+    return bTime - aTime;
+  });
+  const respondedCount = polls.reduce((count, poll) => count + (poll.responded ? 1 : 0), 0);
+  return { polls, respondedCount };
+}
+
+function submitForumPollVote(payload) {
+  setup_();
+  const session = requireSessionUser_(payload && payload.token);
+  const pollId = (payload && payload.pollId ? payload.pollId.toString() : '').trim();
+  if (!pollId) throw new Error('Enquete inválida.');
+  const pollSheet = sh_(SHEET_FORUM_POLLS);
+  const pollRows = pollSheet ? getAll_(pollSheet) : [];
+  let pollRecord = null;
+  for (let i = 0; i < pollRows.length; i++) {
+    if ((pollRows[i][0] || '') === pollId) {
+      pollRecord = pollRows[i];
+      break;
+    }
+  }
+  if (!pollRecord) throw new Error('Enquete não encontrada.');
+  const creatorId = pollRecord[1] || '';
+  const visibility = (pollRecord[6] || '') === 'private' ? 'private' : 'public';
+  const targetUserIds = deserializeIdList_(pollRecord[10]);
+  const allowMultiple = pollRecord[4] === true || pollRecord[4] === 'TRUE';
+  const allowUpdates = pollRecord[5] === false || pollRecord[5] === 'FALSE' ? false : true;
+  const metadata = parseNotificationMetadata_(pollRecord[11]);
+  const effectiveAllowUpdates = metadata && Object.prototype.hasOwnProperty.call(metadata, 'allowUpdates') ? !!metadata.allowUpdates : !!allowUpdates;
+  const closesAtRaw = pollRecord[8] || '';
+  const closesAtDate = parseDateValue_(closesAtRaw);
+  const closed = !!(closesAtDate && closesAtDate.getTime() < Date.now());
+  if (closed) {
+    throw new Error('Esta enquete está encerrada.');
+  }
+  let allowed = visibility !== 'private';
+  if (!allowed) {
+    allowed = session.user.isAdmin || session.user.id === creatorId || targetUserIds.indexOf(session.user.id) !== -1;
+  }
+  if (!allowed) throw new Error('Você não pode votar nesta enquete.');
+  const optionRows = getAll_(sh_(SHEET_FORUM_POLL_OPTIONS));
+  const optionIds = [];
+  for (let i = 0; i < optionRows.length; i++) {
+    if ((optionRows[i][1] || '') === pollId && optionRows[i][0]) {
+      optionIds.push(optionRows[i][0]);
+    }
+  }
+  if (!optionIds.length) throw new Error('A enquete não possui opções válidas.');
+  const choicesInput = Array.isArray(payload && payload.choices) ? payload.choices : [];
+  const normalizedChoices = normalizePollChoiceList_(choicesInput);
+  const choiceSet = [];
+  for (let i = 0; i < normalizedChoices.length; i++) {
+    const choiceId = normalizedChoices[i];
+    if (optionIds.indexOf(choiceId) === -1) continue;
+    if (choiceSet.indexOf(choiceId) === -1) choiceSet.push(choiceId);
+  }
+  if (!choiceSet.length) throw new Error('Selecione ao menos uma alternativa.');
+  if (!allowMultiple && choiceSet.length > 1) {
+    throw new Error('Esta enquete permite apenas uma alternativa.');
+  }
+  const voteSheet = sh_(SHEET_FORUM_POLL_VOTES);
+  const voteRows = voteSheet ? getAll_(voteSheet) : [];
+  let existingRowIndex = -1;
+  for (let i = 0; i < voteRows.length; i++) {
+    const row = voteRows[i];
+    if ((row[1] || '') === pollId && (row[2] || '') === session.user.id) {
+      existingRowIndex = i + 2;
+      break;
+    }
+  }
+  if (existingRowIndex > -1 && !effectiveAllowUpdates) {
+    throw new Error('Não é possível alterar o voto nesta enquete.');
+  }
+  const now = nowISO_();
+  if (existingRowIndex > -1) {
+    voteSheet.getRange(existingRowIndex, 4).setValue(JSON.stringify(choiceSet));
+    voteSheet.getRange(existingRowIndex, 6).setValue(now);
+    return { ok: true, updated: true };
+  }
+  voteSheet.appendRow([Utilities.getUuid(), pollId, session.user.id, JSON.stringify(choiceSet), now, now]);
+  return { ok: true };
+}
+
+function submitForumQuestion(payload) {
+  setup_();
+  const session = requireSessionUser_(payload && payload.token);
+  const subject = (payload && payload.subject ? payload.subject.toString() : '').trim();
+  if (!subject) throw new Error('Informe o assunto da dúvida.');
+  const details = (payload && payload.details ? payload.details.toString() : '').trim();
+  if (!details) throw new Error('Descreva a dúvida para a comunidade ou coordenação.');
+  const scopeRaw = (payload && payload.scope ? payload.scope.toString() : 'community');
+  const scope = ['community', 'admin', 'both'].indexOf(scopeRaw) !== -1 ? scopeRaw : 'community';
+  const visibility = (payload && payload.visibility === 'private') ? 'private' : 'public';
+  const userMap = getUserMap_();
+  const targetRaw = payload && (payload.targetUserIds || payload.targets);
+  const targetIds = visibility === 'private'
+    ? filterValidUserIds_(Array.isArray(targetRaw) ? targetRaw : deserializeIdList_(targetRaw || []), userMap)
+    : [];
+  const filteredTargets = targetIds.filter(id => id && id !== session.user.id);
+  if (visibility === 'private' && scope !== 'admin' && !filteredTargets.length) {
+    throw new Error('Selecione ao menos um convidado para dúvidas privadas.');
+  }
+  const sheet = sh_(SHEET_FORUM_QUESTIONS);
+  const id = Utilities.getUuid();
+  const createdAt = nowISO_();
+  sheet.appendRow([
+    id,
+    session.user.id,
+    session.user.name || '',
+    subject,
+    details,
+    scope,
+    visibility,
+    serializeIdList_(filteredTargets),
+    createdAt,
+    'open',
+    '{}'
+  ]);
+  const admins = getAdminUsers_();
+  const adminIds = admins.map(admin => admin.id).filter(id => id && id !== session.user.id);
+  if (adminIds.length) {
+    const authorName = session.user.name || 'Um colega';
+    const adminMessage = `${authorName} registrou a dúvida "${subject}".`;
+    createNotifications_(adminIds, {
+      type: 'question',
+      entityId: id,
+      message: adminMessage,
+      link: 'forum',
+      metadata: { questionId: id },
+      sendEmail: true,
+      emailSubject: 'Nova dúvida registrada no fórum',
+      emailMessage: `${adminMessage}
+
+${details}`
+    });
+  }
+  if (filteredTargets.length) {
+    const authorName = session.user.name || 'Um colega';
+    const message = `${authorName} compartilhou a dúvida "${subject}" com você.`;
+    createNotifications_(filteredTargets, {
+      type: 'question',
+      entityId: id,
+      message,
+      link: 'forum',
+      metadata: { questionId: id },
+      sendEmail: visibility === 'private',
+      emailSubject: 'Você foi convidado para uma dúvida',
+      emailMessage: `${message}
+
+${details}`
+    });
+  }
+  return { ok: true, question: { id } };
+}
+
+function listForumQuestions(payload) {
+  setup_();
+  let viewerId = null;
+  let viewerIsAdmin = false;
+  if (payload && payload.token) {
+    try {
+      const session = requireSessionUser_(payload.token);
+      viewerId = session.user.id;
+      viewerIsAdmin = !!session.user.isAdmin;
+    } catch (err) {
+      viewerId = null;
+      viewerIsAdmin = false;
+    }
+  }
+  const sheet = sh_(SHEET_FORUM_QUESTIONS);
+  const rows = sheet ? getAll_(sheet) : [];
+  const userMap = getUserMap_();
+  const questions = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || !row[0]) continue;
+    const id = row[0];
+    const authorId = row[1] || '';
+    const authorName = row[2] || '';
+    const subject = row[3] || '';
+    const details = row[4] || '';
+    const scope = row[5] || 'community';
+    const visibility = (row[6] || '') === 'private' ? 'private' : 'public';
+    const targetUserIds = deserializeIdList_(row[7]);
+    const createdAtRaw = row[8] || '';
+    const status = row[9] || 'open';
+    const metadata = parseNotificationMetadata_(row[10]);
+    let allowed = visibility !== 'private';
+    if (!allowed) {
+      allowed = viewerIsAdmin || viewerId === authorId || targetUserIds.indexOf(viewerId) !== -1;
+    }
+    if (!allowed) continue;
+    if (scope === 'admin' && !viewerIsAdmin && viewerId !== authorId) continue;
+    const createdAtDate = parseDateValue_(createdAtRaw);
+    const createdAt = createdAtDate ? createdAtDate.toISOString() : createdAtRaw.toString();
+    questions.push({
+      id,
+      authorId,
+      authorName,
+      subject,
+      details,
+      scope,
+      visibility,
+      status,
+      targetUserIds,
+      targetUserNames: targetUserIds.map(t => (userMap[t] && userMap[t].name) ? userMap[t].name : '').filter(Boolean),
+      createdAt,
+      metadata,
+      isOwner: viewerId === authorId
+    });
+  }
+  questions.sort((a, b) => {
+    const aTime = parseDateValue_(a.createdAt)?.getTime() || 0;
+    const bTime = parseDateValue_(b.createdAt)?.getTime() || 0;
+    return bTime - aTime;
+  });
+  return { questions };
+}
+
+function listForumNotifications(payload) {
+  setup_();
+  const session = requireSessionUser_(payload && payload.token);
+  const sheet = sh_(SHEET_FORUM_NOTIFICATIONS);
+  const rows = sheet ? getAll_(sheet) : [];
+  const items = [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[1] || '') !== session.user.id) continue;
+    const createdAtRaw = row[6] || '';
+    const createdAtDate = parseDateValue_(createdAtRaw);
+    const readAtRaw = row[7] || '';
+    const readAtDate = readAtRaw ? parseDateValue_(readAtRaw) : null;
+    items.push({
+      id: row[0] || '',
+      type: row[2] || '',
+      entityId: row[3] || '',
+      message: row[4] || '',
+      link: row[5] || '',
+      createdAt: createdAtDate ? createdAtDate.toISOString() : createdAtRaw.toString(),
+      readAt: readAtDate ? readAtDate.toISOString() : '',
+      metadata: parseNotificationMetadata_(row[8])
+    });
+  }
+  items.sort((a, b) => {
+    const aTime = parseDateValue_(a.createdAt)?.getTime() || 0;
+    const bTime = parseDateValue_(b.createdAt)?.getTime() || 0;
+    return bTime - aTime;
+  });
+  const unreadCount = items.reduce((count, item) => count + (item.readAt ? 0 : 1), 0);
+  return { items: items.slice(0, 40), unreadCount };
+}
+
+function markForumNotificationsRead(payload) {
+  setup_();
+  const session = requireSessionUser_(payload && payload.token);
+  const ids = normalizeStringArray_(payload && payload.ids ? payload.ids : []);
+  if (!ids.length) return { ok: true, updated: 0 };
+  const sheet = sh_(SHEET_FORUM_NOTIFICATIONS);
+  const rows = sheet ? getAll_(sheet) : [];
+  const now = nowISO_();
+  let updated = 0;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[1] || '') !== session.user.id) continue;
+    if (ids.indexOf(row[0]) === -1) continue;
+    sheet.getRange(i + 2, 8).setValue(now);
+    updated += 1;
+  }
+  return { ok: true, updated };
+}
+
+function toggleCommunityReaction(payload) {
+  setup_();
+  const session = requireSessionUser_(payload && payload.token);
+  const postId = (payload && payload.postId ? payload.postId.toString() : '').trim();
+  if (!postId) throw new Error('Publicação inválida.');
+  const reactionRaw = (payload && payload.reaction ? payload.reaction.toString() : '').trim().toLowerCase();
+  if (COMMUNITY_REACTION_TYPES.indexOf(reactionRaw) === -1) {
+    throw new Error('Reação inválida.');
+  }
+  const wallRows = getAll_(sh_(SHEET_WALL));
+  let record = null;
+  for (let i = 0; i < wallRows.length; i++) {
+    const row = wallRows[i];
+    if ((row[0] || '') === postId) {
+      if (row[9]) throw new Error('Publicação removida.');
+      record = row;
+      break;
+    }
+  }
+  if (!record) throw new Error('Publicação não encontrada.');
+  const authorId = record[1] || '';
+  const visibility = (record[5] || '') === 'private' ? 'private' : 'public';
+  const targetUserIds = deserializeIdList_(record[6]);
+  let allowed = visibility !== 'private';
+  if (!allowed) {
+    allowed = session.user.isAdmin || session.user.id === authorId || targetUserIds.indexOf(session.user.id) !== -1;
+  }
+  if (!allowed) throw new Error('Você não pode reagir a esta publicação.');
+  const reactionSheet = sh_(SHEET_FORUM_REACTIONS);
+  const rows = reactionSheet ? getAll_(reactionSheet) : [];
+  let existingRowIndex = -1;
+  let existingReaction = '';
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if ((row[1] || '') === postId && (row[2] || '') === session.user.id) {
+      existingRowIndex = i + 2;
+      existingReaction = row[3] || '';
+      break;
+    }
+  }
+  if (existingRowIndex > -1 && existingReaction === reactionRaw) {
+    reactionSheet.deleteRow(existingRowIndex);
+    return { ok: true, removed: true };
+  }
+  const now = nowISO_();
+  if (existingRowIndex > -1) {
+    reactionSheet.getRange(existingRowIndex, 4, 1, 2).setValues([[reactionRaw, now]]);
+    return { ok: true, updated: true };
+  }
+  reactionSheet.appendRow([Utilities.getUuid(), postId, session.user.id, reactionRaw, now, now]);
+  return { ok: true };
+}
+
