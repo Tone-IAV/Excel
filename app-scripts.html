@@ -188,6 +188,7 @@
       userId: user.id,
       name: user.name,
       isAdmin: !!user.isAdmin,
+      remember,
     };
     if (remember) {
       try {
@@ -263,9 +264,18 @@
     } catch (err) {
       console.warn('Não foi possível acessar armazenamento local:', err);
     }
-    if (fromLocal) return fromLocal;
+    if (fromLocal) {
+      return { ...fromLocal, remember: true };
+    }
     try {
-      return parse(sessionStorage.getItem(SESSION_STORAGE_KEY), 'temporária');
+      const fromSession = parse(sessionStorage.getItem(SESSION_STORAGE_KEY), 'temporária');
+      if (fromSession) {
+        const remember = Object.prototype.hasOwnProperty.call(fromSession, 'remember')
+          ? !!fromSession.remember
+          : false;
+        return { ...fromSession, remember };
+      }
+      return null;
     } catch (err) {
       console.warn('Não foi possível acessar armazenamento de sessão:', err);
       return null;
@@ -6529,6 +6539,14 @@
     const stored = getStoredSession();
     if (stored && stored.token) {
       currentSessionToken = stored.token;
+      if (Object.prototype.hasOwnProperty.call(stored, 'remember')) {
+        rememberPreference = !!stored.remember;
+      } else {
+        rememberPreference = true;
+      }
+      if (typeof rememberMeCheckbox !== 'undefined' && rememberMeCheckbox) {
+        rememberMeCheckbox.checked = rememberPreference;
+      }
     }
     const authSection = $('#authSection');
     if (authSection) authSection.classList.add('hidden');
@@ -6542,7 +6560,7 @@
         .withSuccessHandler(user => {
           if (user && user.id) {
             currentUser = user;
-            persistSession(stored.token, user);
+            persistSession(stored.token, user, { remember: rememberPreference });
           } else {
             clearStoredSession();
           }
