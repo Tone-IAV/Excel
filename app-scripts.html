@@ -493,6 +493,131 @@
     }
   }
 
+  const backgroundWarmupQueue = [];
+  let backgroundWarmupProcessing = false;
+  let backgroundWarmupSignature = null;
+  let backgroundWarmupPrimed = false;
+  let backgroundWarmupOptions = { includeCommunity: true, includeForum: true, includeEmbeds: true };
+
+  function resetBackgroundWarmupState() {
+    backgroundWarmupQueue.length = 0;
+    backgroundWarmupProcessing = false;
+    backgroundWarmupPrimed = false;
+    backgroundWarmupSignature = null;
+    backgroundWarmupOptions = { includeCommunity: true, includeForum: true, includeEmbeds: true };
+  }
+
+  function enqueueBackgroundWarmup(taskFn, options = {}) {
+    if (typeof taskFn !== 'function') return;
+    const delayValue = Number(options && options.delay);
+    const delay = Number.isFinite(delayValue) && delayValue > 0 ? delayValue : 0;
+    backgroundWarmupQueue.push({ taskFn, delay });
+    processBackgroundWarmup();
+  }
+
+  function processBackgroundWarmup() {
+    if (backgroundWarmupProcessing) return;
+    const next = backgroundWarmupQueue.shift();
+    if (!next) return;
+    backgroundWarmupProcessing = true;
+    const runTask = () => {
+      let result;
+      try {
+        result = next.taskFn();
+      } catch (err) {
+        const message = typeof extractErrorMessage === 'function' ? extractErrorMessage(err) : err?.message;
+        if (!message || !isSessionErrorMessage(message)) {
+          console.warn('Falha ao executar tarefa de pré-carregamento:', err);
+        }
+        result = null;
+      }
+      Promise.resolve(result)
+        .catch(err => {
+          const message = typeof extractErrorMessage === 'function' ? extractErrorMessage(err) : err?.message;
+          if (!message || !isSessionErrorMessage(message)) {
+            console.warn('Erro durante pré-carregamento em segundo plano:', err);
+          }
+        })
+        .finally(() => {
+          backgroundWarmupProcessing = false;
+          processBackgroundWarmup();
+        });
+    };
+    if (next.delay > 0) {
+      setTimeout(runTask, next.delay);
+    } else {
+      runTask();
+    }
+  }
+
+  function primeBackgroundWarmup(user, options = {}) {
+    if (!user || !user.id) {
+      resetBackgroundWarmupState();
+      return;
+    }
+    const signature = computeUserSignature(user);
+    const shouldReset = signature !== backgroundWarmupSignature
+      || (options && options.force === true);
+    if (shouldReset) {
+      resetBackgroundWarmupState();
+      backgroundWarmupSignature = signature;
+    }
+    const includeCommunity = options && options.includeCommunity === false ? false : true;
+    const includeForum = options && options.includeForum === false ? false : true;
+    const includeEmbeds = options && options.includeEmbeds === false ? false : true;
+    const includeDashboard = options && options.includeDashboard === true;
+    const sameOptions = backgroundWarmupPrimed
+      && backgroundWarmupOptions.includeCommunity === includeCommunity
+      && backgroundWarmupOptions.includeForum === includeForum
+      && backgroundWarmupOptions.includeEmbeds === includeEmbeds
+      && backgroundWarmupOptions.includeDashboard === includeDashboard;
+    if (backgroundWarmupPrimed && sameOptions) {
+      processBackgroundWarmup();
+      return;
+    }
+    backgroundWarmupQueue.length = 0;
+    backgroundWarmupProcessing = false;
+    backgroundWarmupPrimed = true;
+    backgroundWarmupOptions = { includeCommunity, includeForum, includeEmbeds, includeDashboard };
+    const signatureCheck = () => currentUser && computeUserSignature(currentUser) === backgroundWarmupSignature;
+
+    if (includeDashboard) {
+      enqueueBackgroundWarmup(() => {
+        if (!signatureCheck()) return null;
+        return hydrateDashboardSections(['userState', 'history', 'ranking', 'achievements'], {
+          priority: 'high',
+          silentAchievements: true
+        });
+      }, { delay: 80 });
+    }
+
+    if (includeCommunity) {
+      enqueueBackgroundWarmup(() => {
+        if (!signatureCheck()) return null;
+        return ensureCommunityData({ priority: 'normal', silent: true });
+      }, { delay: includeDashboard ? 260 : 120 });
+    }
+
+    if (includeForum) {
+      enqueueBackgroundWarmup(() => {
+        if (!signatureCheck()) return null;
+        const isForumRoute = currentAppRoute === 'forum';
+        return ensureForumData({
+          priority: isForumRoute ? 'high' : 'normal',
+          silent: !isForumRoute,
+          ttl: isForumRoute ? DATA_CACHE_TTL : DATA_CACHE_LONG_TTL
+        });
+      }, { delay: includeCommunity ? 360 : 180 });
+    }
+
+    if (includeEmbeds) {
+      enqueueBackgroundWarmup(() => {
+        if (!signatureCheck()) return null;
+        return loadEmbeds({ priority: 'normal', silent: true });
+      }, { delay: includeForum ? 460 : 260 });
+    }
+  }
+
   function hydrateDashboardSections(sections, options = {}) {
     if (!currentUser || !currentUser.id) {
       return Promise.resolve(null);
@@ -785,6 +910,10 @@
       extensions: ['.ppt', '.pptx', '.pps', '.ppsx', '.odp']
     }
   };
+  const sessionWarmupCardEl = $('#sessionWarmupCard');
+  const sessionWarmupTitleEl = $('#sessionWarmupTitle');
+  const sessionWarmupMessageEl = $('#sessionWarmupMessage');
+  let sessionWarmupVisible = false;
   const loginForm = $('#loginForm');
   const loginCardEl = $('#loginCard');
   const signupCardEl = $('#signupCard');
@@ -5795,9 +5924,11 @@
   }
 
   function showAuthView(mode = 'login') {
-    const normalized = mode === 'signup' || mode === 'confirm' ? mode : 'login';
+    const normalized = ['login', 'signup', 'confirm', 'warmup'].includes(mode) ? mode : 'login';
     currentAuthMode = normalized;
-    if (loginCardEl) loginCardEl.classList.toggle('hidden', normalized !== 'login');
+    const isWarmup = normalized === 'warmup';
+    if (sessionWarmupCardEl) sessionWarmupCardEl.classList.toggle('hidden', !isWarmup);
+    if (loginCardEl) loginCardEl.classList.toggle('hidden', isWarmup || normalized !== 'login');
     if (signupCardEl) signupCardEl.classList.toggle('hidden', normalized !== 'signup');
     if (confirmCardEl) confirmCardEl.classList.toggle('hidden', normalized !== 'confirm');
     if (normalized !== 'confirm') {
@@ -5808,12 +5939,35 @@
     } else {
       startConfirmationCountdown();
     }
-    if (normalized === 'login' && loginEmailInput) {
+    if (normalized === 'login' && loginEmailInput && !sessionWarmupVisible) {
       setTimeout(() => loginEmailInput.focus(), 60);
     } else if (normalized === 'signup' && signupFields.name.input) {
       setTimeout(() => signupFields.name.input.focus(), 60);
     } else if (normalized === 'confirm' && confirmCodeInput) {
       setTimeout(() => confirmCodeInput.focus(), 60);
+    }
+  }
+
+  function enterSessionWarmup(message, options = {}) {
+    sessionWarmupVisible = true;
+    const title = options && options.title ? options.title : 'Carregando sua jornada';
+    if (sessionWarmupTitleEl) sessionWarmupTitleEl.textContent = title;
+    if (sessionWarmupMessageEl && message) sessionWarmupMessageEl.textContent = message;
+    showAuthView('warmup');
+    const authSectionEl = $('#authSection');
+    if (authSectionEl) authSectionEl.classList.remove('hidden');
+  }
+
+  function updateSessionWarmupMessage(message) {
+    if (!sessionWarmupVisible || !sessionWarmupMessageEl || !message) return;
+    sessionWarmupMessageEl.textContent = message;
+  }
+
+  function leaveSessionWarmup(options = {}) {
+    sessionWarmupVisible = false;
+    if (sessionWarmupCardEl) sessionWarmupCardEl.classList.add('hidden');
+    if (options && options.showLogin) {
+      showAuthView('login');
     }
   }
 
@@ -6564,11 +6718,17 @@
     lastKnownUserSignature = currentSignature;
 
     if (!currentUser) {
+      resetBackgroundWarmupState();
       resetDatasetCaches();
       communityState.shareableUsers = [];
       communityState.loadedShareableUsers = false;
       if (authSectionEl) authSectionEl.classList.remove('hidden');
-      showAuthView('login');
+      if (sessionWarmupVisible) {
+        showAuthView('warmup');
+      } else {
+        leaveSessionWarmup();
+        showAuthView('login');
+      }
       if (dashSectionEl) dashSectionEl.classList.add('hidden');
       if (userInfoEl) userInfoEl.textContent = 'Visitante';
       if (logoutBtnEl) logoutBtnEl.classList.add('hidden');
@@ -6652,6 +6812,7 @@
       return;
     }
 
+    leaveSessionWarmup();
     if (authSectionEl) authSectionEl.classList.add('hidden');
     if (dashSectionEl) dashSectionEl.classList.remove('hidden');
     if (logoutBtnEl) logoutBtnEl.classList.remove('hidden');
@@ -6810,19 +6971,12 @@
     renderAdminMissionList();
     updateCommunityAccess();
 
-    if (!skipCommunity) {
-      ensureCommunityData({ priority: 'normal' }).catch(() => {});
-    }
-
-    if (currentAppRoute === 'forum') {
-      ensureForumData({ priority: 'high' }).catch(() => {});
-    } else {
-      ensureForumData({ priority: 'normal', silent: true, ttl: DATA_CACHE_LONG_TTL }).catch(() => {});
-    }
-
-    if (!hasLoadedEmbeds) {
-      loadEmbeds({ priority: 'normal', silent: true }).catch(() => {});
-    }
+    primeBackgroundWarmup(currentUser, {
+      includeCommunity: !skipCommunity,
+      includeForum: true,
+      includeEmbeds: !hasLoadedEmbeds,
+      force: userIdChanged || hasUserChanged
+    });
   }
 
   function refreshRanking(options = {}) {
@@ -7398,23 +7552,27 @@
         rememberMeCheckbox.checked = rememberPreference;
       }
     }
-    const authSection = $('#authSection');
-    if (authSection) authSection.classList.add('hidden');
-
     if (stored && stored.token) {
+      enterSessionWarmup('Validando sua sessão, isso deve levar apenas alguns segundos...', {
+        title: 'Restaurando sessão'
+      });
       google.script.run
         .withFailureHandler(() => {
           clearStoredSession();
+          leaveSessionWarmup({ showLogin: true });
           updateUI();
         })
         .withSuccessHandler(user => {
           if (user && user.id) {
             currentUser = user;
             persistSession(stored.token, user, { remember: rememberPreference });
+            const firstName = (user.name || '').split(' ')[0] || 'aluno';
+            updateSessionWarmupMessage(`Bem-vindo de volta, ${firstName}! Carregando seu painel personalizado...`);
           } else {
             clearStoredSession();
+            leaveSessionWarmup({ showLogin: true });
           }
-          updateUI();
+          setTimeout(() => updateUI(), 120);
         })
         .resumeSession(stored.token);
     } else {
