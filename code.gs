@@ -2465,6 +2465,202 @@ function getActivityHistory(payload) {
   return entries;
 }
 
+function resolveListLimit_(value, defaultLimit, absoluteMax) {
+  const fallback = Number(defaultLimit);
+  const base = Number.isFinite(fallback) && fallback > 0 ? Math.floor(fallback) : 50;
+  const capRaw = Number(absoluteMax);
+  const cap = Number.isFinite(capRaw) && capRaw > 0 ? Math.floor(capRaw) : Math.max(base, 200);
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) return base;
+  const normalized = Math.floor(raw);
+  if (!Number.isFinite(normalized) || normalized <= 0) return base;
+  const limit = Math.max(1, normalized);
+  return Math.min(limit, Math.max(base, cap));
+}
+
+function limitArray_(list, limit) {
+  if (!Array.isArray(list)) return [];
+  const maxRaw = Number(limit);
+  if (!Number.isFinite(maxRaw) || maxRaw <= 0) {
+    return list.slice();
+  }
+  const max = Math.max(1, Math.floor(maxRaw));
+  return list.length > max ? list.slice(0, max) : list.slice();
+}
+
+function normalizeDashboardSection_(name) {
+  const key = (name || '').toString().trim().toLowerCase();
+  if (!key) return '';
+  if (key === 'user' || key === 'usuario' || key === 'profile' || key === 'userstate' || key === 'estado') {
+    return 'userState';
+  }
+  if (key === 'history' || key === 'historico' || key === 'histórico' || key === 'timeline') {
+    return 'history';
+  }
+  if (key === 'ranking' || key === 'leaderboard' || key === 'placar') {
+    return 'ranking';
+  }
+  if (key === 'achievements' || key === 'achievement' || key === 'conquistas') {
+    return 'achievements';
+  }
+  return '';
+}
+
+function normalizeForumSection_(name) {
+  const key = (name || '').toString().trim().toLowerCase();
+  if (!key) return '';
+  if (key === 'polls' || key === 'enquetes' || key === 'poll') return 'polls';
+  if (key === 'ideas' || key === 'ideias' || key === 'idea') return 'ideas';
+  if (key === 'questions' || key === 'duvidas' || key === 'dúvidas' || key === 'question') return 'questions';
+  if (key === 'notifications' || key === 'notificacoes' || key === 'notificações' || key === 'notification') {
+    return 'notifications';
+  }
+  return '';
+}
+
+function getDashboardBootstrap(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const userId = payload && payload.userId;
+  const sectionsInput = Array.isArray(payload && payload.sections) ? payload.sections : [];
+  const sectionsRequested = sectionsInput
+    .map(item => normalizeDashboardSection_(item))
+    .filter(Boolean);
+  const includeAll = !sectionsRequested.length;
+  const includeUserState = includeAll || sectionsRequested.indexOf('userState') !== -1;
+  const includeHistory = includeAll || sectionsRequested.indexOf('history') !== -1;
+  const includeRanking = includeAll || sectionsRequested.indexOf('ranking') !== -1;
+  const includeAchievements = includeAll || sectionsRequested.indexOf('achievements') !== -1;
+
+  const historyLimit = resolveListLimit_(payload && payload.historyLimit, 60, 180);
+  const activityLimit = resolveListLimit_(payload && payload.activityLimit, 60, 180);
+
+  const session = includeUserState || includeHistory || includeAchievements
+    ? requireSessionUser_(token, userId)
+    : null;
+
+  const result = { ok: true, generatedAt: nowISO_(), sections: [] };
+
+  if (includeUserState) {
+    result.userState = getUserState({ token, userId });
+    result.sections.push('userState');
+  }
+
+  if (includeHistory) {
+    const checkins = getCheckinHistory({ token, userId });
+    const activities = getActivityHistory({ token, userId });
+    result.history = {
+      checkins: limitArray_(checkins, historyLimit),
+      activities: limitArray_(activities, activityLimit)
+    };
+    result.sections.push('history');
+  }
+
+  if (includeRanking) {
+    result.ranking = getRanking();
+    result.sections.push('ranking');
+  }
+
+  if (includeAchievements) {
+    result.achievements = getUserAchievementsOverview({ token, userId });
+    result.sections.push('achievements');
+  }
+
+  if (session && session.user) {
+    result.sessionUser = {
+      id: session.user.id,
+      isAdmin: !!session.user.isAdmin
+    };
+  }
+
+  return result;
+}
+
+function getCommunitySnapshot(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const userId = payload && payload.userId;
+  let session = null;
+  if (token) {
+    try {
+      session = requireSessionUser_(token, userId);
+    } catch (err) {
+      throw err;
+    }
+  }
+  const wall = listCommunityWallEntries(token ? { token, userId } : {});
+  const limit = resolveListLimit_(payload && payload.limit, 40, 80);
+  const entries = wall && Array.isArray(wall.entries) ? limitArray_(wall.entries, limit) : [];
+  let shareableUsers = [];
+  if (session && session.user && session.user.id) {
+    const shareable = listShareableUsers({ token, userId });
+    shareableUsers = shareable && Array.isArray(shareable.users) ? shareable.users : [];
+  }
+  return {
+    ok: true,
+    entries,
+    limit: wall && typeof wall.limit === 'number' ? Number(wall.limit) : COMMUNITY_WALL_CHAR_LIMIT,
+    shareableUsers,
+    fetchedAt: nowISO_()
+  };
+}
+
+function getForumSnapshot(payload) {
+  setup_();
+  const token = payload && payload.token;
+  const userId = payload && payload.userId;
+  const sectionsInput = Array.isArray(payload && payload.sections) ? payload.sections : [];
+  const sectionsRequested = sectionsInput
+    .map(item => normalizeForumSection_(item))
+    .filter(Boolean);
+  const includeAll = !sectionsRequested.length;
+  const includePolls = includeAll || sectionsRequested.indexOf('polls') !== -1;
+  const includeIdeas = includeAll || sectionsRequested.indexOf('ideas') !== -1;
+  const includeQuestions = includeAll || sectionsRequested.indexOf('questions') !== -1;
+  const includeNotifications = includeAll || sectionsRequested.indexOf('notifications') !== -1;
+
+  const session = requireSessionUser_(token, userId);
+
+  const result = { ok: true, sections: [], fetchedAt: nowISO_() };
+
+  if (includePolls) {
+    const pollResponse = listForumPolls({ token, userId });
+    result.polls = Array.isArray(pollResponse && pollResponse.polls) ? pollResponse.polls : [];
+    result.pollRespondedCount = Number(pollResponse && pollResponse.respondedCount || 0);
+    result.sections.push('polls');
+  }
+
+  if (includeIdeas) {
+    const ideasResponse = listForumIdeas({ token, userId });
+    result.ideas = Array.isArray(ideasResponse && ideasResponse.ideas) ? ideasResponse.ideas : [];
+    result.sections.push('ideas');
+  }
+
+  if (includeQuestions) {
+    const questionsResponse = listForumQuestions({ token, userId });
+    result.questions = Array.isArray(questionsResponse && questionsResponse.questions)
+      ? questionsResponse.questions
+      : [];
+    result.sections.push('questions');
+  }
+
+  if (includeNotifications) {
+    const notificationsResponse = listForumNotifications({ token, userId });
+    result.notifications = Array.isArray(notificationsResponse && notificationsResponse.items)
+      ? notificationsResponse.items
+      : [];
+    result.notificationsUnread = Number(notificationsResponse && notificationsResponse.unreadCount || 0);
+    result.sections.push('notifications');
+  }
+
+  result.sessionUser = {
+    id: session.user.id,
+    isAdmin: !!session.user.isAdmin
+  };
+
+  return result;
+}
+
 /** Embeds (Excel/PPT) */
 function saveEmbeds(payload) {
   setup_();
