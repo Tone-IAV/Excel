@@ -149,6 +149,7 @@
     } else if (!hadSnapshot) {
       updateSheetUpdateDisplay(null);
     }
+    handleBackendChanges(entries);
     sheetUpdateInitialized = true;
   }
 
@@ -173,6 +174,374 @@
     if (!sheetUpdateInput || sheetUpdatePollTimer) return;
     pollSheetChangeLog();
     sheetUpdatePollTimer = setInterval(pollSheetChangeLog, SHEET_UPDATE_POLL_INTERVAL);
+  }
+
+  const DATA_CACHE_TTL = 60000;
+  const DATA_CACHE_LONG_TTL = 120000;
+
+  function createCacheBucket(defaultSections = []) {
+    return {
+      data: {},
+      fetchedAt: 0,
+      stale: true,
+      sectionTimestamps: defaultSections.reduce((map, section) => {
+        map[section] = 0;
+        return map;
+      }, {}),
+      defaultSections: defaultSections.slice()
+    };
+  }
+
+  function resetCacheBucket(bucket) {
+    if (!bucket) return;
+    bucket.data = {};
+    bucket.fetchedAt = 0;
+    bucket.stale = true;
+    const base = Array.isArray(bucket.defaultSections) ? bucket.defaultSections : [];
+    bucket.sectionTimestamps = base.reduce((map, section) => {
+      map[section] = 0;
+      return map;
+    }, {});
+  }
+
+  const datasetCache = {
+    dashboard: createCacheBucket(['userState', 'history', 'ranking', 'achievements']),
+    community: createCacheBucket(['entries', 'shareable']),
+    forum: createCacheBucket(['polls', 'ideas', 'questions', 'notifications']),
+    embeds: createCacheBucket(['materials'])
+  };
+
+  const datasetRefreshTimers = {};
+  const scriptTaskQueue = [];
+  let scriptTaskActive = false;
+
+  function enqueueScriptTask(taskFn, options = {}) {
+    return new Promise((resolve, reject) => {
+      const item = { taskFn, resolve, reject };
+      if (options && options.priority === 'high') {
+        scriptTaskQueue.unshift(item);
+      } else {
+        scriptTaskQueue.push(item);
+      }
+      processScriptTaskQueue();
+    });
+  }
+
+  function processScriptTaskQueue() {
+    if (scriptTaskActive) return;
+    const next = scriptTaskQueue.shift();
+    if (!next) return;
+    scriptTaskActive = true;
+    let taskPromise;
+    try {
+      taskPromise = next.taskFn();
+    } catch (err) {
+      scriptTaskActive = false;
+      next.reject(err);
+      processScriptTaskQueue();
+      return;
+    }
+    Promise.resolve(taskPromise)
+      .then(result => {
+        scriptTaskActive = false;
+        next.resolve(result);
+        processScriptTaskQueue();
+      })
+      .catch(err => {
+        scriptTaskActive = false;
+        next.reject(err);
+        processScriptTaskQueue();
+      });
+  }
+
+  function executeScriptMethod(methodName, payload) {
+    return new Promise((resolve, reject) => {
+      if (!(google && google.script && google.script.run)) {
+        reject(new Error('Integração indisponível.'));
+        return;
+      }
+      const runner = google.script.run
+        .withFailureHandler(err => reject(err))
+        .withSuccessHandler(result => resolve(result));
+      if (typeof runner[methodName] === 'function') {
+        runner[methodName](payload);
+      } else {
+        reject(new Error(`Método ${methodName} indisponível.`));
+      }
+    });
+  }
+
+  function resetDatasetCaches() {
+    Object.keys(datasetCache).forEach(key => resetCacheBucket(datasetCache[key]));
+  }
+
+  function normalizeDashboardSectionName(section) {
+    const key = (section || '').toString().trim().toLowerCase();
+    switch (key) {
+      case 'user':
+      case 'usuario':
+      case 'profile':
+      case 'userstate':
+      case 'estado':
+        return 'userState';
+      case 'history':
+      case 'historico':
+      case 'histórico':
+      case 'timeline':
+        return 'history';
+      case 'ranking':
+      case 'leaderboard':
+      case 'placar':
+        return 'ranking';
+      case 'achievements':
+      case 'achievement':
+      case 'conquistas':
+        return 'achievements';
+      default:
+        return '';
+    }
+  }
+
+  function normalizeForumSectionName(section) {
+    const key = (section || '').toString().trim().toLowerCase();
+    switch (key) {
+      case 'polls':
+      case 'enquetes':
+      case 'poll':
+        return 'polls';
+      case 'ideas':
+      case 'ideias':
+      case 'idea':
+        return 'ideas';
+      case 'questions':
+      case 'duvidas':
+      case 'dúvidas':
+      case 'question':
+        return 'questions';
+      case 'notifications':
+      case 'notificacoes':
+      case 'notificações':
+      case 'notification':
+        return 'notifications';
+      default:
+        return '';
+    }
+  }
+
+  function isSectionFresh(bucket, section, ttl = DATA_CACHE_TTL) {
+    if (!bucket || bucket.stale) return false;
+    if (!bucket.sectionTimestamps) bucket.sectionTimestamps = {};
+    const stamp = bucket.sectionTimestamps[section];
+    if (!Number.isFinite(stamp) || stamp <= 0) return false;
+    return Date.now() - stamp < ttl;
+  }
+
+  function markDatasetSectionsStale(key, sections) {
+    const bucket = datasetCache[key];
+    if (!bucket) return;
+    if (!bucket.sectionTimestamps) bucket.sectionTimestamps = {};
+    if (!Array.isArray(sections) || !sections.length) {
+      Object.keys(bucket.sectionTimestamps).forEach(sectionKey => {
+        bucket.sectionTimestamps[sectionKey] = 0;
+      });
+      bucket.stale = true;
+      return;
+    }
+    sections.forEach(section => {
+      let normalized = section;
+      if (key === 'dashboard') normalized = normalizeDashboardSectionName(section);
+      if (key === 'forum') normalized = normalizeForumSectionName(section);
+      if (key === 'community') {
+        normalized = section === 'shareable' ? 'shareable' : 'entries';
+      }
+      if (!normalized) return;
+      bucket.sectionTimestamps[normalized] = 0;
+    });
+    bucket.stale = Object.values(bucket.sectionTimestamps).every(value => !value);
+  }
+
+  function markDatasetStale(key) {
+    markDatasetSectionsStale(key, []);
+  }
+
+  function pickDashboardSections(data, sections) {
+    const snapshot = {};
+    if (!data || typeof data !== 'object') return snapshot;
+    sections.forEach(section => {
+      if (section === 'userState' && data.userState) snapshot.userState = data.userState;
+      if (section === 'history' && data.history) snapshot.history = data.history;
+      if (section === 'ranking' && data.ranking) snapshot.ranking = data.ranking;
+      if (section === 'achievements' && data.achievements) snapshot.achievements = data.achievements;
+    });
+    return snapshot;
+  }
+
+  function pickForumSections(data, sections) {
+    const snapshot = {};
+    if (!data || typeof data !== 'object') return snapshot;
+    sections.forEach(section => {
+      if (section === 'polls' && data.polls) {
+        snapshot.polls = data.polls;
+        snapshot.pollRespondedCount = data.pollRespondedCount;
+      }
+      if (section === 'ideas' && data.ideas) snapshot.ideas = data.ideas;
+      if (section === 'questions' && data.questions) snapshot.questions = data.questions;
+      if (section === 'notifications' && data.notifications) {
+        snapshot.notifications = data.notifications;
+        snapshot.notificationsUnread = data.notificationsUnread;
+      }
+    });
+    return snapshot;
+  }
+
+  function scheduleDatasetRefresh(key, options = {}) {
+    const delayRaw = Number(options && options.delay);
+    const delay = Number.isFinite(delayRaw) && delayRaw >= 0 ? delayRaw : 1200;
+    if (datasetRefreshTimers[key]) {
+      clearTimeout(datasetRefreshTimers[key]);
+    }
+    datasetRefreshTimers[key] = setTimeout(() => {
+      datasetRefreshTimers[key] = null;
+      if (!currentUser) return;
+      if (key === 'dashboard') {
+        const sections = Array.isArray(options && options.sections) && options.sections.length
+          ? options.sections
+          : ['userState', 'history', 'ranking'];
+        hydrateDashboardSections(sections, { priority: 'high', silentAchievements: true }).catch(() => {});
+      } else if (key === 'community') {
+        ensureCommunityData({ force: true, priority: 'normal', silent: true }).catch(() => {});
+      } else if (key === 'forum') {
+        if (currentAppRoute === 'forum') {
+          ensureForumData({ force: true, priority: 'normal', silent: true }).catch(() => {});
+        } else {
+          markDatasetSectionsStale('forum', ['polls', 'ideas', 'questions', 'notifications']);
+        }
+      } else if (key === 'embeds') {
+        if (hasLoadedEmbeds) {
+          loadEmbeds({ force: true, silent: true }).catch(() => {});
+        }
+      }
+    }, delay);
+  }
+
+  function handleBackendChanges(changes) {
+    if (!Array.isArray(changes) || !changes.length) return;
+    let dashboardImpacted = false;
+    let communityImpacted = false;
+    let forumImpacted = false;
+    let embedsImpacted = false;
+
+    changes.forEach(change => {
+      const sheetName = (change && change.sheet ? change.sheet.toString() : '').trim().toLowerCase();
+      if (!sheetName) return;
+      switch (sheetName) {
+        case 'users':
+        case 'progress':
+        case 'checkins':
+        case 'userachievements':
+          markDatasetStale('dashboard');
+          dashboardImpacted = true;
+          break;
+        case 'wall':
+        case 'wallattachments':
+        case 'forumreactions':
+          markDatasetStale('community');
+          communityImpacted = true;
+          break;
+        case 'forumideas':
+        case 'forumideafeedback':
+          markDatasetSectionsStale('forum', ['ideas']);
+          forumImpacted = true;
+          break;
+        case 'forumpolls':
+        case 'forumpolloptions':
+        case 'forumpollvotes':
+          markDatasetSectionsStale('forum', ['polls']);
+          forumImpacted = true;
+          break;
+        case 'forumquestions':
+          markDatasetSectionsStale('forum', ['questions']);
+          forumImpacted = true;
+          break;
+        case 'forumnotifications':
+          markDatasetSectionsStale('forum', ['notifications']);
+          forumImpacted = true;
+          break;
+        case 'embeds':
+        case 'config':
+          markDatasetStale('embeds');
+          embedsImpacted = true;
+          break;
+        default:
+          break;
+      }
+    });
+
+    if (!currentUser) return;
+
+    if (dashboardImpacted) {
+      scheduleDatasetRefresh('dashboard', { sections: ['userState', 'history', 'ranking', 'achievements'], delay: 900 });
+    }
+    if (communityImpacted && typeof communityListEl !== 'undefined' && communityListEl) {
+      scheduleDatasetRefresh('community', { delay: 1000 });
+    }
+    if (forumImpacted) {
+      scheduleDatasetRefresh('forum', { delay: 1200 });
+    }
+    if (embedsImpacted) {
+      scheduleDatasetRefresh('embeds', { delay: 1500 });
+    }
+  }
+
+  function hydrateDashboardSections(sections, options = {}) {
+    if (!currentUser || !currentUser.id) {
+      return Promise.resolve(null);
+    }
+    const normalized = Array.isArray(sections) && sections.length
+      ? sections.map(item => normalizeDashboardSectionName(item)).filter(Boolean)
+      : ['userState', 'history', 'ranking', 'achievements'];
+    const bucket = datasetCache.dashboard;
+    if (!bucket) return Promise.resolve(null);
+    const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_TTL;
+    const missing = normalized.filter(section => !isSectionFresh(bucket, section, ttl));
+    if (!missing.length) {
+      const cached = pickDashboardSections(bucket.data, normalized);
+      if (Object.keys(cached).length) {
+        applyDashboardSnapshot(cached, options);
+      }
+      return Promise.resolve(bucket.data);
+    }
+    const token = getSessionToken();
+    if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+      return Promise.reject(new Error('Sessão expirada.'));
+    }
+    const payload = {
+      token,
+      userId: currentUser.id,
+      sections: missing,
+      historyLimit: options && options.historyLimit,
+      activityLimit: options && options.activityLimit
+    };
+    return enqueueScriptTask(
+      () => executeScriptMethod('getDashboardBootstrap', payload),
+      { priority: options && options.priority === 'high' ? 'high' : 'normal' }
+    ).then(response => {
+      if (!response || response.ok === false) {
+        const message = response && response.message ? response.message : 'Não foi possível carregar o painel agora.';
+        throw new Error(message);
+      }
+      applyDashboardSnapshot(response, options);
+      return response;
+    }).catch(err => {
+      if (handleSessionExpiredError(err, { onHandled: options && options.onSessionExpired })) {
+        return Promise.reject(err);
+      }
+      if (typeof options.onError === 'function') {
+        try { options.onError(err); } catch (callbackErr) { console.error(callbackErr); }
+      }
+      throw err;
+    });
   }
 
   function persistSession(token, user, options = {}) {
@@ -508,6 +877,8 @@
   const achievementsPodiumEl = $('#achievementsPodium');
   const achievementsLeaderboardTableEl = $('#achievementsLeaderboardTable');
   const achievementsRankingBadgeEl = $('#achievementsRankingBadge');
+  const rankingSimpleListEl = $('#rankWrap');
+  const rankingAdminListEl = $('#adminRank');
   const achievementsAdminNoticeDefaultText = achievementsAdminNoticeEl
     ? achievementsAdminNoticeEl.textContent
     : '';
@@ -797,7 +1168,14 @@
     admin: 'Coordenação',
     both: 'Comunidade + Coordenação'
   };
-  let lastPanelPollUserId = null;
+  let lastKnownUserId = null;
+  let lastKnownUserSignature = null;
+
+  function computeUserSignature(user) {
+    if (!user || typeof user !== 'object') return 'guest';
+    const id = user.id ? String(user.id) : 'anonymous';
+    return `${id}::${user.isAdmin ? 'admin' : 'student'}`;
+  }
 
   let adminBulletinState = {
     content: 'Semana 3 aberta! Reserve 15 minutos para revisar o bloco A antes do encontro ao vivo e registre o check-in até 22h.\n\nDica extra: quem postar um insight no mural até sexta participa do sorteio do livro “Excel na Prática”.',
@@ -1288,7 +1666,7 @@
           .withSuccessHandler(res => {
             showToast({ message: res && res.updated ? 'Voto atualizado com sucesso.' : 'Voto registrado com sucesso!', type: 'success' });
             clearPollSelection(poll.id);
-            loadForumPolls();
+            loadForumPolls({ force: true, priority: 'high', silent: true }).catch(() => {});
           })
           .submitForumPollVote({ token, pollId: poll.id, choices });
       });
@@ -1300,27 +1678,26 @@
     });
   }
 
-  function loadForumPolls() {
-    if (!forumPollListEl) return;
-    const token = getSessionToken();
-    const payload = token ? { token } : {};
-    google.script.run
-      .withFailureHandler(err => {
+  function loadForumPolls(options = {}) {
+    if (!currentUser) {
+      forumState.polls = [];
+      forumState.pollRespondedCount = 0;
+      forumState.pollSelections = {};
+      renderForumPolls();
+      return Promise.resolve(null);
+    }
+    return ensureForumData({
+      sections: ['polls'],
+      force: !!(options && options.force),
+      priority: options && options.priority ? options.priority : 'normal',
+      silent: !!(options && options.silent)
+    }).catch(err => {
+      const message = extractErrorMessage(err);
+      if (!isSessionErrorMessage(message) && !(options && options.silent)) {
         console.warn('Falha ao carregar enquetes:', err);
-      })
-      .withSuccessHandler(res => {
-        const polls = res && Array.isArray(res.polls) ? res.polls : [];
-        forumState.polls = polls;
-        forumState.pollRespondedCount = Number(res && res.respondedCount || 0);
-        const activeIds = new Set(polls.map(poll => poll && poll.id).filter(Boolean));
-        Object.keys(forumState.pollSelections).forEach(id => {
-          if (!activeIds.has(id)) {
-            delete forumState.pollSelections[id];
-          }
-        });
-        renderForumPolls();
-      })
-      .listForumPolls(payload);
+      }
+      return null;
+    });
   }
 
   function showIdeaFormError(message) {
@@ -1495,20 +1872,24 @@
     });
   }
 
-  function loadForumIdeas() {
-    if (!forumIdeaListEl) return;
-    const token = getSessionToken();
-    const payload = token ? { token } : {};
-    google.script.run
-      .withFailureHandler(err => {
+  function loadForumIdeas(options = {}) {
+    if (!currentUser) {
+      forumState.ideas = [];
+      renderForumIdeas();
+      return Promise.resolve(null);
+    }
+    return ensureForumData({
+      sections: ['ideas'],
+      force: !!(options && options.force),
+      priority: options && options.priority ? options.priority : 'normal',
+      silent: !!(options && options.silent)
+    }).catch(err => {
+      const message = extractErrorMessage(err);
+      if (!isSessionErrorMessage(message) && !(options && options.silent)) {
         console.warn('Falha ao carregar ideias:', err);
-      })
-      .withSuccessHandler(res => {
-        const ideas = res && Array.isArray(res.ideas) ? res.ideas : [];
-        forumState.ideas = ideas;
-        renderForumIdeas();
-      })
-      .listForumIdeas(payload);
+      }
+      return null;
+    });
   }
 
   function handleIdeaFeedback(ideaId, type, options = {}) {
@@ -1551,7 +1932,7 @@
           showToast({ message: 'Interação registrada com sucesso.', type: 'success' });
         }
         if (textarea) textarea.value = '';
-        loadForumIdeas();
+        loadForumIdeas({ force: true, priority: 'high', silent: true }).catch(() => {});
       })
       .submitForumIdeaFeedback({ token, ideaId, type, message });
   }
@@ -1706,20 +2087,24 @@
     });
   }
 
-  function loadForumQuestions() {
-    if (!forumQuestionListEl) return;
-    const token = getSessionToken();
-    const payload = token ? { token } : {};
-    google.script.run
-      .withFailureHandler(err => {
+  function loadForumQuestions(options = {}) {
+    if (!currentUser) {
+      forumState.questions = [];
+      renderForumQuestions();
+      return Promise.resolve(null);
+    }
+    return ensureForumData({
+      sections: ['questions'],
+      force: !!(options && options.force),
+      priority: options && options.priority ? options.priority : 'normal',
+      silent: !!(options && options.silent)
+    }).catch(err => {
+      const message = extractErrorMessage(err);
+      if (!isSessionErrorMessage(message) && !(options && options.silent)) {
         console.warn('Falha ao carregar dúvidas:', err);
-      })
-      .withSuccessHandler(res => {
-        const questions = res && Array.isArray(res.questions) ? res.questions : [];
-        forumState.questions = questions;
-        renderForumQuestions();
-      })
-      .listForumQuestions(payload);
+      }
+      return null;
+    });
   }
 
   function renderForumNotifications() {
@@ -1749,28 +2134,25 @@
     });
   }
 
-  function loadForumNotifications() {
-    if (!currentUser || !forumNotificationListEl) {
+  function loadForumNotifications(options = {}) {
+    if (!currentUser) {
       forumState.notifications = [];
       forumState.notificationsUnread = 0;
       renderForumNotifications();
-      return;
+      return Promise.resolve(null);
     }
-    const token = getSessionToken();
-    if (!token) {
-      expireSession(SESSION_EXPIRED_FALLBACK);
-      return;
-    }
-    google.script.run
-      .withFailureHandler(err => {
+    return ensureForumData({
+      sections: ['notifications'],
+      force: !!(options && options.force),
+      priority: options && options.priority ? options.priority : 'normal',
+      silent: !!(options && options.silent)
+    }).catch(err => {
+      const message = extractErrorMessage(err);
+      if (!isSessionErrorMessage(message) && !(options && options.silent)) {
         console.warn('Falha ao carregar notificações:', err);
-      })
-      .withSuccessHandler(res => {
-        forumState.notifications = res && Array.isArray(res.items) ? res.items : [];
-        forumState.notificationsUnread = Number(res && res.unreadCount || 0);
-        renderForumNotifications();
-      })
-      .listForumNotifications({ token });
+      }
+      return null;
+    });
   }
 
   function markForumNotificationsRead() {
@@ -1794,7 +2176,7 @@
         showToast({ message: err?.message || 'Não foi possível atualizar as notificações.', type: 'error' });
       })
       .withSuccessHandler(() => {
-        loadForumNotifications();
+        loadForumNotifications({ force: true, priority: 'high', silent: true }).catch(() => {});
         showToast({ message: 'Notificações marcadas como lidas.', type: 'success' });
       })
       .markForumNotificationsRead({ token, ids: unreadIds });
@@ -1828,6 +2210,108 @@
       meta.append(time, privacy);
       li.append(author, snippet, meta);
       forumLatestListEl.appendChild(li);
+    });
+  }
+
+  function applyForumSnapshot(snapshot, options = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return;
+    const bucket = datasetCache.forum;
+    const now = Date.now();
+    if (bucket) {
+      if (!bucket.sectionTimestamps) bucket.sectionTimestamps = {};
+      bucket.fetchedAt = now;
+    }
+    if (Array.isArray(snapshot.polls)) {
+      if (bucket) {
+        bucket.data.polls = snapshot.polls;
+        bucket.data.pollRespondedCount = Number(snapshot.pollRespondedCount || 0);
+        bucket.sectionTimestamps.polls = now;
+        bucket.stale = false;
+      }
+      forumState.polls = snapshot.polls.slice();
+      forumState.pollRespondedCount = Number(snapshot.pollRespondedCount || 0);
+      const activeIds = new Set(forumState.polls.map(poll => poll && poll.id).filter(Boolean));
+      Object.keys(forumState.pollSelections).forEach(id => {
+        if (!activeIds.has(id)) {
+          delete forumState.pollSelections[id];
+        }
+      });
+      renderForumPolls();
+    }
+    if (Array.isArray(snapshot.ideas)) {
+      if (bucket) {
+        bucket.data.ideas = snapshot.ideas;
+        bucket.sectionTimestamps.ideas = now;
+        bucket.stale = false;
+      }
+      forumState.ideas = snapshot.ideas.slice();
+      renderForumIdeas();
+    }
+    if (Array.isArray(snapshot.questions)) {
+      if (bucket) {
+        bucket.data.questions = snapshot.questions;
+        bucket.sectionTimestamps.questions = now;
+        bucket.stale = false;
+      }
+      forumState.questions = snapshot.questions.slice();
+      renderForumQuestions();
+    }
+    if (Array.isArray(snapshot.notifications)) {
+      if (bucket) {
+        bucket.data.notifications = snapshot.notifications;
+        bucket.data.notificationsUnread = Number(snapshot.notificationsUnread || 0);
+        bucket.sectionTimestamps.notifications = now;
+        bucket.stale = false;
+      }
+      forumState.notifications = snapshot.notifications.slice();
+      forumState.notificationsUnread = Number(snapshot.notificationsUnread || 0);
+      renderForumNotifications();
+    }
+  }
+
+  function ensureForumData(options = {}) {
+    if (!currentUser || !currentUser.id) return Promise.resolve(null);
+    const bucket = datasetCache.forum;
+    const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_TTL;
+    const sections = Array.isArray(options && options.sections) && options.sections.length
+      ? options.sections.map(item => normalizeForumSectionName(item)).filter(Boolean)
+      : ['polls', 'ideas', 'questions', 'notifications'];
+    const missing = options.force
+      ? sections
+      : sections.filter(section => !isSectionFresh(bucket, section, ttl));
+    if (!missing.length) {
+      if (bucket && bucket.data) {
+        applyForumSnapshot(pickForumSections(bucket.data, sections), options);
+        return Promise.resolve(bucket.data);
+      }
+      return Promise.resolve(null);
+    }
+    const token = getSessionToken();
+    if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+      return Promise.reject(new Error('Sessão expirada.'));
+    }
+    const payload = {
+      token,
+      userId: currentUser.id,
+      sections: missing
+    };
+    return enqueueScriptTask(
+      () => executeScriptMethod('getForumSnapshot', payload),
+      { priority: options && options.priority === 'high' ? 'high' : 'normal' }
+    ).then(response => {
+      if (!response || response.ok === false) {
+        const message = response && response.message ? response.message : 'Não foi possível carregar o fórum agora.';
+        throw new Error(message);
+      }
+      applyForumSnapshot(response, options);
+      return response;
+    }).catch(err => {
+      if (handleSessionExpiredError(err)) return Promise.reject(err);
+      if (!options || !options.silent) {
+        console.warn('Falha ao carregar dados do fórum:', err);
+      }
+      throw err;
     });
   }
 
@@ -1898,12 +2382,14 @@
     renderCommunityMentionChips();
     renderCommunityMentionOptions();
     if (currentUser) {
-      loadShareableUsers();
+      loadShareableUsers({ priority: 'normal', silent: true }).catch(() => {});
+      ensureForumData({ priority: 'normal', silent: true }).catch(err => {
+        const message = extractErrorMessage(err);
+        if (!isSessionErrorMessage(message)) {
+          console.warn('Falha ao carregar fórum:', err);
+        }
+      });
     }
-    loadForumPolls();
-    loadForumIdeas();
-    loadForumQuestions();
-    loadForumNotifications();
   }
 
   function renderAchievementsShowcase(summary = achievementsState.summary, metrics = achievementsState.metrics) {
@@ -3056,7 +3542,8 @@
           loader.finish();
           if (res && res.ok) {
             showToast({ message: res.message || 'Arquivo enviado com sucesso.', type: 'success' });
-            loadEmbeds();
+            markDatasetStale('embeds');
+            loadEmbeds({ force: true, priority: 'high', silent: false }).catch(() => {});
           } else {
             showToast({ message: (res && res.message) || 'Não foi possível enviar o arquivo.', type: 'error' });
           }
@@ -3511,24 +3998,30 @@
     });
   }
 
-  function loadShareableUsers() {
-    if (!currentUser || communityState.loadedShareableUsers) return;
-    const token = getSessionToken();
-    if (!token) return;
-    google.script.run
-      .withFailureHandler(err => {
-        console.warn('Falha ao carregar destinatários:', err);
-      })
-      .withSuccessHandler(res => {
-        const list = res && Array.isArray(res.users) ? res.users : [];
-        communityState.shareableUsers = list;
-        communityState.loadedShareableUsers = true;
-        renderCommunityTargetsOptions();
-        renderCommunityMentionOptions();
-        renderForumTargetSelects();
-        syncMentionsFromText();
-      })
-      .listShareableUsers({ token });
+  function loadShareableUsers(options = {}) {
+    if (!currentUser) return Promise.resolve(null);
+    const silent = options && Object.prototype.hasOwnProperty.call(options, 'silent')
+      ? !!options.silent
+      : true;
+    return ensureCommunityData({
+      sections: ['shareable'],
+      force: !!(options && options.force),
+      priority: options && options.priority ? options.priority : 'normal',
+      silent
+    }).catch(err => {
+      const message = extractErrorMessage(err);
+      if (isSessionErrorMessage(message)) {
+        return null;
+      }
+      console.warn('Falha ao carregar destinatários:', err);
+      if (!silent) {
+        showToast({
+          message: message || 'Não foi possível carregar a lista de participantes agora.',
+          type: 'error'
+        });
+      }
+      return null;
+    });
   }
 
   function uploadCommunityAttachmentFile(file) {
@@ -3835,22 +4328,90 @@
     });
   }
 
+  function applyCommunitySnapshot(snapshot, options = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return;
+    const bucket = datasetCache.community;
+    const now = Date.now();
+    if (bucket) {
+      if (!bucket.sectionTimestamps) bucket.sectionTimestamps = {};
+      bucket.fetchedAt = now;
+    }
+    if (Array.isArray(snapshot.entries)) {
+      if (bucket) {
+        bucket.data.entries = snapshot.entries;
+        bucket.sectionTimestamps.entries = now;
+        bucket.stale = false;
+      }
+      renderCommunityWall(snapshot.entries);
+    }
+    if (Array.isArray(snapshot.shareableUsers)) {
+      if (bucket) {
+        bucket.data.shareableUsers = snapshot.shareableUsers;
+        bucket.sectionTimestamps.shareable = now;
+        bucket.stale = false;
+      }
+      if (currentUser) {
+        communityState.shareableUsers = snapshot.shareableUsers.slice();
+        communityState.loadedShareableUsers = true;
+        renderCommunityTargetsOptions();
+        renderCommunityMentionOptions();
+        renderForumTargetSelects();
+        syncMentionsFromText();
+      }
+    }
+    if (snapshot && typeof snapshot.limit === 'number') {
+      setCommunityLimit(snapshot.limit);
+    }
+  }
+
+  function ensureCommunityData(options = {}) {
+    const bucket = datasetCache.community;
+    const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_TTL;
+    const needsEntries = options && Array.isArray(options.sections)
+      ? options.sections.includes('entries')
+      : true;
+    const needsShareable = options && Array.isArray(options.sections)
+      ? options.sections.includes('shareable')
+      : !!currentUser;
+    const sectionsToFetch = [];
+    if (needsEntries && !isSectionFresh(bucket, 'entries', ttl)) sectionsToFetch.push('entries');
+    if (needsShareable && currentUser && !isSectionFresh(bucket, 'shareable', ttl)) sectionsToFetch.push('shareable');
+    if (!options.force && sectionsToFetch.length === 0) {
+      if (bucket && bucket.data) {
+        applyCommunitySnapshot(bucket.data, options);
+        return Promise.resolve(bucket.data);
+      }
+      if (!communityListEl) return Promise.resolve(null);
+    }
+    const token = getSessionToken();
+    const payload = {
+      token: token || null,
+      userId: currentUser ? currentUser.id : null
+    };
+    if (options && options.limit) payload.limit = options.limit;
+    return enqueueScriptTask(
+      () => executeScriptMethod('getCommunitySnapshot', payload),
+      { priority: options && options.priority === 'high' ? 'high' : 'normal' }
+    ).then(response => {
+      if (!response || response.ok === false) {
+        const message = response && response.message ? response.message : 'Não foi possível carregar o mural agora.';
+        throw new Error(message);
+      }
+      applyCommunitySnapshot(response, options);
+      return response;
+    }).catch(err => {
+      if (handleSessionExpiredError(err)) return Promise.reject(err);
+      if (!options || !options.silent) {
+        console.warn('Falha ao carregar mural:', err);
+      }
+      throw err;
+    });
+  }
+
   function refreshCommunityWall() {
     if (!communityListEl) return;
-    const token = getSessionToken();
-    const payload = token ? { token } : {};
-    google.script.run
-      .withFailureHandler(err => {
-        console.error('Falha ao carregar mural:', err);
-      })
-      .withSuccessHandler(res => {
-        if (res && typeof res.limit === 'number') {
-          setCommunityLimit(res.limit);
-        }
-        const entries = res && Array.isArray(res.entries) ? res.entries : [];
-        renderCommunityWall(entries);
-      })
-      .listCommunityWallEntries(payload);
+    ensureCommunityData({ priority: 'normal' })
+      .catch(err => console.error('Falha ao carregar mural:', err));
   }
 
   const achievementsState = {
@@ -3983,6 +4544,328 @@
   const achievementsErrorEl = $('#achievementsError');
   const achievementsContentEl = $('#achievementsContent');
   const checkinStreakInfoEl = $('#checkinStreakInfo');
+
+  function applyDashboardSnapshot(snapshot, options = {}) {
+    if (!snapshot || typeof snapshot !== 'object') return;
+    const bucket = datasetCache.dashboard;
+    const now = Date.now();
+    if (bucket) {
+      if (!bucket.sectionTimestamps) bucket.sectionTimestamps = {};
+      bucket.fetchedAt = now;
+    }
+    if (snapshot.userState) {
+      if (bucket) {
+        bucket.data.userState = snapshot.userState;
+        bucket.sectionTimestamps.userState = now;
+        bucket.stale = false;
+      }
+      applyUserStateData(snapshot.userState, options);
+    }
+    if (snapshot.history) {
+      if (bucket) {
+        bucket.data.history = snapshot.history;
+        bucket.sectionTimestamps.history = now;
+        bucket.stale = false;
+      }
+      applyHistoryData(snapshot.history);
+    }
+    if (Array.isArray(snapshot.ranking)) {
+      if (bucket) {
+        bucket.data.ranking = snapshot.ranking;
+        bucket.sectionTimestamps.ranking = now;
+        bucket.stale = false;
+      }
+      applyRankingData(snapshot.ranking);
+    }
+    if (snapshot.achievements) {
+      if (bucket) {
+        bucket.data.achievements = snapshot.achievements;
+        bucket.sectionTimestamps.achievements = now;
+        bucket.stale = false;
+      }
+      const unlocked = Array.isArray(options && options.achievementsUnlocked)
+        ? options.achievementsUnlocked
+        : [];
+      applyAchievementsUpdate(snapshot.achievements, unlocked, { silent: options && options.silentAchievements });
+    }
+  }
+
+  function applyUserStateData(state) {
+    if (!state) return;
+    if (xpBoxEl) xpBoxEl.textContent = state.xp;
+    if (lvlBoxEl) lvlBoxEl.textContent = state.level;
+    if (doneBoxEl) doneBoxEl.textContent = state.concluidos;
+    const pct = Math.round((Number(state.concluidos || 0) / TOTAL_MODULES) * 100);
+    if (pctBoxEl) pctBoxEl.textContent = `${pct}%`;
+    if (barBoxEl) barBoxEl.style.width = `${pct}%`;
+    updateLevelIndicator(state);
+    updateStudentStoryState({
+      xp: state.xp,
+      level: state.level,
+      modulesCompleted: state.concluidos,
+      metrics: { xpTotal: state.xp, modulesCompleted: state.concluidos }
+    });
+  }
+
+  function applyHistoryData(history) {
+    if (!history || typeof history !== 'object') {
+      historyState.loading.checkins = false;
+      historyState.loading.activities = false;
+      historyState.errors.checkins = 'Histórico indisponível.';
+      historyState.errors.activities = 'Histórico indisponível.';
+      historyState.checkins = [];
+      historyState.activities = [];
+      historyState.streak = { current: 0, best: 0 };
+      renderHistory();
+      updateCheckinStreakInfo(null);
+      return;
+    }
+
+    if (Array.isArray(history.checkins)) {
+      historyState.checkins = normalizeCheckinHistory(history.checkins);
+      historyState.streak = computeCheckinStreak(historyState.checkins);
+      historyState.errors.checkins = '';
+      historyState.loading.checkins = false;
+      updateCheckinStreakInfo({
+        checkinCurrentStreak: historyState.streak.current,
+        checkinBestStreak: historyState.streak.best,
+        totalCheckins: historyState.checkins.length
+      });
+      updateStudentStoryState({
+        checkinToday: hasCheckinToday(),
+        metrics: {
+          checkinCurrentStreak: historyState.streak.current,
+          checkinBestStreak: historyState.streak.best,
+          totalCheckins: historyState.checkins.length
+        }
+      });
+    } else {
+      historyState.loading.checkins = false;
+      historyState.errors.checkins = 'Histórico de check-ins indisponível.';
+      historyState.checkins = [];
+      historyState.streak = { current: 0, best: 0 };
+      updateCheckinStreakInfo(null);
+    }
+
+    if (Array.isArray(history.activities)) {
+      historyState.activities = normalizeActivityHistory(history.activities);
+      historyState.errors.activities = '';
+      historyState.loading.activities = false;
+    } else {
+      historyState.loading.activities = false;
+      historyState.errors.activities = 'Histórico de atividades indisponível.';
+      historyState.activities = [];
+    }
+    updateHistoryModuleFilterOptions();
+    renderHistory();
+  }
+
+  function renderRankingSimpleList(entries, options = {}) {
+    if (!rankingSimpleListEl) return;
+    const list = Array.isArray(entries) ? entries.slice(0, 5) : [];
+    const isLoading = !!(options && options.loading);
+    const errorMessage = options && options.error ? String(options.error) : '';
+
+    rankingSimpleListEl.innerHTML = '';
+
+    if (isLoading) {
+      const loading = document.createElement('div');
+      loading.className = 'text-xs text-slate-500 dark:text-slate-400';
+      loading.textContent = 'Atualizando ranking...';
+      rankingSimpleListEl.appendChild(loading);
+      return;
+    }
+
+    if (errorMessage) {
+      const error = document.createElement('div');
+      error.className = 'text-xs text-rose-600 dark:text-rose-300';
+      error.textContent = errorMessage;
+      rankingSimpleListEl.appendChild(error);
+      return;
+    }
+
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'text-xs text-slate-500 dark:text-slate-400';
+      empty.textContent = 'Ranking ainda não disponível.';
+      rankingSimpleListEl.appendChild(empty);
+      return;
+    }
+
+    list.forEach(item => {
+      const row = document.createElement('div');
+      const name = item && item.name ? item.name : 'Participante';
+      const xp = Number.isFinite(Number(item && item.xp)) ? formatNumber(item.xp) : '0';
+      const pos = Number.isFinite(Number(item && item.pos)) ? Number(item.pos) : '-';
+      row.textContent = `${pos}º — ${name} • ${xp} XP`;
+      rankingSimpleListEl.appendChild(row);
+    });
+  }
+
+  function renderRankingAdminList(entries, options = {}) {
+    const list = Array.isArray(entries) ? entries : [];
+    const isAdmin = !!(currentUser && currentUser.isAdmin);
+    const isLoading = !!(options && options.loading);
+    const errorMessage = options && options.error ? String(options.error) : '';
+
+    if (rankingAdminListEl) {
+      rankingAdminListEl.innerHTML = '';
+      if (isLoading) {
+        const loading = document.createElement('div');
+        loading.className = 'text-xs text-slate-500 dark:text-slate-400';
+        loading.textContent = 'Carregando ranking completo...';
+        rankingAdminListEl.appendChild(loading);
+      } else if (errorMessage) {
+        const error = document.createElement('div');
+        error.className = 'text-xs text-rose-600 dark:text-rose-300';
+        error.textContent = errorMessage;
+        rankingAdminListEl.appendChild(error);
+      } else if (!list.length) {
+        const empty = document.createElement('div');
+        empty.className = 'text-xs text-slate-500 dark:text-slate-400';
+        empty.textContent = 'Ranking ainda não disponível.';
+        rankingAdminListEl.appendChild(empty);
+      } else {
+        list.forEach(item => {
+          const row = document.createElement('div');
+          const name = item && item.name ? item.name : 'Participante';
+          const xp = Number.isFinite(Number(item && item.xp)) ? formatNumber(item.xp) : '0';
+          const pos = Number.isFinite(Number(item && item.pos)) ? Number(item.pos) : '-';
+          row.textContent = `${pos}º — ${name} • ${xp} XP`;
+          rankingAdminListEl.appendChild(row);
+        });
+      }
+    }
+
+    if (!isAdmin) {
+      if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.add('hidden');
+      if (achievementsAdminNoticeEl) {
+        achievementsAdminNoticeEl.textContent = achievementsAdminNoticeDefaultText
+          || 'Ranking disponível apenas para a coordenação.';
+        achievementsAdminNoticeEl.classList.remove('hidden');
+      }
+      if (achievementsPodiumEl) achievementsPodiumEl.innerHTML = '';
+      if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
+      if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Restrito à coordenação';
+      return;
+    }
+
+    if (errorMessage) {
+      if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.add('hidden');
+      if (achievementsAdminNoticeEl) {
+        achievementsAdminNoticeEl.textContent = errorMessage
+          || 'Não foi possível carregar o ranking agora.';
+        achievementsAdminNoticeEl.classList.remove('hidden');
+      }
+      if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Falha ao atualizar';
+      if (achievementsPodiumEl) achievementsPodiumEl.innerHTML = '';
+      if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
+      return;
+    }
+
+    if (achievementsAdminNoticeEl) achievementsAdminNoticeEl.classList.add('hidden');
+    if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.remove('hidden');
+
+    if (isLoading) {
+      if (achievementsPodiumEl) {
+        achievementsPodiumEl.innerHTML = '';
+        const placeholder = document.createElement('p');
+        placeholder.className = 'text-sm text-slate-500 dark:text-slate-300';
+        placeholder.textContent = 'Carregando ranking...';
+        achievementsPodiumEl.appendChild(placeholder);
+      }
+      if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
+      if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Atualizando...';
+      return;
+    }
+
+    if (achievementsRankingBadgeEl) {
+      let label = 'Atualizado agora';
+      if (timeFormatter) {
+        try {
+          label = `Atualizado às ${timeFormatter.format(new Date())}`;
+        } catch (err) {
+          label = 'Atualizado agora';
+        }
+      }
+      achievementsRankingBadgeEl.textContent = label;
+    }
+
+    if (achievementsPodiumEl) {
+      achievementsPodiumEl.innerHTML = '';
+      const podiumByRank = {};
+      list.forEach(item => {
+        if (item && item.pos && item.pos <= 3 && !podiumByRank[item.pos]) {
+          podiumByRank[item.pos] = item;
+        }
+      });
+      const order = [2, 1, 3];
+      order.forEach(rank => {
+        const entry = podiumByRank[rank];
+        if (!entry) return;
+        const card = document.createElement('div');
+        let classes = 'podium-card';
+        if (rank === 1) classes += ' podium-card-first';
+        else if (rank === 2) classes += ' podium-card-second';
+        else if (rank === 3) classes += ' podium-card-third';
+        card.className = classes;
+        const rankLabel = document.createElement('div');
+        rankLabel.className = 'podium-rank';
+        rankLabel.textContent = `${rank}º lugar`;
+        const nameEl = document.createElement('div');
+        nameEl.className = 'podium-name';
+        nameEl.textContent = entry.name || 'Participante';
+        const scoreEl = document.createElement('div');
+        scoreEl.className = 'podium-score';
+        scoreEl.textContent = `Nível ${formatNumber(entry.level)} • ${formatNumber(entry.xp)} XP`;
+        card.append(rankLabel, nameEl, scoreEl);
+        achievementsPodiumEl.appendChild(card);
+      });
+      if (!achievementsPodiumEl.children.length) {
+        const empty = document.createElement('p');
+        empty.className = 'text-sm text-slate-500 dark:text-slate-300';
+        empty.textContent = 'Ranking ainda não possui participantes suficientes.';
+        achievementsPodiumEl.appendChild(empty);
+      }
+    }
+
+    if (achievementsLeaderboardTableEl) {
+      achievementsLeaderboardTableEl.innerHTML = '';
+      if (!list.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 2;
+        td.className = 'px-4 py-4 text-sm text-slate-500 dark:text-slate-300';
+        td.textContent = 'Nenhum aluno ranqueado ainda.';
+        tr.appendChild(td);
+        achievementsLeaderboardTableEl.appendChild(tr);
+      } else {
+        list.forEach(entry => {
+          const tr = document.createElement('tr');
+          const infoTd = document.createElement('td');
+          infoTd.className = 'px-4 py-3 align-middle';
+          const nameDiv = document.createElement('div');
+          nameDiv.className = 'leaderboard-name';
+          nameDiv.textContent = `${entry.pos}º — ${entry.name || 'Participante'}`;
+          const metaDiv = document.createElement('div');
+          metaDiv.className = 'leaderboard-meta';
+          metaDiv.textContent = `Nível ${formatNumber(entry.level)} • ${formatNumber(entry.xp)} XP`;
+          infoTd.append(nameDiv, metaDiv);
+          const xpTd = document.createElement('td');
+          xpTd.className = 'px-4 py-3 text-right align-middle font-semibold text-slate-600 dark:text-slate-200';
+          xpTd.textContent = `${formatNumber(entry.xp)} XP`;
+          tr.append(infoTd, xpTd);
+          achievementsLeaderboardTableEl.appendChild(tr);
+        });
+      }
+    }
+  }
+
+  function applyRankingData(entries) {
+    const list = Array.isArray(entries) ? entries : [];
+    renderRankingSimpleList(list);
+    renderRankingAdminList(list);
+  }
 
   function resetLevelIndicator() {
     if (nextLevelTextEl) nextLevelTextEl.textContent = 'Faça login para acompanhar seus marcos.';
@@ -4324,49 +5207,55 @@
     updateStudentStoryState({ achievementsUnlocked: 0, totalAchievements: 0, metrics: {} });
   }
 
-  function loadAchievementsOverview() {
+  function loadAchievementsOverview(options = {}) {
     if (!currentUser || !currentUser.id) {
       resetAchievementsUI();
-      return;
+      return Promise.resolve(null);
     }
-    const token = getSessionToken();
-    if (!token) {
-      expireSession(SESSION_EXPIRED_FALLBACK);
-      return;
+
+    const bucket = datasetCache.dashboard;
+    const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_LONG_TTL;
+    const force = !!(options && options.force);
+    const shouldFetch = force || !isSectionFresh(bucket, 'achievements', ttl);
+
+    if (!shouldFetch && bucket && bucket.data && bucket.data.achievements) {
+      applyAchievementsUpdate(
+        bucket.data.achievements,
+        options && Array.isArray(options.achievementsUnlocked) ? options.achievementsUnlocked : [],
+        { silent: !!(options && options.silent) }
+      );
+      return Promise.resolve(bucket.data.achievements);
     }
-    const expectedUserId = currentUser.id;
+
     achievementsState.loading = true;
     achievementsState.error = '';
     renderAchievements();
-    google.script.run
-      .withFailureHandler(err => {
-        if (handleSessionExpiredError(err, {
-          onHandled: () => {
-            achievementsState.loading = false;
-            achievementsState.error = '';
-            achievementsState.metrics = {};
-            renderAchievements();
-          }
-        })) {
-          return;
-        }
-        if (!currentUser || currentUser.id !== expectedUserId) return;
+
+    const handleSessionMessage = message => {
+      achievementsState.loading = false;
+      achievementsState.error = message;
+      achievementsState.metrics = {};
+      renderAchievements();
+    };
+
+    return hydrateDashboardSections(['achievements'], {
+      priority: options && options.priority ? options.priority : 'normal',
+      onSessionExpired: handleSessionMessage,
+      onError: err => {
         achievementsState.loading = false;
         achievementsState.error = err?.message || 'Não foi possível carregar as conquistas.';
         achievementsState.metrics = {};
         renderAchievements();
-      })
-      .withSuccessHandler(data => {
-        if (!currentUser || currentUser.id !== expectedUserId) return;
-        const normalized = normalizeAchievementsResponse(data);
-        achievementsState.loading = false;
-        achievementsState.error = '';
-        achievementsState.achievements = normalized.achievements;
-        achievementsState.summary = normalized.summary;
-        achievementsState.metrics = normalized.metrics || {};
-        renderAchievements();
-      })
-      .getUserAchievementsOverview({ token, userId: currentUser.id });
+      },
+      achievementsUnlocked: options && options.achievementsUnlocked,
+      silentAchievements: !!(options && options.silent)
+    }).catch(err => {
+      const message = extractErrorMessage(err);
+      if (!isSessionErrorMessage(message)) {
+        console.warn('Falha ao carregar conquistas:', err);
+      }
+      return Promise.reject(err);
+    });
   }
 
   function updateLevelIndicator(state) {
@@ -4796,94 +5685,65 @@
     });
   }
 
-  function loadHistoryForCurrentUser() {
-    if (!currentUser || !currentUser.id) return;
-
-    const token = getSessionToken();
-    if (!token) {
-      expireSession(SESSION_EXPIRED_FALLBACK);
-      return;
+  function loadHistoryForCurrentUser(options = {}) {
+    if (!currentUser || !currentUser.id) {
+      resetHistorySection();
+      return Promise.resolve(null);
     }
 
-    const expectedUserId = currentUser.id;
+    const bucket = datasetCache.dashboard;
+    const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_TTL;
+    const force = !!(options && options.force);
+    const shouldFetch = force || !isSectionFresh(bucket, 'history', ttl);
+
+    if (!shouldFetch && bucket && bucket.data && bucket.data.history) {
+      applyHistoryData(bucket.data.history);
+      return Promise.resolve(bucket.data.history);
+    }
+
     historyState.loading.checkins = true;
-    historyState.errors.checkins = '';
     historyState.loading.activities = true;
+    historyState.errors.checkins = '';
     historyState.errors.activities = '';
     renderHistory();
 
-    google.script.run
-      .withFailureHandler(err => {
-        if (handleSessionExpiredError(err, {
-          onHandled: message => {
-            historyState.loading.checkins = false;
-            historyState.errors.checkins = message;
-            historyState.checkins = [];
-            historyState.streak = { current: 0, best: 0 };
-            renderHistory();
-          }
-        })) {
-          return;
-        }
-        if (!currentUser || currentUser.id !== expectedUserId) return;
-        historyState.loading.checkins = false;
-        historyState.errors.checkins = err?.message || 'Não foi possível carregar o histórico de check-ins.';
-        historyState.checkins = [];
-        historyState.streak = { current: 0, best: 0 };
-        renderHistory();
-      })
-      .withSuccessHandler(data => {
-        if (!currentUser || currentUser.id !== expectedUserId) return;
-        historyState.loading.checkins = false;
-        historyState.checkins = normalizeCheckinHistory(data);
-        historyState.streak = computeCheckinStreak(historyState.checkins);
-        historyState.errors.checkins = '';
-        updateCheckinStreakInfo({
-          checkinCurrentStreak: historyState.streak.current,
-          checkinBestStreak: historyState.streak.best,
-          totalCheckins: historyState.checkins.length
-        });
-        updateStudentStoryState({
-          checkinToday: hasCheckinToday(),
-          metrics: {
-            checkinCurrentStreak: historyState.streak.current,
-            checkinBestStreak: historyState.streak.best,
-            totalCheckins: historyState.checkins.length
-          }
-        });
-        renderHistory();
-      })
-      .getCheckinHistory({ token, userId: currentUser.id });
+    const handleSessionMessage = message => {
+      historyState.loading.checkins = false;
+      historyState.loading.activities = false;
+      historyState.errors.checkins = message;
+      historyState.errors.activities = message;
+      historyState.checkins = [];
+      historyState.activities = [];
+      historyState.streak = { current: 0, best: 0 };
+      renderHistory();
+      updateCheckinStreakInfo(null);
+    };
 
-    google.script.run
-      .withFailureHandler(err => {
-        if (handleSessionExpiredError(err, {
-          onHandled: message => {
-            historyState.loading.activities = false;
-            historyState.errors.activities = message;
-            historyState.activities = [];
-            updateHistoryModuleFilterOptions();
-            renderHistory();
-          }
-        })) {
-          return;
-        }
-        if (!currentUser || currentUser.id !== expectedUserId) return;
+    return hydrateDashboardSections(['history'], {
+      priority: options && options.priority ? options.priority : 'normal',
+      historyLimit: options && options.historyLimit,
+      activityLimit: options && options.activityLimit,
+      onSessionExpired: handleSessionMessage,
+      onError: err => {
+        const message = err?.message || 'Não foi possível carregar o histórico agora.';
+        historyState.loading.checkins = false;
         historyState.loading.activities = false;
-        historyState.errors.activities = err?.message || 'Não foi possível carregar o histórico de atividades.';
+        historyState.errors.checkins = message;
+        historyState.errors.activities = message;
+        historyState.checkins = [];
         historyState.activities = [];
+        historyState.streak = { current: 0, best: 0 };
         updateHistoryModuleFilterOptions();
         renderHistory();
-      })
-      .withSuccessHandler(data => {
-        if (!currentUser || currentUser.id !== expectedUserId) return;
-        historyState.loading.activities = false;
-        historyState.activities = normalizeActivityHistory(data);
-        historyState.errors.activities = '';
-        updateHistoryModuleFilterOptions();
-        renderHistory();
-      })
-      .getActivityHistory({ token, userId: currentUser.id });
+        updateCheckinStreakInfo(null);
+      }
+    }).catch(err => {
+      const message = extractErrorMessage(err);
+      if (!isSessionErrorMessage(message)) {
+        console.warn('Falha ao carregar histórico:', err);
+      }
+      return Promise.reject(err);
+    });
   }
 
   const signupMessageEl = $('#signupMsg');
@@ -5350,15 +6210,15 @@
           showPollFormError(err?.message || 'Não foi possível publicar a enquete agora.');
         })
         .withSuccessHandler(() => {
-          if (btnSubmitPoll) {
-            btnSubmitPoll.disabled = false;
-            btnSubmitPoll.removeAttribute('aria-busy');
-          }
-          resetPollForm();
-          showToast({ message: 'Enquete publicada para a turma!', type: 'success' });
-          loadForumPolls();
-        })
-        .createForumPoll({
+        if (btnSubmitPoll) {
+          btnSubmitPoll.disabled = false;
+          btnSubmitPoll.removeAttribute('aria-busy');
+        }
+        resetPollForm();
+        showToast({ message: 'Enquete publicada para a turma!', type: 'success' });
+        loadForumPolls({ force: true, priority: 'high', silent: true }).catch(() => {});
+      })
+      .createForumPoll({
           token,
           question,
           description,
@@ -5432,14 +6292,14 @@
           showQuestionFormError(err?.message || 'Não foi possível registrar a dúvida agora.');
         })
         .withSuccessHandler(() => {
-          if (btnSubmitQuestion) {
-            btnSubmitQuestion.disabled = false;
-            btnSubmitQuestion.removeAttribute('aria-busy');
-          }
-          resetQuestionForm();
-          showToast({ message: 'Dúvida enviada com sucesso!', type: 'success' });
-          loadForumQuestions();
-        })
+        if (btnSubmitQuestion) {
+          btnSubmitQuestion.disabled = false;
+          btnSubmitQuestion.removeAttribute('aria-busy');
+        }
+        resetQuestionForm();
+        showToast({ message: 'Dúvida enviada com sucesso!', type: 'success' });
+        loadForumQuestions({ force: true, priority: 'high', silent: true }).catch(() => {});
+      })
         .submitForumQuestion({
           token,
           subject,
@@ -5694,13 +6554,19 @@
     const adminPanelEl = $('#adminPanel');
 
     const activeUserId = currentUser?.id ?? null;
-    const hasUserChanged = activeUserId !== lastPanelPollUserId;
-    if (!currentUser || hasUserChanged) {
+    const currentSignature = computeUserSignature(currentUser);
+    const userIdChanged = activeUserId !== lastKnownUserId;
+    const hasUserChanged = currentSignature !== lastKnownUserSignature;
+    if (!currentUser || userIdChanged) {
       forumState.pollSelections = {};
     }
-    lastPanelPollUserId = activeUserId;
+    lastKnownUserId = activeUserId;
+    lastKnownUserSignature = currentSignature;
 
     if (!currentUser) {
+      resetDatasetCaches();
+      communityState.shareableUsers = [];
+      communityState.loadedShareableUsers = false;
       if (authSectionEl) authSectionEl.classList.remove('hidden');
       showAuthView('login');
       if (dashSectionEl) dashSectionEl.classList.add('hidden');
@@ -5781,6 +6647,8 @@
       if (achievementsPodiumEl) achievementsPodiumEl.innerHTML = '';
       if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
       if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Restrito à coordenação';
+      renderRankingSimpleList([]);
+      renderRankingAdminList([]);
       return;
     }
 
@@ -5791,259 +6659,209 @@
     if (resourcesEmptyEl && resourcesEmptyDefaultText) resourcesEmptyEl.textContent = resourcesEmptyDefaultText;
     if (eventsEmptyEl && eventsEmptyDefaultText) eventsEmptyEl.textContent = eventsEmptyDefaultText;
     if (communityEmptyEl && communityEmptyDefaultHtml) communityEmptyEl.innerHTML = communityEmptyDefaultHtml;
-    if (!hasLoadedEmbeds) {
-      loadEmbeds();
+
+    if (hasUserChanged) {
+      resetDatasetCaches();
+      historyState.checkins = [];
+      historyState.activities = [];
+      historyState.streak = { current: 0, best: 0 };
+      communityState.shareableUsers = [];
+      communityState.loadedShareableUsers = false;
+      hasLoadedEmbeds = false;
+      renderHistory();
     }
+
     setActiveSubPageButtons(activeSubPage);
     syncHeaderContext();
     renderForumPolls();
-    loadShareableUsers();
+    loadShareableUsers({ priority: 'normal', silent: true }).catch(() => {});
 
-    if (!keepLevelIndicator) {
-      setLevelIndicatorLoading();
+    const dashboardBucket = datasetCache.dashboard;
+    const requestedSections = ['userState', 'history', 'ranking'];
+    if (!skipAchievements && !achievementsData) {
+      requestedSections.push('achievements');
     }
 
     if (achievementsData) {
-      applyAchievementsUpdate(achievementsData, achievementsUnlocked || [], { silent: achievementsSilent });
-    } else if (!skipAchievements) {
-      loadAchievementsOverview();
+      applyDashboardSnapshot({ achievements: achievementsData }, {
+        achievementsUnlocked: achievementsUnlocked || [],
+        silentAchievements: achievementsSilent
+      });
     }
 
-    const token = getSessionToken();
-    if (!token) {
-      expireSession(SESSION_EXPIRED_FALLBACK);
-      return;
+    if (dashboardBucket && dashboardBucket.data) {
+      const cachedSnapshot = pickDashboardSections(dashboardBucket.data, requestedSections);
+      if (Object.keys(cachedSnapshot).length) {
+        applyDashboardSnapshot(cachedSnapshot, { silentAchievements: true });
+      }
     }
 
-    google.script.run
-      .withFailureHandler(err => {
-        if (handleSessionExpiredError(err, {
-          onHandled: message => {
-            if (!keepLevelIndicator) {
-              if (nextLevelTextEl) nextLevelTextEl.textContent = message;
-              if (nextLevelPctEl) nextLevelPctEl.textContent = '—';
-            }
-          }
-        })) {
-          return;
-        }
-        console.error('Falha ao obter estado do usuário:', err);
-        if (!keepLevelIndicator) {
-          if (nextLevelTextEl) nextLevelTextEl.textContent = 'Não foi possível carregar o progresso agora.';
+    const sectionsToFetch = requestedSections.filter(section => !isSectionFresh(dashboardBucket, section));
+    const fetching = new Set(sectionsToFetch);
+
+    if (fetching.has('userState') && !keepLevelIndicator) {
+      setLevelIndicatorLoading();
+    }
+
+    if (fetching.has('history')) {
+      historyState.loading.checkins = true;
+      historyState.errors.checkins = '';
+      historyState.loading.activities = true;
+      historyState.errors.activities = '';
+      renderHistory();
+    }
+
+    const cachedRanking = dashboardBucket && dashboardBucket.data && Array.isArray(dashboardBucket.data.ranking)
+      ? dashboardBucket.data.ranking
+      : [];
+    if (fetching.has('ranking')) {
+      renderRankingSimpleList(cachedRanking, { loading: true });
+      if (currentUser.isAdmin) {
+        renderRankingAdminList(cachedRanking, { loading: true });
+      } else {
+        renderRankingAdminList([]);
+      }
+    } else {
+      renderRankingSimpleList(cachedRanking);
+      renderRankingAdminList(cachedRanking);
+    }
+
+    if (fetching.has('achievements')) {
+      achievementsState.loading = true;
+      achievementsState.error = '';
+      renderAchievements();
+    }
+
+    const hydrateOptions = {
+      priority: 'high',
+      achievementsUnlocked,
+      silentAchievements: achievementsSilent,
+      onSessionExpired: message => {
+        if (fetching.has('userState') && !keepLevelIndicator) {
+          if (nextLevelTextEl) nextLevelTextEl.textContent = message;
           if (nextLevelPctEl) nextLevelPctEl.textContent = '—';
         }
-      })
-      .withSuccessHandler(s => {
-        if (xpBoxEl) xpBoxEl.textContent = s.xp;
-        if (lvlBoxEl) lvlBoxEl.textContent = s.level;
-        if (doneBoxEl) doneBoxEl.textContent = s.concluidos;
-        const pct = Math.round((s.concluidos / TOTAL_MODULES) * 100);
-        if (pctBoxEl) pctBoxEl.textContent = pct + '%';
-        if (barBoxEl) barBoxEl.style.width = pct + '%';
-        updateLevelIndicator(s);
-        updateStudentStoryState({
-          xp: s.xp,
-          level: s.level,
-          modulesCompleted: s.concluidos,
-          metrics: { xpTotal: s.xp, modulesCompleted: s.concluidos }
-        });
-      })
-      .getUserState({ token, userId: currentUser.id });
+        if (fetching.has('history')) {
+          historyState.loading.checkins = false;
+          historyState.loading.activities = false;
+          historyState.errors.checkins = message;
+          historyState.errors.activities = message;
+          historyState.checkins = [];
+          historyState.activities = [];
+          historyState.streak = { current: 0, best: 0 };
+          renderHistory();
+          updateCheckinStreakInfo(null);
+        }
+        if (fetching.has('ranking')) {
+          renderRankingSimpleList([], { error: message });
+          renderRankingAdminList([], { error: message });
+        }
+        if (fetching.has('achievements')) {
+          achievementsState.loading = false;
+          achievementsState.error = message;
+          achievementsState.metrics = {};
+          renderAchievements();
+        }
+      },
+      onError: err => {
+        const message = err?.message || 'Não foi possível atualizar o painel agora.';
+        if (fetching.has('userState') && !keepLevelIndicator) {
+          if (nextLevelTextEl) nextLevelTextEl.textContent = message;
+          if (nextLevelPctEl) nextLevelPctEl.textContent = '—';
+        }
+        if (fetching.has('history')) {
+          historyState.loading.checkins = false;
+          historyState.loading.activities = false;
+          historyState.errors.checkins = message;
+          historyState.errors.activities = message;
+          historyState.checkins = [];
+          historyState.activities = [];
+          historyState.streak = { current: 0, best: 0 };
+          renderHistory();
+          updateCheckinStreakInfo(null);
+        }
+        if (fetching.has('ranking')) {
+          renderRankingSimpleList([], { error: 'Não foi possível carregar o ranking agora.' });
+          renderRankingAdminList([], { error: 'Não foi possível carregar o ranking agora.' });
+        }
+        if (fetching.has('achievements')) {
+          achievementsState.loading = false;
+          achievementsState.error = message;
+          achievementsState.metrics = {};
+          renderAchievements();
+        }
+      }
+    };
 
-    loadHistoryForCurrentUser();
-    refreshRanking();
+    const hydratePromise = sectionsToFetch.length
+      ? hydrateDashboardSections(sectionsToFetch, hydrateOptions)
+      : Promise.resolve(dashboardBucket && dashboardBucket.data);
+
+    hydratePromise.catch(err => {
+      const message = extractErrorMessage(err);
+      if (!isSessionErrorMessage(message)) {
+        console.warn('Falha ao carregar dados do painel:', err);
+      }
+    });
+
     if (adminPanelEl) adminPanelEl.classList.toggle('hidden', !currentUser.isAdmin);
     syncAdminVisibility();
     renderAdminBulletin();
     renderAdminMissionList();
     updateCommunityAccess();
-    if (!skipCommunity) refreshCommunityWall();
+
+    if (!skipCommunity) {
+      ensureCommunityData({ priority: 'normal' }).catch(() => {});
+    }
+
     if (currentAppRoute === 'forum') {
-      loadForumPolls();
-      loadForumIdeas();
-      loadForumQuestions();
-      loadForumNotifications();
+      ensureForumData({ priority: 'high' }).catch(() => {});
+    } else {
+      ensureForumData({ priority: 'normal', silent: true, ttl: DATA_CACHE_LONG_TTL }).catch(() => {});
+    }
+
+    if (!hasLoadedEmbeds) {
+      loadEmbeds({ priority: 'normal', silent: true }).catch(() => {});
     }
   }
 
-  function refreshRanking() {
-    const simpleWrap = $('#rankWrap');
-    const adminWrap = $('#adminRank');
-    const isAdmin = !!(currentUser && currentUser.isAdmin);
-
-    const renderSimpleList = entries => {
-      if (simpleWrap) {
-        simpleWrap.innerHTML = '';
-        if (!entries.length) {
-          const empty = document.createElement('div');
-          empty.className = 'text-xs text-slate-500 dark:text-slate-400';
-          empty.textContent = 'Ranking ainda não disponível.';
-          simpleWrap.appendChild(empty);
-        } else {
-          entries.slice(0, 5).forEach(item => {
-            const row = document.createElement('div');
-            row.textContent = `${item.pos}º — ${item.name || 'Participante'} • ${formatNumber(item.xp)} XP`;
-            simpleWrap.appendChild(row);
-          });
-        }
-      }
-      if (adminWrap) {
-        adminWrap.innerHTML = '';
-        if (!entries.length) {
-          const empty = document.createElement('div');
-          empty.className = 'text-xs text-slate-500 dark:text-slate-400';
-          empty.textContent = 'Ranking ainda não disponível.';
-          adminWrap.appendChild(empty);
-        } else {
-          entries.forEach(item => {
-            const row = document.createElement('div');
-            row.textContent = `${item.pos}º — ${item.name || 'Participante'} • ${formatNumber(item.xp)} XP`;
-            adminWrap.appendChild(row);
-          });
-        }
-      }
-    };
-
-    const renderAdminLeaderboard = entries => {
-      if (achievementsRankingBadgeEl) {
-        let label = 'Atualizado agora';
-        if (timeFormatter) {
-          try {
-            label = `Atualizado às ${timeFormatter.format(new Date())}`;
-          } catch (err) {
-            label = 'Atualizado agora';
-          }
-        }
-        achievementsRankingBadgeEl.textContent = label;
-      }
-
-      if (achievementsPodiumEl) {
-        achievementsPodiumEl.innerHTML = '';
-        const podiumByRank = {};
-        entries.forEach(item => {
-          if (item && item.pos && item.pos <= 3 && !podiumByRank[item.pos]) {
-            podiumByRank[item.pos] = item;
-          }
-        });
-        const order = [2, 1, 3];
-        order.forEach(rank => {
-          const entry = podiumByRank[rank];
-          if (!entry) return;
-          const card = document.createElement('div');
-          let classes = 'podium-card';
-          if (rank === 1) classes += ' podium-card-first';
-          else if (rank === 2) classes += ' podium-card-second';
-          else if (rank === 3) classes += ' podium-card-third';
-          card.className = classes;
-          const rankLabel = document.createElement('div');
-          rankLabel.className = 'podium-rank';
-          rankLabel.textContent = `${rank}º lugar`;
-          const nameEl = document.createElement('div');
-          nameEl.className = 'podium-name';
-          nameEl.textContent = entry.name || 'Participante';
-          const scoreEl = document.createElement('div');
-          scoreEl.className = 'podium-score';
-          scoreEl.textContent = `Nível ${formatNumber(entry.level)} • ${formatNumber(entry.xp)} XP`;
-          card.append(rankLabel, nameEl, scoreEl);
-          achievementsPodiumEl.appendChild(card);
-        });
-        if (!achievementsPodiumEl.children.length) {
-          const empty = document.createElement('p');
-          empty.className = 'text-sm text-slate-500 dark:text-slate-300';
-          empty.textContent = 'Ranking ainda não possui participantes suficientes.';
-          achievementsPodiumEl.appendChild(empty);
-        }
-      }
-
-      if (achievementsLeaderboardTableEl) {
-        achievementsLeaderboardTableEl.innerHTML = '';
-        if (!entries.length) {
-          const tr = document.createElement('tr');
-          const td = document.createElement('td');
-          td.colSpan = 2;
-          td.className = 'px-4 py-4 text-sm text-slate-500 dark:text-slate-300';
-          td.textContent = 'Nenhum aluno ranqueado ainda.';
-          tr.appendChild(td);
-          achievementsLeaderboardTableEl.appendChild(tr);
-        } else {
-          entries.forEach(entry => {
-            const tr = document.createElement('tr');
-            const infoTd = document.createElement('td');
-            infoTd.className = 'px-4 py-3 align-middle';
-            const nameDiv = document.createElement('div');
-            nameDiv.className = 'leaderboard-name';
-            nameDiv.textContent = `${entry.pos}º — ${entry.name || 'Participante'}`;
-            const metaDiv = document.createElement('div');
-            metaDiv.className = 'leaderboard-meta';
-            metaDiv.textContent = `Nível ${formatNumber(entry.level)} • ${formatNumber(entry.xp)} XP`;
-            infoTd.append(nameDiv, metaDiv);
-            const xpTd = document.createElement('td');
-            xpTd.className = 'px-4 py-3 text-right align-middle font-semibold text-slate-600 dark:text-slate-200';
-            xpTd.textContent = `${formatNumber(entry.xp)} XP`;
-            tr.append(infoTd, xpTd);
-            achievementsLeaderboardTableEl.appendChild(tr);
-          });
-        }
-      }
-
-      if (achievementsLeaderboardEl) {
-        achievementsLeaderboardEl.classList.remove('hidden');
-      }
-      if (achievementsRankingBadgeEl && !entries.length) {
-        achievementsRankingBadgeEl.textContent = 'Sem participantes';
-      }
-    };
-
-    const resetAdminNotice = () => {
-      if (!achievementsAdminNoticeEl) return;
-      if (achievementsAdminNoticeDefaultText) {
-        achievementsAdminNoticeEl.textContent = achievementsAdminNoticeDefaultText;
-      }
-    };
-
-    resetAdminNotice();
-    if (!isAdmin) {
-      if (achievementsAdminNoticeEl) achievementsAdminNoticeEl.classList.remove('hidden');
-      if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.add('hidden');
-      if (achievementsPodiumEl) achievementsPodiumEl.innerHTML = '';
-      if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
-      if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Restrito à coordenação';
-    } else {
-      if (achievementsAdminNoticeEl) achievementsAdminNoticeEl.classList.add('hidden');
-      if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.remove('hidden');
-      if (achievementsPodiumEl) {
-        achievementsPodiumEl.innerHTML = '';
-        const placeholder = document.createElement('p');
-        placeholder.className = 'text-sm text-slate-500 dark:text-slate-300';
-        placeholder.textContent = 'Carregando ranking...';
-        achievementsPodiumEl.appendChild(placeholder);
-      }
-      if (achievementsLeaderboardTableEl) achievementsLeaderboardTableEl.innerHTML = '';
-      if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Atualizando...';
+  function refreshRanking(options = {}) {
+    if (!currentUser || !currentUser.id) {
+      renderRankingSimpleList([]);
+      renderRankingAdminList([]);
+      return Promise.resolve(null);
     }
 
-    google.script.run
-      .withFailureHandler(err => {
-        renderSimpleList([]);
-        if (isAdmin) {
-          if (achievementsLeaderboardEl) achievementsLeaderboardEl.classList.add('hidden');
-          if (achievementsAdminNoticeEl) {
-            achievementsAdminNoticeEl.textContent = err?.message || 'Não foi possível carregar o ranking agora.';
-            achievementsAdminNoticeEl.classList.remove('hidden');
-          }
-          if (achievementsRankingBadgeEl) achievementsRankingBadgeEl.textContent = 'Falha ao atualizar';
-        }
-        console.error('Falha ao carregar ranking:', err);
-      })
-      .withSuccessHandler(list => {
-        const entries = Array.isArray(list) ? list : [];
-        renderSimpleList(entries);
-        if (isAdmin) {
-          if (achievementsAdminNoticeEl) achievementsAdminNoticeEl.classList.add('hidden');
-          renderAdminLeaderboard(entries);
-        }
-      })
-      .getRanking();
+    const bucket = datasetCache.dashboard;
+    const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_TTL;
+    const force = !!(options && options.force);
+    const cached = bucket && bucket.data && Array.isArray(bucket.data.ranking) ? bucket.data.ranking : [];
+    const shouldFetch = force || !isSectionFresh(bucket, 'ranking', ttl);
+
+    if (!shouldFetch) {
+      applyRankingData(cached);
+      return Promise.resolve(cached);
+    }
+
+    renderRankingSimpleList(cached, { loading: true });
+    if (currentUser.isAdmin) {
+      renderRankingAdminList(cached, { loading: true });
+    } else {
+      renderRankingAdminList([]);
+    }
+
+    return hydrateDashboardSections(['ranking'], {
+      priority: options && options.priority ? options.priority : 'normal',
+      silentAchievements: true
+    }).catch(err => {
+      const message = extractErrorMessage(err);
+      if (!isSessionErrorMessage(message)) {
+        renderRankingSimpleList([], { error: 'Não foi possível carregar o ranking agora.' });
+        renderRankingAdminList([], { error: 'Não foi possível carregar o ranking agora.' });
+        console.warn('Falha ao carregar ranking:', err);
+      }
+      return null;
+    });
   }
 
   // AUTH
@@ -6329,6 +7147,7 @@
           if (Number.isFinite(Number(totalXP))) $('#xpBox').textContent = totalXP;
           if (Number.isFinite(Number(res.level))) $('#lvlBox').textContent = res.level;
           updateLevelIndicator(res);
+          markDatasetStale('dashboard');
           updateUI({ keepLevelIndicator: true, skipAchievements: true, skipCommunity: true });
         } else {
           $('#checkinMsg').textContent = res?.msg || 'Não foi possível registrar o check-in.';
@@ -6384,75 +7203,106 @@
         .withSuccessHandler(() => {
           loader.finish();
           showToast({ message: 'Materiais atualizados com sucesso.', type: 'success' });
-          loadEmbeds();
+          markDatasetStale('embeds');
+          loadEmbeds({ force: true, priority: 'high', silent: false }).catch(() => {});
         })
         .saveEmbeds({ excel, ppt, token, recommendedResources, upcomingEvents });
     });
   }
   if (btnLoadEmbeds) {
-    btnLoadEmbeds.addEventListener('click', () => loadEmbeds({ showLoader: true }));
+    btnLoadEmbeds.addEventListener('click', () => {
+      loadEmbeds({ showLoader: true, silent: false }).catch(() => {});
+    });
   }
+
+  function applyEmbedsData(data) {
+    const materials = data && typeof data === 'object' ? data : {};
+    const bucket = datasetCache.embeds;
+    const now = Date.now();
+    if (bucket) {
+      if (!bucket.sectionTimestamps) bucket.sectionTimestamps = {};
+      bucket.data.materials = materials;
+      bucket.sectionTimestamps.materials = now;
+      bucket.fetchedAt = now;
+      bucket.stale = false;
+    }
+    hasLoadedEmbeds = true;
+    if (excelFrameEl) excelFrameEl.src = normalizeEmbed(materials.excel || '');
+    if (pptFrameEl) pptFrameEl.src = normalizeEmbed(materials.ppt || '');
+    if (excelLinkInput) excelLinkInput.value = materials.excel || '';
+    if (pptLinkInput) pptLinkInput.value = materials.ppt || '';
+    if (resourcesEmptyEl && resourcesEmptyDefaultText) resourcesEmptyEl.textContent = resourcesEmptyDefaultText;
+    if (eventsEmptyEl && eventsEmptyDefaultText) eventsEmptyEl.textContent = eventsEmptyDefaultText;
+    renderHighlightList(resourcesListEl, materials.recommendedResources, resourcesEmptyEl);
+    renderHighlightList(eventsListEl, materials.upcomingEvents, eventsEmptyEl);
+    if (resourcesInputEl) {
+      const list = Array.isArray(materials.recommendedResources) ? materials.recommendedResources : [];
+      resourcesInputEl.value = list.join('\n');
+    }
+    if (eventsInputEl) {
+      const list = Array.isArray(materials.upcomingEvents) ? materials.upcomingEvents : [];
+      eventsInputEl.value = list.join('\n');
+    }
+    if (adminExcelEmptyEl && adminExcelEmptyDefaultText) adminExcelEmptyEl.textContent = adminExcelEmptyDefaultText;
+    if (adminPptEmptyEl && adminPptEmptyDefaultText) adminPptEmptyEl.textContent = adminPptEmptyDefaultText;
+    renderMaterialList(adminExcelListEl, materials.adminMaterials?.excel, adminExcelEmptyEl, { icon: '📊', emptyText: adminExcelEmptyDefaultText });
+    renderMaterialList(adminPptListEl, materials.adminMaterials?.ppt, adminPptEmptyEl, { icon: '📽️', emptyText: adminPptEmptyDefaultText });
+    if (userExcelEmptyEl && userExcelEmptyDefaultText) userExcelEmptyEl.textContent = userExcelEmptyDefaultText;
+    if (userPptEmptyEl && userPptEmptyDefaultText) userPptEmptyEl.textContent = userPptEmptyDefaultText;
+    renderMaterialList(userExcelListEl, materials.userMaterials?.excel, userExcelEmptyEl, { icon: '📊', showMeta: true, emptyText: userExcelEmptyDefaultText });
+    renderMaterialList(userPptListEl, materials.userMaterials?.ppt, userPptEmptyEl, { icon: '📽️', showMeta: true, emptyText: userPptEmptyDefaultText });
+    if (userFolderLinkEl) {
+      if (materials.userFolder && materials.userFolder.url) {
+        userFolderLinkEl.href = materials.userFolder.url;
+        userFolderLinkEl.classList.remove('hidden');
+      } else {
+        userFolderLinkEl.classList.add('hidden');
+      }
+    }
+    if (userFolderHintEl) {
+      userFolderHintEl.textContent = materials.userFolderMessage || userFolderHintDefaultText;
+    }
+    if (currentUser) {
+      if (materials.userFolder?.id) currentUser.folderId = materials.userFolder.id;
+      if (materials.userFolder?.url) currentUser.folderUrl = materials.userFolder.url;
+    }
+  }
+
   function loadEmbeds(options = {}) {
-    if (!currentUser) return;
+    if (!currentUser) return Promise.resolve(null);
+    const bucket = datasetCache.embeds;
+    const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_LONG_TTL;
+    const force = !!(options && options.force);
+    const shouldFetch = force || !isSectionFresh(bucket, 'materials', ttl);
+    if (!shouldFetch && bucket && bucket.data && bucket.data.materials) {
+      applyEmbedsData(bucket.data.materials);
+      return Promise.resolve(bucket.data.materials);
+    }
     const token = getSessionToken();
     if (!token) {
       expireSession(SESSION_EXPIRED_FALLBACK);
-      return;
+      return Promise.resolve(null);
     }
     const loader = options && options.showLoader ? createActionLoader('Carregando materiais...') : null;
-    google.script.run
-      .withFailureHandler(err => {
-        if (loader) loader.finish();
-        if (handleSessionExpiredError(err)) {
-          return;
+    const payload = { token, userId: currentUser.id };
+    return enqueueScriptTask(
+      () => executeScriptMethod('getEmbeds', payload),
+      { priority: options && options.priority === 'high' ? 'high' : 'normal' }
+    ).then(data => {
+      if (loader) loader.finish();
+      applyEmbedsData(data || {});
+      return data;
+    }).catch(err => {
+      if (loader) loader.finish();
+      if (!handleSessionExpiredError(err)) {
+        if (!(options && options.silent)) {
+          console.error('Falha ao carregar materiais compartilhados:', err);
+          const message = err?.message || 'Não foi possível carregar os materiais agora.';
+          showToast({ message, type: 'error' });
         }
-        console.error('Falha ao carregar materiais compartilhados:', err);
-        showToast({ message: err?.message || 'Não foi possível carregar os materiais agora.', type: 'error' });
-      })
-      .withSuccessHandler(data => {
-        if (loader) loader.finish();
-        hasLoadedEmbeds = true;
-        if (excelFrameEl) excelFrameEl.src = normalizeEmbed(data?.excel || '');
-        if (pptFrameEl) pptFrameEl.src = normalizeEmbed(data?.ppt || '');
-        if (excelLinkInput) excelLinkInput.value = data?.excel || '';
-        if (pptLinkInput) pptLinkInput.value = data?.ppt || '';
-        if (resourcesEmptyEl && resourcesEmptyDefaultText) resourcesEmptyEl.textContent = resourcesEmptyDefaultText;
-        if (eventsEmptyEl && eventsEmptyDefaultText) eventsEmptyEl.textContent = eventsEmptyDefaultText;
-        renderHighlightList(resourcesListEl, data?.recommendedResources, resourcesEmptyEl);
-        renderHighlightList(eventsListEl, data?.upcomingEvents, eventsEmptyEl);
-        if (resourcesInputEl) {
-          const list = Array.isArray(data?.recommendedResources) ? data.recommendedResources : [];
-          resourcesInputEl.value = list.join('\n');
-        }
-        if (eventsInputEl) {
-          const list = Array.isArray(data?.upcomingEvents) ? data.upcomingEvents : [];
-          eventsInputEl.value = list.join('\n');
-        }
-        if (adminExcelEmptyEl && adminExcelEmptyDefaultText) adminExcelEmptyEl.textContent = adminExcelEmptyDefaultText;
-        if (adminPptEmptyEl && adminPptEmptyDefaultText) adminPptEmptyEl.textContent = adminPptEmptyDefaultText;
-        renderMaterialList(adminExcelListEl, data?.adminMaterials?.excel, adminExcelEmptyEl, { icon: '📊', emptyText: adminExcelEmptyDefaultText });
-        renderMaterialList(adminPptListEl, data?.adminMaterials?.ppt, adminPptEmptyEl, { icon: '📽️', emptyText: adminPptEmptyDefaultText });
-        if (userExcelEmptyEl && userExcelEmptyDefaultText) userExcelEmptyEl.textContent = userExcelEmptyDefaultText;
-        if (userPptEmptyEl && userPptEmptyDefaultText) userPptEmptyEl.textContent = userPptEmptyDefaultText;
-        renderMaterialList(userExcelListEl, data?.userMaterials?.excel, userExcelEmptyEl, { icon: '📊', showMeta: true, emptyText: userExcelEmptyDefaultText });
-        renderMaterialList(userPptListEl, data?.userMaterials?.ppt, userPptEmptyEl, { icon: '📽️', showMeta: true, emptyText: userPptEmptyDefaultText });
-        if (userFolderLinkEl) {
-          if (data?.userFolder && data.userFolder.url) {
-            userFolderLinkEl.href = data.userFolder.url;
-            userFolderLinkEl.classList.remove('hidden');
-          } else {
-            userFolderLinkEl.classList.add('hidden');
-          }
-        }
-        if (userFolderHintEl) {
-          userFolderHintEl.textContent = data?.userFolderMessage || userFolderHintDefaultText;
-        }
-        if (currentUser) {
-          if (data?.userFolder?.id) currentUser.folderId = data.userFolder.id;
-          if (data?.userFolder?.url) currentUser.folderUrl = data.userFolder.url;
-        }
-      })
-      .getEmbeds({ token, userId: currentUser.id });
+      }
+      return null;
+    });
   }
 
   if (btnSaveBulletinEl) {
