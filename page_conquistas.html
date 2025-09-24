@@ -1,0 +1,54 @@
+<section data-app-page="conquistas" id="conquistasPage" class="hidden space-y-6 max-w-6xl mx-auto">
+    <div class="grid gap-6 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+      <div class="space-y-6">
+        <div class="card card-transparent space-y-3">
+          <p class="pill">Vitrine de badges</p>
+          <h2 class="text-2xl font-semibold text-primary">Celebre cada passo rumo ao nível Mestre</h2>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Acompanhe o total de medalhas desbloqueadas, descubra o próximo troféu e monitore o progresso do seu streak.</p>
+          <div class="grid gap-3 sm:grid-cols-3" id="achievementsHeroStats"></div>
+        </div>
+
+        <div class="card" data-achievements-page data-subpage="achievements-catalog">
+          <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+            <div>
+              <h3 class="text-xl font-semibold">Catálogo completo de conquistas</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Todas as medalhas disponíveis, critérios e recompensas.</p>
+            </div>
+            <span class="pill" data-role="achievement-summary">0/0 desbloqueadas</span>
+          </div>
+          <div data-role="achievement-loading" class="text-sm text-slate-500 dark:text-slate-300">Carregando conquistas...</div>
+          <div data-role="achievement-error" class="text-sm text-rose-600 dark:text-rose-300 hidden"></div>
+          <p data-role="achievement-empty" class="history-empty hidden">Faça login para acompanhar suas conquistas.</p>
+          <div data-role="achievement-list" class="achievements-grid"></div>
+        </div>
+      </div>
+
+      <div class="space-y-6">
+        <div class="card card-transparent space-y-4" id="achievementsAdminPanel">
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p class="pill">Hall da fama</p>
+              <h3 class="text-xl font-semibold">Ranking da temporada</h3>
+              <p class="text-sm text-slate-500">Visão exclusiva para administradores com os alunos mais engajados.</p>
+            </div>
+            <span class="pill" id="achievementsRankingBadge">Atualização diária</span>
+          </div>
+          <div id="achievementsAdminNotice" class="text-sm text-slate-500 dark:text-slate-300">Faça login como administrador para acompanhar o ranking da turma.</div>
+          <div id="achievementsLeaderboard" class="space-y-5 hidden">
+            <div id="achievementsPodium" class="grid gap-3 md:grid-cols-3"></div>
+            <div class="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900/50 shadow-sm">
+              <div class="flex flex-wrap items-center justify-between gap-3 px-4 pt-4 pb-2">
+                <h4 class="text-sm font-semibold text-slate-600 dark:text-slate-200">Top participantes</h4>
+                <span class="text-xs text-slate-400">Níveis calculados automaticamente</span>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                  <tbody id="achievementsLeaderboardTable" class="divide-y divide-slate-200 dark:divide-slate-700"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>

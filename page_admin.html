@@ -1,0 +1,76 @@
+<section data-app-page="admin" id="adminPage" class="hidden space-y-6 max-w-6xl mx-auto">
+    <div class="card space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="pill">Informativo do administrador</p>
+          <h3 class="text-xl font-semibold">Comunicados oficiais da coordenação</h3>
+        </div>
+        <span class="pill" data-admin-only aria-hidden="true">Modo administrador</span>
+      </div>
+      <div id="adminBulletinView" class="prose prose-slate dark:prose-invert max-w-none text-sm leading-relaxed"></div>
+      <div id="adminBulletinEditor" class="space-y-3 hidden" data-admin-only aria-hidden="true">
+        <textarea id="adminBulletinInput" class="input min-h-[140px] resize-y" placeholder="Escreva o informativo a ser publicado para a turma"></textarea>
+        <div class="flex flex-wrap justify-end gap-2">
+          <button id="btnDiscardBulletin" class="btn btn-ghost">Descartar alterações</button>
+          <button id="btnSaveBulletin" class="btn btn-primary">Publicar informativo</button>
+        </div>
+      </div>
+      <p id="adminBulletinEmpty" class="text-xs text-slate-500">Nenhum informativo publicado ainda.</p>
+    </div>
+
+    <div class="card space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="pill">Lançar missões</p>
+          <h3 class="text-xl font-semibold">Distribua missões diárias ou relâmpago com XP personalizado</h3>
+        </div>
+        <span class="pill" data-admin-only aria-hidden="true">Administrador</span>
+      </div>
+      <div class="grid gap-3 lg:grid-cols-2" id="adminMissionForm">
+        <div class="space-y-3">
+          <div class="space-y-1">
+            <label for="missionTitle" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Título da missão</label>
+            <input id="missionTitle" class="input" placeholder="Ex.: Revisão de Procv em base real" />
+          </div>
+          <div class="space-y-1">
+            <label for="missionDescription" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Descrição</label>
+            <textarea id="missionDescription" class="input min-h-[120px] resize-y" placeholder="Detalhe o objetivo, entregáveis e anexos necessários."></textarea>
+          </div>
+        </div>
+        <div class="space-y-3">
+          <div class="grid sm:grid-cols-2 gap-3">
+            <div class="space-y-1">
+              <label for="missionXP" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">XP</label>
+              <input id="missionXP" class="input" type="number" min="5" max="60" step="5" placeholder="Ex.: 25" />
+            </div>
+            <div class="space-y-1">
+              <label for="missionValidity" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Validade</label>
+              <input id="missionValidity" class="input" type="date" />
+            </div>
+          </div>
+          <div class="space-y-1">
+            <label for="missionAudience" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Público-alvo</label>
+            <select id="missionAudience" class="input">
+              <option value="all">Todos os alunos</option>
+              <option value="moduleA">Bloco A</option>
+              <option value="moduleB">Bloco B</option>
+              <option value="moduleC">Bloco C</option>
+              <option value="moduleD">Bloco D</option>
+            </select>
+          </div>
+          <div class="space-y-1">
+            <label for="missionAttachments" class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Links ou anexos</label>
+            <textarea id="missionAttachments" class="input min-h-[72px] resize-y" placeholder="Cole URLs ou IDs de arquivos, um por linha."></textarea>
+          </div>
+          <div class="flex flex-wrap justify-end gap-2">
+            <button id="btnResetMission" class="btn btn-ghost">Limpar</button>
+            <button id="btnLaunchMission" class="btn btn-primary">Lançar missão</button>
+          </div>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <h4 class="text-sm font-semibold">Missões lançadas recentemente</h4>
+        <ul id="adminMissionList" class="space-y-2 text-sm"></ul>
+      </div>
+    </div>
+  </section>

@@ -1,0 +1,43 @@
+<header class="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur border-b border-slate-200 dark:border-slate-700">
+  <div class="w-full px-6 lg:px-12 py-4 space-y-4">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-primary/70">Trilha intensiva de 24 encontros</p>
+        <h1 class="text-2xl font-semibold text-primary">Excel do Zero ao Avançado</h1>
+      </div>
+      <div class="md:ml-auto flex items-center gap-2">
+        <span id="userInfo" class="pill">Visitante</span>
+        <button id="btnLogout" class="btn btn-ghost hidden">Sair</button>
+      </div>
+    </div>
+    <nav aria-label="Navegação principal">
+      <ul id="primaryNav" class="app-nav">
+        <li><a href="/inicio" class="app-nav-link" data-app-route="inicio" data-requires-auth="true">Início</a></li>
+        <li><a href="/forum" class="app-nav-link" data-app-route="forum" data-requires-auth="true">Fórum</a></li>
+        <li><a href="/conquistas" class="app-nav-link" data-app-route="conquistas">Conquistas</a></li>
+        <li><a href="/aulas" class="app-nav-link" data-app-route="aulas">Aulas &amp; Atividades</a></li>
+        <li><a href="/admin" class="app-nav-link" data-app-route="admin" data-requires-auth="true" data-requires-admin="true">Admin</a></li>
+        <li><a href="/sobre" class="app-nav-link" data-app-route="sobre">Sobre</a></li>
+      </ul>
+    </nav>
+    <nav id="headerBreadcrumbs" class="hidden text-xs sm:text-sm text-slate-500 dark:text-slate-400" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-2">
+        <li class="flex items-center gap-2">
+          <span class="opacity-75">Início</span>
+          <span aria-hidden="true" class="text-slate-300">/</span>
+        </li>
+        <li id="breadcrumbDashboard" class="flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-100">
+          Dashboard
+        </li>
+        <li id="breadcrumbSubPage" class="hidden items-center gap-2 font-semibold text-slate-700 dark:text-slate-100">
+          <span aria-hidden="true" class="text-slate-300">/</span>
+          <span id="breadcrumbSubPageLabel"></span>
+        </li>
+        <li id="breadcrumbAdmin" class="hidden flex items-center gap-2 font-semibold text-slate-700 dark:text-slate-100">
+          <span aria-hidden="true" class="text-slate-300">/</span>
+          Administração
+        </li>
+      </ol>
+    </nav>
+  </div>
+</header>
