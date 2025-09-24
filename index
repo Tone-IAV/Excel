@@ -166,6 +166,25 @@
     .forum-toolbar-btn span:first-child { font-size:1.05rem; }
     .dark .forum-toolbar-btn { background:rgba(15,23,42,.7); border-color:rgba(71,85,105,.55); color:#cbd5f5; }
     .dark .forum-toolbar-btn:hover { color:#6ee7b7; border-color:rgba(45,212,191,.45); box-shadow:0 8px 20px rgba(15,118,110,.35); }
+    .forum-toolbar-btn[aria-pressed="true"] { background:#217346; color:#fff; border-color:#217346; box-shadow:0 12px 26px rgba(33,115,70,.25); }
+    .dark .forum-toolbar-btn[aria-pressed="true"] { background:#2563eb; border-color:#2563eb; color:#fff; box-shadow:0 12px 26px rgba(37,99,235,.35); }
+    .info-toggle { display:inline-flex; align-items:center; justify-content:center; width:2.4rem; height:2.4rem; border-radius:9999px; border:1px solid rgba(148,163,184,.45); background:rgba(248,250,252,.95); color:#334155; font-weight:700; font-size:1rem; transition:background-color .2s ease,color .2s ease,border-color .2s ease,box-shadow .2s ease; }
+    .info-toggle:hover { border-color:#217346; color:#14532d; box-shadow:0 10px 24px rgba(33,115,70,.2); }
+    .info-toggle[aria-expanded="true"] { background:#217346; color:#fff; border-color:#217346; box-shadow:0 12px 28px rgba(33,115,70,.3); }
+    .dark .info-toggle { background:rgba(15,23,42,.75); border-color:rgba(71,85,105,.55); color:#cbd5f5; }
+    .dark .info-toggle:hover { color:#6ee7b7; border-color:rgba(45,212,191,.45); box-shadow:0 10px 24px rgba(45,212,191,.25); }
+    .dark .info-toggle[aria-expanded="true"] { background:#2563eb; border-color:#2563eb; box-shadow:0 12px 26px rgba(37,99,235,.35); color:#fff; }
+    .reaction-button { display:inline-flex; align-items:center; gap:.35rem; padding:.3rem .7rem; border-radius:9999px; border:1px solid rgba(148,163,184,.4); background:rgba(248,250,252,.9); color:#475569; font-size:.75rem; font-weight:600; transition:background-color .2s ease,color .2s ease,border-color .2s ease,box-shadow .2s ease; }
+    .reaction-button:hover { border-color:rgba(33,115,70,.45); color:#14532d; box-shadow:0 8px 20px rgba(33,115,70,.18); }
+    .reaction-button span:first-child { font-size:1rem; }
+    .reaction-button-active { background:#217346; border-color:#217346; color:#fff; box-shadow:0 12px 26px rgba(33,115,70,.25); }
+    .dark .reaction-button { background:rgba(15,23,42,.7); border-color:rgba(71,85,105,.55); color:#cbd5f5; }
+    .dark .reaction-button:hover { color:#6ee7b7; border-color:rgba(45,212,191,.45); box-shadow:0 8px 20px rgba(45,212,191,.28); }
+    .dark .reaction-button-active { background:#2563eb; border-color:#2563eb; color:#fff; box-shadow:0 12px 26px rgba(37,99,235,.35); }
+    .notification-item { display:flex; flex-direction:column; gap:.35rem; padding:.75rem 1rem; border-radius:1rem; border:1px solid rgba(148,163,184,.35); background:rgba(248,250,252,.95); transition:border-color .2s ease, box-shadow .2s ease; }
+    .notification-item-unread { border-color:rgba(37,99,235,.45); box-shadow:0 12px 26px rgba(37,99,235,.18); }
+    .dark .notification-item { background:rgba(15,23,42,.82); border-color:rgba(71,85,105,.55); }
+    .dark .notification-item-unread { border-color:rgba(59,130,246,.55); box-shadow:0 12px 26px rgba(59,130,246,.28); }
     .mention-panel { position:absolute; top:100%; left:0; margin-top:.6rem; min-width:240px; background:#fff; border:1px solid rgba(148,163,184,.35); border-radius:1rem; padding:1rem; box-shadow:0 18px 34px rgba(15,23,42,.18); z-index:40; }
     .dark .mention-panel { background:rgba(15,23,42,.95); border-color:rgba(71,85,105,.65); box-shadow:0 18px 34px rgba(0,0,0,.5); }
     .mention-option { width:100%; display:flex; flex-direction:column; gap:.2rem; align-items:flex-start; padding:.55rem .8rem; border-radius:.85rem; border:1px solid transparent; background:rgba(248,250,252,.85); color:#1f2937; font-size:.85rem; font-weight:500; transition:border-color .2s ease, background-color .2s ease, color .2s ease; }
@@ -592,6 +611,56 @@
   const communityMentionList = $('#communityMentionList');
   const communityMentionEmpty = $('#communityMentionEmpty');
   const communityMentionWrap = $('#communityMentionWrap');
+  const forumInfoToggle = $('#forumInfoToggle');
+  const forumInfoPanel = $('#forumInfoPanel');
+  const communityModeToggle = $('#communityModeToggle');
+  const communityModeButtons = Array.from(document.querySelectorAll('[data-community-mode]'));
+  const communityModeHint = $('#communityModeHint');
+  const communityMessageForm = $('#communityMessageForm');
+  const forumIdeaForm = $('#forumIdeaForm');
+  const forumIdeaTitleInput = $('#forumIdeaTitle');
+  const forumIdeaImpactSelect = $('#forumIdeaImpact');
+  const forumIdeaSummaryInput = $('#forumIdeaSummary');
+  const forumIdeaBenefitInput = $('#forumIdeaBenefit');
+  const forumIdeaTagsInput = $('#forumIdeaTags');
+  const forumIdeaVisibilitySelect = $('#forumIdeaVisibility');
+  const forumIdeaTargetsSelect = $('#forumIdeaTargets');
+  const forumIdeaFormFeedback = $('#forumIdeaFormFeedback');
+  const btnSubmitIdea = $('#btnSubmitIdea');
+  const forumPollForm = $('#forumPollForm');
+  const forumPollQuestionInput = $('#forumPollQuestion');
+  const forumPollDescriptionInput = $('#forumPollDescription');
+  const forumPollOptionsWrap = $('#forumPollOptions');
+  const btnAddPollOption = $('#btnAddPollOption');
+  const forumPollAudienceSelect = $('#forumPollAudience');
+  const forumPollClosingInput = $('#forumPollClosing');
+  const forumPollAllowMultiple = $('#forumPollAllowMultiple');
+  const forumPollAllowUpdate = $('#forumPollAllowUpdate');
+  const forumPollVisibilitySelect = $('#forumPollVisibility');
+  const forumPollTargetsSelect = $('#forumPollTargets');
+  const forumPollFormFeedback = $('#forumPollFormFeedback');
+  const btnSubmitPoll = $('#btnSubmitPoll');
+  const forumQuestionForm = $('#forumQuestionForm');
+  const forumQuestionSubjectInput = $('#forumQuestionSubject');
+  const forumQuestionDetailsInput = $('#forumQuestionDetails');
+  const forumQuestionScopeRadios = Array.from(document.querySelectorAll('input[name="forumQuestionScope"]'));
+  const forumQuestionVisibilitySelect = $('#forumQuestionVisibility');
+  const forumQuestionTargetsSelect = $('#forumQuestionTargets');
+  const forumQuestionFormFeedback = $('#forumQuestionFormFeedback');
+  const btnSubmitQuestion = $('#btnSubmitQuestion');
+  const forumIdeaListEl = $('#forumIdeaList');
+  const forumIdeaCountEl = $('#forumIdeaCount');
+  const forumIdeaEmptyEl = $('#forumIdeaEmpty');
+  const forumQuestionListEl = $('#forumQuestionList');
+  const forumQuestionEmptyEl = $('#forumQuestionEmpty');
+  const forumLatestListEl = $('#forumLatestList');
+  const forumLatestBadgeEl = $('#forumLatestBadge');
+  const forumLatestEmptyEl = $('#forumLatestEmpty');
+  const forumNotificationListEl = $('#forumNotificationList');
+  const forumNotificationBadgeEl = $('#forumNotificationBadge');
+  const forumNotificationEmptyEl = $('#forumNotificationEmpty');
+  const btnForumNotificationsRead = $('#btnForumNotificationsRead');
+  const forumPollSummaryEl = $('#forumPollSummary');
   const achievementsAdminNoticeEl = $('#achievementsAdminNotice');
   const achievementsLeaderboardEl = $('#achievementsLeaderboard');
   const achievementsPodiumEl = $('#achievementsPodium');
@@ -827,31 +896,6 @@
     }
   ];
 
-  const forumPolls = [
-    {
-      id: 'poll-review',
-      question: 'Qual tema merece reforço na sessão de revisão desta semana?',
-      audience: 'Todos os blocos',
-      closesAt: daysFromNow(2),
-      options: [
-        { id: 'atalhos', label: 'Produtividade e atalhos', votes: 18 },
-        { id: 'busca', label: 'PROCX / ÍNDICE + CORRESP', votes: 24 },
-        { id: 'dash', label: 'Tabelas dinâmicas & dashboards', votes: 20 }
-      ]
-    },
-    {
-      id: 'poll-challenge',
-      question: 'Qual missão especial devemos lançar para o Bloco B?',
-      audience: 'Bloco B',
-      closesAt: daysFromNow(4),
-      options: [
-        { id: 'mini-dashboard', label: 'Mini dashboard com segmentações', votes: 12 },
-        { id: 'power-query', label: 'Limpeza de dados com Power Query', votes: 17 },
-        { id: 'colaborativo', label: 'Integração Excel + PowerPoint', votes: 9 }
-      ]
-    }
-  ];
-
   const defaultMissionSamples = [
     {
       id: 'mission-atalhos',
@@ -882,15 +926,35 @@
     }
   ];
 
-  let forumPollState = forumPolls.map(poll => ({
-    id: poll.id,
-    question: poll.question,
-    audience: poll.audience,
-    closesAt: poll.closesAt,
-    options: poll.options.map(option => ({ ...option })),
-    userChoice: null,
-    pendingChoice: null
-  }));
+  const forumState = {
+    mode: 'message',
+    polls: [],
+    pollSelections: {},
+    pollRespondedCount: 0,
+    ideas: [],
+    questions: [],
+    notifications: [],
+    notificationsUnread: 0,
+    latestEntries: [],
+    latestMaxTimestamp: 0
+  };
+  const reactionDefinitions = {
+    like: { emoji: '👍', label: 'Gostei' },
+    insight: { emoji: '💡', label: 'Insight' },
+    celebrate: { emoji: '🎉', label: 'Comemorar' },
+    resolve: { emoji: '✅', label: 'Resolvido' }
+  };
+  const communityModeHints = {
+    message: 'Escreva uma atualização rápida para a turma.',
+    idea: 'Apresente a ideia e convide colegas para apoiar ou participar.',
+    poll: 'Crie uma enquete para coletar opiniões e preferências.',
+    question: 'Envie dúvidas para a comunidade, coordenação ou ambos.'
+  };
+  const questionScopeLabels = {
+    community: 'Comunidade',
+    admin: 'Coordenação',
+    both: 'Comunidade + Coordenação'
+  };
   let lastPanelPollUserId = null;
 
   let adminBulletinState = {
@@ -1125,61 +1189,213 @@
     }
   }
 
+  function getPollSelection(pollId) {
+    if (!pollId) return [];
+    const stored = forumState.pollSelections[pollId];
+    if (Array.isArray(stored) && stored.length) return stored.slice();
+    const poll = (forumState.polls || []).find(item => item && item.id === pollId);
+    if (poll && Array.isArray(poll.userChoices) && poll.userChoices.length) {
+      return poll.userChoices.slice();
+    }
+    return [];
+  }
+
+  function setPollSelection(pollId, choices) {
+    if (!pollId) return;
+    const normalized = Array.isArray(choices) ? choices.filter(Boolean) : [];
+    forumState.pollSelections[pollId] = normalized.slice();
+  }
+
+  function clearPollSelection(pollId) {
+    if (!pollId) return;
+    delete forumState.pollSelections[pollId];
+  }
+
+  function setCommunityMode(mode) {
+    const validModes = ['message', 'idea', 'poll', 'question'];
+    const nextMode = validModes.includes(mode) ? mode : 'message';
+    forumState.mode = nextMode;
+    communityModeButtons.forEach(button => {
+      if (!button) return;
+      const buttonMode = button.getAttribute('data-community-mode');
+      const isActive = buttonMode === nextMode;
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+    if (communityMessageForm) communityMessageForm.classList.toggle('hidden', nextMode !== 'message');
+    if (forumIdeaForm) forumIdeaForm.classList.toggle('hidden', nextMode !== 'idea');
+    if (forumPollForm) forumPollForm.classList.toggle('hidden', nextMode !== 'poll');
+    if (forumQuestionForm) forumQuestionForm.classList.toggle('hidden', nextMode !== 'question');
+    if (communityModeHint) {
+      communityModeHint.textContent = communityModeHints[nextMode] || communityModeHints.message;
+    }
+    const focusTarget = nextMode === 'message'
+      ? communityTextarea
+      : nextMode === 'idea'
+        ? forumIdeaTitleInput
+        : nextMode === 'poll'
+          ? forumPollQuestionInput
+          : forumQuestionSubjectInput;
+    if (focusTarget) {
+      setTimeout(() => {
+        try {
+          focusTarget.focus({ preventScroll: true });
+        } catch (err) {
+          focusTarget.focus();
+        }
+      }, 0);
+    }
+  }
+
   function renderForumPolls() {
     if (!forumPollListEl) return;
     forumPollListEl.innerHTML = '';
-    const hasActiveUser = !!currentUser;
-    forumPollState.forEach(poll => {
+    const polls = Array.isArray(forumState.polls) ? forumState.polls : [];
+    const activePolls = polls.filter(poll => !poll.responded || poll.allowUpdates);
+    const hiddenCount = polls.length - activePolls.length;
+
+    if (forumPollSummaryEl) {
+      let summaryText = 'Entre para votar nas enquetes da turma.';
+      if (!polls.length) {
+        summaryText = currentUser
+          ? 'A coordenação ainda não publicou novas enquetes.'
+          : 'Entre com sua conta para acompanhar as enquetes.';
+      } else if (currentUser) {
+        const responded = Number(forumState.pollRespondedCount || 0);
+        const actionable = activePolls.filter(poll => !poll.responded).length;
+        if (actionable > 0) {
+          summaryText = `Você respondeu ${responded} enquete${responded === 1 ? '' : 's'}. Ainda restam ${actionable} para votar.`;
+        } else if (activePolls.some(poll => poll.allowUpdates && poll.responded)) {
+          summaryText = `Você respondeu ${responded} enquete${responded === 1 ? '' : 's'}. Atualize seu voto sempre que quiser.`;
+        } else {
+          summaryText = `Você respondeu ${responded} enquete${responded === 1 ? '' : 's'}. Todas as enquetes disponíveis estão concluídas.`;
+        }
+        if (hiddenCount > 0) {
+          summaryText += ` (${hiddenCount} enquete${hiddenCount === 1 ? '' : 's'} concluída${hiddenCount === 1 ? '' : 's'} foi ocultada do painel.)`;
+        }
+      }
+      forumPollSummaryEl.textContent = summaryText;
+    }
+
+    if (!activePolls.length) {
+      const message = document.createElement('div');
+      message.className = 'history-empty';
+      message.textContent = polls.length
+        ? 'Você respondeu todas as enquetes disponíveis. 👏'
+        : 'Nenhuma enquete disponível no momento.';
+      forumPollListEl.appendChild(message);
+      return;
+    }
+
+    activePolls.forEach(poll => {
       const totalVotes = poll.options.reduce((sum, option) => sum + Number(option.votes || 0), 0);
+      const selection = getPollSelection(poll.id);
+      const allowMultiple = !!poll.allowMultiple;
+      const isClosed = !!poll.closed;
       const card = document.createElement('div');
-      card.className = 'card card-flat space-y-3';
+      card.className = 'card card-flat space-y-4';
+
       const header = document.createElement('div');
       header.className = 'flex flex-wrap items-start justify-between gap-3';
       const info = document.createElement('div');
-      info.innerHTML = `<h4 class="text-base font-semibold">${poll.question}</h4><p class="text-xs text-slate-500 dark:text-slate-400">${poll.audience}</p>`;
-      const deadline = document.createElement('span');
-      deadline.className = 'pill';
-      const expiresText = formatDateShort(poll.closesAt) || '';
-      deadline.textContent = expiresText ? `Encerra em ${expiresText}` : 'Enquete ativa';
+      info.className = 'space-y-1';
+      const title = document.createElement('h4');
+      title.className = 'text-base font-semibold';
+      title.textContent = poll.question || 'Enquete';
+      const meta = document.createElement('p');
+      meta.className = 'text-xs text-slate-500 dark:text-slate-400';
+      const audienceLabel = poll.audience ? formatAudienceLabel(poll.audience) : 'Turma inteira';
+      meta.textContent = `${audienceLabel}${poll.visibility === 'private' ? ' • Privada' : ''}`;
+      info.append(title, meta);
+
+      const deadline = document.createElement('div');
+      deadline.className = 'flex flex-col items-end gap-2 text-right';
+      if (poll.closesAt) {
+        const badge = document.createElement('span');
+        badge.className = 'pill';
+        badge.textContent = `Encerra em ${formatDateShort(poll.closesAt) || 'breve'}`;
+        deadline.appendChild(badge);
+      } else {
+        const badge = document.createElement('span');
+        badge.className = 'pill';
+        badge.textContent = 'Sem data de encerramento';
+        deadline.appendChild(badge);
+      }
+      if (poll.allowUpdates && poll.responded) {
+        const hint = document.createElement('span');
+        hint.className = 'text-[0.7rem] uppercase tracking-wide text-emerald-600 dark:text-emerald-300 font-semibold';
+        hint.textContent = 'Resposta editável';
+        deadline.appendChild(hint);
+      }
+      if (isClosed) {
+        const closedBadge = document.createElement('span');
+        closedBadge.className = 'text-[0.7rem] uppercase tracking-wide text-rose-600 dark:text-rose-300 font-semibold';
+        closedBadge.textContent = 'Enquete encerrada';
+        deadline.appendChild(closedBadge);
+      }
+
       header.append(info, deadline);
+
+      card.appendChild(header);
+
+      const description = (poll.description || '').toString().trim();
+      if (description) {
+        const desc = document.createElement('p');
+        desc.className = 'text-sm text-slate-600 dark:text-slate-300 leading-relaxed';
+        desc.textContent = description;
+        card.appendChild(desc);
+      }
 
       const optionsWrap = document.createElement('div');
       optionsWrap.className = 'space-y-2';
+      const inputType = allowMultiple ? 'checkbox' : 'radio';
+      const currentUserId = currentUser?.id || null;
 
       poll.options.forEach(option => {
         const optionId = `${poll.id}-${option.id}`;
         const optionLabel = document.createElement('label');
         optionLabel.className = 'block rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white/95 dark:bg-slate-900/60 px-3 py-2';
+
         const row = document.createElement('div');
-        row.className = 'flex items-center justify-between gap-2';
+        row.className = 'flex flex-wrap items-center justify-between gap-2';
         const left = document.createElement('div');
         left.className = 'flex items-center gap-2';
         const input = document.createElement('input');
-        input.type = 'radio';
+        input.type = inputType;
         input.name = `poll-${poll.id}`;
         input.value = option.id;
         input.id = optionId;
-        const isSelected = hasActiveUser && (poll.pendingChoice ? poll.pendingChoice === option.id : poll.userChoice === option.id);
-        input.checked = isSelected;
-        input.disabled = !hasActiveUser;
+        input.checked = selection.includes(option.id);
+        input.disabled = !currentUserId || isClosed;
         input.addEventListener('change', () => {
-          poll.pendingChoice = option.id;
+          let nextChoices = selection.slice();
+          if (allowMultiple) {
+            if (input.checked) {
+              if (!nextChoices.includes(option.id)) nextChoices.push(option.id);
+            } else {
+              nextChoices = nextChoices.filter(value => value !== option.id);
+            }
+          } else {
+            nextChoices = input.checked ? [option.id] : [];
+          }
+          setPollSelection(poll.id, nextChoices);
           renderForumPolls();
         });
         const labelText = document.createElement('span');
         labelText.className = 'text-sm font-medium';
-        labelText.textContent = option.label;
+        labelText.textContent = option.label || 'Opção';
         left.append(input, labelText);
+
         const voteInfo = document.createElement('span');
-        voteInfo.className = 'text-xs text-slate-500';
-        voteInfo.textContent = `${option.votes || 0} voto${Number(option.votes || 0) === 1 ? '' : 's'}`;
+        voteInfo.className = 'text-xs text-slate-500 dark:text-slate-400';
+        const votes = Number(option.votes || 0);
+        voteInfo.textContent = `${votes} voto${votes === 1 ? '' : 's'}`;
         row.append(left, voteInfo);
 
         const bar = document.createElement('div');
         bar.className = 'mt-2 h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden';
         const fill = document.createElement('div');
         fill.className = 'h-full rounded-full bg-primary/80';
-        const pct = totalVotes > 0 ? Math.round((Number(option.votes || 0) / totalVotes) * 100) : 0;
+        const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
         fill.style.width = `${pct}%`;
         bar.appendChild(fill);
 
@@ -1187,47 +1403,653 @@
         optionsWrap.appendChild(optionLabel);
       });
 
+      card.appendChild(optionsWrap);
+
       const footer = document.createElement('div');
       footer.className = 'flex flex-wrap items-center justify-between gap-2';
       const totalBadge = document.createElement('span');
       totalBadge.className = 'text-xs text-slate-500 dark:text-slate-400';
       totalBadge.textContent = `${totalVotes} voto${totalVotes === 1 ? '' : 's'} registrados`;
+
       const voteButton = document.createElement('button');
       voteButton.type = 'button';
       voteButton.className = 'btn btn-primary';
-      const nextChoice = poll.pendingChoice || poll.userChoice;
-      voteButton.disabled = !hasActiveUser || !poll.pendingChoice || poll.pendingChoice === poll.userChoice;
-      voteButton.textContent = poll.userChoice ? 'Atualizar voto' : 'Registrar voto';
+      voteButton.textContent = poll.responded ? 'Atualizar voto' : 'Registrar voto';
+      const selectedChoices = getPollSelection(poll.id);
+      const hasSelection = selectedChoices.length > 0;
+      voteButton.disabled = !currentUserId || !hasSelection || isClosed;
       voteButton.addEventListener('click', () => {
         if (!currentUser) {
           showToast({ message: 'Faça login para votar na enquete.', type: 'warning' });
           return;
         }
-        const choice = poll.pendingChoice;
-        if (!choice) return;
-        if (poll.userChoice) {
-          const previous = poll.options.find(opt => opt.id === poll.userChoice);
-          if (previous) previous.votes = Math.max(0, Number(previous.votes || 0) - 1);
+        const token = getSessionToken();
+        if (!token) {
+          expireSession(SESSION_EXPIRED_FALLBACK);
+          return;
         }
-        const selected = poll.options.find(opt => opt.id === choice);
-        if (selected) selected.votes = Number(selected.votes || 0) + 1;
-        poll.userChoice = choice;
-        poll.pendingChoice = choice;
-        showToast({ message: 'Voto registrado! +3 XP garantidos na atualização diária.', type: 'success' });
-        renderForumPolls();
-      });
-      if (!hasActiveUser) {
+        const choices = getPollSelection(poll.id);
+        if (!choices.length) {
+          showToast({ message: 'Selecione ao menos uma alternativa.', type: 'error' });
+          return;
+        }
         voteButton.disabled = true;
-      }
-      footer.append(totalBadge, voteButton);
+        const originalText = voteButton.textContent;
+        voteButton.textContent = 'Enviando...';
+        google.script.run
+          .withFailureHandler(err => {
+            voteButton.disabled = false;
+            voteButton.textContent = originalText;
+            if (handleSessionExpiredError(err)) return;
+            showToast({ message: err?.message || 'Não foi possível registrar o voto agora.', type: 'error' });
+          })
+          .withSuccessHandler(res => {
+            showToast({ message: res && res.updated ? 'Voto atualizado com sucesso.' : 'Voto registrado com sucesso!', type: 'success' });
+            clearPollSelection(poll.id);
+            loadForumPolls();
+          })
+          .submitForumPollVote({ token, pollId: poll.id, choices });
+      });
 
-      card.append(header, optionsWrap, footer);
+      footer.append(totalBadge, voteButton);
+      card.appendChild(footer);
+
       forumPollListEl.appendChild(card);
     });
   }
 
+  function loadForumPolls() {
+    if (!forumPollListEl) return;
+    const token = getSessionToken();
+    const payload = token ? { token } : {};
+    google.script.run
+      .withFailureHandler(err => {
+        console.warn('Falha ao carregar enquetes:', err);
+      })
+      .withSuccessHandler(res => {
+        const polls = res && Array.isArray(res.polls) ? res.polls : [];
+        forumState.polls = polls;
+        forumState.pollRespondedCount = Number(res && res.respondedCount || 0);
+        const activeIds = new Set(polls.map(poll => poll && poll.id).filter(Boolean));
+        Object.keys(forumState.pollSelections).forEach(id => {
+          if (!activeIds.has(id)) {
+            delete forumState.pollSelections[id];
+          }
+        });
+        renderForumPolls();
+      })
+      .listForumPolls(payload);
+  }
+
+  function showIdeaFormError(message) {
+    if (!forumIdeaFormFeedback) return;
+    const text = (message || '').toString().trim();
+    forumIdeaFormFeedback.textContent = text;
+    forumIdeaFormFeedback.classList.toggle('hidden', !text);
+  }
+
+  function resetIdeaForm() {
+    if (forumIdeaTitleInput) forumIdeaTitleInput.value = '';
+    if (forumIdeaSummaryInput) forumIdeaSummaryInput.value = '';
+    if (forumIdeaBenefitInput) forumIdeaBenefitInput.value = '';
+    if (forumIdeaTagsInput) forumIdeaTagsInput.value = '';
+    if (forumIdeaImpactSelect) forumIdeaImpactSelect.value = 'Alto';
+    if (forumIdeaVisibilitySelect) forumIdeaVisibilitySelect.value = 'public';
+    if (forumIdeaTargetsSelect) {
+      Array.from(forumIdeaTargetsSelect.options || []).forEach(option => { option.selected = false; });
+    }
+    showIdeaFormError('');
+  }
+
+  function renderForumIdeas() {
+    if (forumIdeaListEl) forumIdeaListEl.innerHTML = '';
+    const ideas = Array.isArray(forumState.ideas) ? forumState.ideas : [];
+    if (forumIdeaCountEl) {
+      forumIdeaCountEl.textContent = `${ideas.length} ideia${ideas.length === 1 ? '' : 's'} registrada${ideas.length === 1 ? '' : 's'}`;
+    }
+    if (!ideas.length) {
+      if (forumIdeaEmptyEl) forumIdeaEmptyEl.classList.remove('hidden');
+      return;
+    }
+    if (forumIdeaEmptyEl) forumIdeaEmptyEl.classList.add('hidden');
+    ideas.forEach(idea => {
+      if (!forumIdeaListEl) return;
+      const card = document.createElement('article');
+      card.className = 'card card-flat space-y-3';
+      card.dataset.ideaId = idea && idea.id ? idea.id : '';
+
+      const header = document.createElement('div');
+      header.className = 'flex flex-wrap items-start justify-between gap-3';
+      const meta = document.createElement('div');
+      meta.className = 'space-y-1';
+      const title = document.createElement('h4');
+      title.className = 'text-base font-semibold';
+      title.textContent = idea && idea.title ? idea.title : 'Ideia';
+      const authorLine = document.createElement('p');
+      authorLine.className = 'text-xs text-slate-500 dark:text-slate-400';
+      const author = idea && idea.authorName ? idea.authorName : 'Participante';
+      const createdAt = formatCommunityDate(idea && idea.createdAt);
+      authorLine.textContent = `${author} • ${createdAt || 'agora'}`;
+      meta.append(title, authorLine);
+
+      const statusWrap = document.createElement('div');
+      statusWrap.className = 'flex flex-col items-end gap-2 text-right';
+      const privacyChip = document.createElement('span');
+      const isPrivate = idea && idea.visibility === 'private';
+      privacyChip.className = 'privacy-chip' + (isPrivate ? ' privacy-chip-private' : '');
+      privacyChip.textContent = isPrivate ? 'Privada' : 'Pública';
+      statusWrap.appendChild(privacyChip);
+      if (idea && idea.status) {
+        const status = document.createElement('span');
+        status.className = 'text-[0.7rem] uppercase tracking-wide text-primary font-semibold';
+        status.textContent = idea.status === 'open' ? 'Em análise' : idea.status;
+        statusWrap.appendChild(status);
+      }
+      header.append(meta, statusWrap);
+      card.appendChild(header);
+
+      if (idea && idea.summary) {
+        const summary = document.createElement('p');
+        summary.className = 'text-sm text-slate-700 dark:text-slate-200 leading-relaxed';
+        summary.textContent = idea.summary;
+        card.appendChild(summary);
+      }
+
+      const insights = document.createElement('div');
+      insights.className = 'grid gap-2 sm:grid-cols-2';
+      const impact = document.createElement('div');
+      impact.className = 'rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-600 dark:text-slate-300';
+      impact.innerHTML = `<strong>Impacto:</strong> ${(idea && idea.impact) || 'Médio'}`;
+      const benefit = document.createElement('div');
+      benefit.className = 'rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-600 dark:text-slate-300';
+      benefit.innerHTML = `<strong>Benefício:</strong> ${(idea && idea.benefit) || 'Em definição'}`;
+      insights.append(impact, benefit);
+      card.appendChild(insights);
+
+      const tags = Array.isArray(idea && idea.tags) ? idea.tags.filter(Boolean) : [];
+      if (tags.length) {
+        const tagRow = document.createElement('div');
+        tagRow.className = 'flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400';
+        tags.forEach(tag => {
+          const pill = document.createElement('span');
+          pill.className = 'pill';
+          pill.textContent = tag;
+          tagRow.appendChild(pill);
+        });
+        card.appendChild(tagRow);
+      }
+
+      if (isPrivate && idea && Array.isArray(idea.targetUserNames) && idea.targetUserNames.length) {
+        const invited = document.createElement('p');
+        invited.className = 'text-xs text-slate-500 dark:text-slate-400';
+        invited.textContent = 'Convidados: ' + idea.targetUserNames.join(', ');
+        card.appendChild(invited);
+      }
+
+      const actions = document.createElement('div');
+      actions.className = 'flex flex-wrap items-center gap-2';
+      const supporters = Number(idea && idea.supporters || 0);
+      const volunteers = Number(idea && idea.volunteers || 0);
+
+      const supportBtn = document.createElement('button');
+      supportBtn.type = 'button';
+      supportBtn.className = 'reaction-button' + ((idea && idea.viewerSupport) ? ' reaction-button-active' : '');
+      supportBtn.dataset.action = 'idea-feedback';
+      supportBtn.dataset.type = 'support';
+      supportBtn.dataset.id = idea && idea.id ? idea.id : '';
+      supportBtn.innerHTML = `<span>🤝</span><span>Apoiar</span><span class="text-xs text-slate-500 dark:text-slate-300">${supporters ? `(${supporters})` : ''}</span>`;
+      actions.appendChild(supportBtn);
+
+      const volunteerBtn = document.createElement('button');
+      volunteerBtn.type = 'button';
+      volunteerBtn.className = 'reaction-button' + ((idea && idea.viewerVolunteer) ? ' reaction-button-active' : '');
+      volunteerBtn.dataset.action = 'idea-feedback';
+      volunteerBtn.dataset.type = 'volunteer';
+      volunteerBtn.dataset.id = idea && idea.id ? idea.id : '';
+      volunteerBtn.innerHTML = `<span>🙋‍♀️</span><span>Participar</span><span class="text-xs text-slate-500 dark:text-slate-300">${volunteers ? `(${volunteers})` : ''}</span>`;
+      actions.appendChild(volunteerBtn);
+
+      card.appendChild(actions);
+
+      const comments = Array.isArray(idea && idea.comments) ? idea.comments : [];
+      if (comments.length) {
+        const commentWrap = document.createElement('div');
+        commentWrap.className = 'space-y-2';
+        comments.forEach(comment => {
+          const box = document.createElement('div');
+          box.className = 'rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs text-slate-600 dark:text-slate-300';
+          const authorLine = document.createElement('div');
+          authorLine.className = 'font-semibold text-slate-700 dark:text-slate-200';
+          authorLine.textContent = `${comment.authorName || 'Participante'} • ${formatCommunityDate(comment.createdAt) || 'agora'}`;
+          const body = document.createElement('p');
+          body.className = 'mt-1 text-slate-600 dark:text-slate-300';
+          body.textContent = comment.message || '';
+          box.append(authorLine, body);
+          commentWrap.appendChild(box);
+        });
+        card.appendChild(commentWrap);
+      }
+
+      if (currentUser) {
+        const commentForm = document.createElement('form');
+        commentForm.className = 'space-y-2';
+        commentForm.dataset.action = 'idea-comment';
+        commentForm.dataset.id = idea && idea.id ? idea.id : '';
+        const textarea = document.createElement('textarea');
+        textarea.className = 'input min-h-[80px] resize-y';
+        textarea.setAttribute('placeholder', 'Deixe um comentário construtivo para a turma...');
+        const submitRow = document.createElement('div');
+        submitRow.className = 'flex justify-end';
+        const submit = document.createElement('button');
+        submit.type = 'submit';
+        submit.className = 'btn btn-primary';
+        submit.textContent = 'Comentar';
+        submitRow.appendChild(submit);
+        commentForm.append(textarea, submitRow);
+        card.appendChild(commentForm);
+      }
+
+      forumIdeaListEl.appendChild(card);
+    });
+  }
+
+  function loadForumIdeas() {
+    if (!forumIdeaListEl) return;
+    const token = getSessionToken();
+    const payload = token ? { token } : {};
+    google.script.run
+      .withFailureHandler(err => {
+        console.warn('Falha ao carregar ideias:', err);
+      })
+      .withSuccessHandler(res => {
+        const ideas = res && Array.isArray(res.ideas) ? res.ideas : [];
+        forumState.ideas = ideas;
+        renderForumIdeas();
+      })
+      .listForumIdeas(payload);
+  }
+
+  function handleIdeaFeedback(ideaId, type, options = {}) {
+    if (!ideaId || !type) return;
+    if (!currentUser) {
+      showToast({ message: 'Faça login para interagir com a ideia.', type: 'warning' });
+      return;
+    }
+    const token = getSessionToken();
+    if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+      return;
+    }
+    const button = options.button || null;
+    const message = options.message || '';
+    const textarea = options.textarea || null;
+    if (button) {
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+    }
+    google.script.run
+      .withFailureHandler(err => {
+        if (button) {
+          button.disabled = false;
+          button.removeAttribute('aria-busy');
+        }
+        if (handleSessionExpiredError(err)) return;
+        showToast({ message: err?.message || 'Não foi possível registrar a interação agora.', type: 'error' });
+      })
+      .withSuccessHandler(res => {
+        if (button) {
+          button.disabled = false;
+          button.removeAttribute('aria-busy');
+        }
+        if (type === 'comment') {
+          showToast({ message: 'Comentário registrado na ideia.', type: 'success' });
+        } else if (res && res.removed) {
+          showToast({ message: 'Interação removida.', type: 'success' });
+        } else {
+          showToast({ message: 'Interação registrada com sucesso.', type: 'success' });
+        }
+        if (textarea) textarea.value = '';
+        loadForumIdeas();
+      })
+      .submitForumIdeaFeedback({ token, ideaId, type, message });
+  }
+
+  function showPollFormError(message) {
+    if (!forumPollFormFeedback) return;
+    const text = (message || '').toString().trim();
+    forumPollFormFeedback.textContent = text;
+    forumPollFormFeedback.classList.toggle('hidden', !text);
+  }
+
+  function updatePollOptionPlaceholders() {
+    if (!forumPollOptionsWrap) return;
+    const rows = Array.from(forumPollOptionsWrap.querySelectorAll('[data-option-row]'));
+    rows.forEach((row, index) => {
+      const input = row.querySelector('input');
+      if (input) input.placeholder = `Opção ${index + 1}`;
+    });
+  }
+
+  function addPollOptionRow(value = '') {
+    if (!forumPollOptionsWrap) return;
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2';
+    row.dataset.optionRow = 'true';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'input flex-1';
+    input.placeholder = `Opção ${forumPollOptionsWrap.querySelectorAll('[data-option-row]').length + 1}`;
+    input.value = value;
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn btn-ghost text-xs';
+    removeBtn.textContent = 'Remover';
+    removeBtn.addEventListener('click', () => {
+      const rows = Array.from(forumPollOptionsWrap.querySelectorAll('[data-option-row]'));
+      if (rows.length <= 2) {
+        showPollFormError('A enquete precisa de pelo menos duas alternativas.');
+        return;
+      }
+      forumPollOptionsWrap.removeChild(row);
+      updatePollOptionPlaceholders();
+    });
+    row.append(input, removeBtn);
+    forumPollOptionsWrap.appendChild(row);
+    updatePollOptionPlaceholders();
+  }
+
+  function resetPollForm() {
+    if (!forumPollForm) return;
+    if (forumPollQuestionInput) forumPollQuestionInput.value = '';
+    if (forumPollDescriptionInput) forumPollDescriptionInput.value = '';
+    if (forumPollAudienceSelect) forumPollAudienceSelect.value = 'all';
+    if (forumPollClosingInput) forumPollClosingInput.value = '';
+    if (forumPollAllowMultiple) forumPollAllowMultiple.checked = false;
+    if (forumPollAllowUpdate) forumPollAllowUpdate.checked = true;
+    if (forumPollVisibilitySelect) forumPollVisibilitySelect.value = 'public';
+    if (forumPollTargetsSelect) {
+      Array.from(forumPollTargetsSelect.options || []).forEach(option => { option.selected = false; });
+    }
+    if (forumPollOptionsWrap) {
+      forumPollOptionsWrap.innerHTML = '';
+      addPollOptionRow();
+      addPollOptionRow();
+    }
+    showPollFormError('');
+  }
+
+  function showQuestionFormError(message) {
+    if (!forumQuestionFormFeedback) return;
+    const text = (message || '').toString().trim();
+    forumQuestionFormFeedback.textContent = text;
+    forumQuestionFormFeedback.classList.toggle('hidden', !text);
+  }
+
+  function resetQuestionForm() {
+    if (!forumQuestionForm) return;
+    if (forumQuestionSubjectInput) forumQuestionSubjectInput.value = '';
+    if (forumQuestionDetailsInput) forumQuestionDetailsInput.value = '';
+    forumQuestionScopeRadios.forEach(radio => {
+      if (radio) radio.checked = radio.value === 'community';
+    });
+    if (forumQuestionVisibilitySelect) forumQuestionVisibilitySelect.value = 'public';
+    if (forumQuestionTargetsSelect) {
+      Array.from(forumQuestionTargetsSelect.options || []).forEach(option => { option.selected = false; });
+    }
+    showQuestionFormError('');
+  }
+
+  function renderForumQuestions() {
+    if (forumQuestionListEl) forumQuestionListEl.innerHTML = '';
+    const questions = Array.isArray(forumState.questions) ? forumState.questions : [];
+    if (!questions.length) {
+      if (forumQuestionEmptyEl) forumQuestionEmptyEl.classList.remove('hidden');
+      return;
+    }
+    if (forumQuestionEmptyEl) forumQuestionEmptyEl.classList.add('hidden');
+    questions.forEach(question => {
+      if (!forumQuestionListEl) return;
+      const card = document.createElement('article');
+      card.className = 'card card-flat space-y-3';
+
+      const header = document.createElement('div');
+      header.className = 'flex flex-wrap items-start justify-between gap-3';
+      const meta = document.createElement('div');
+      meta.className = 'space-y-1';
+      const title = document.createElement('h4');
+      title.className = 'text-base font-semibold';
+      title.textContent = question && question.subject ? question.subject : 'Dúvida';
+      const author = document.createElement('p');
+      author.className = 'text-xs text-slate-500 dark:text-slate-400';
+      author.textContent = `${question && question.authorName ? question.authorName : 'Participante'} • ${formatCommunityDate(question && question.createdAt) || 'agora'}`;
+      meta.append(title, author);
+
+      const tags = document.createElement('div');
+      tags.className = 'flex flex-wrap items-end justify-end gap-2 text-right';
+      const scopeChip = document.createElement('span');
+      scopeChip.className = 'pill';
+      const scopeLabel = questionScopeLabels[question && question.scope] || 'Comunidade';
+      scopeChip.textContent = scopeLabel;
+      tags.appendChild(scopeChip);
+      const visibilityChip = document.createElement('span');
+      const isPrivate = question && question.visibility === 'private';
+      visibilityChip.className = 'privacy-chip' + (isPrivate ? ' privacy-chip-private' : '');
+      visibilityChip.textContent = isPrivate ? 'Privada' : 'Pública';
+      tags.appendChild(visibilityChip);
+      if (question && question.status) {
+        const status = document.createElement('span');
+        status.className = 'text-[0.7rem] uppercase tracking-wide text-primary font-semibold';
+        status.textContent = question.status === 'open' ? 'Aberta' : question.status;
+        tags.appendChild(status);
+      }
+
+      header.append(meta, tags);
+      card.appendChild(header);
+
+      if (question && question.details) {
+        const body = document.createElement('p');
+        body.className = 'text-sm text-slate-700 dark:text-slate-200 leading-relaxed';
+        body.textContent = question.details;
+        card.appendChild(body);
+      }
+
+      if (isPrivate && question && Array.isArray(question.targetUserNames) && question.targetUserNames.length) {
+        const invited = document.createElement('p');
+        invited.className = 'text-xs text-slate-500 dark:text-slate-400';
+        invited.textContent = 'Convidados: ' + question.targetUserNames.join(', ');
+        card.appendChild(invited);
+      }
+
+      forumQuestionListEl.appendChild(card);
+    });
+  }
+
+  function loadForumQuestions() {
+    if (!forumQuestionListEl) return;
+    const token = getSessionToken();
+    const payload = token ? { token } : {};
+    google.script.run
+      .withFailureHandler(err => {
+        console.warn('Falha ao carregar dúvidas:', err);
+      })
+      .withSuccessHandler(res => {
+        const questions = res && Array.isArray(res.questions) ? res.questions : [];
+        forumState.questions = questions;
+        renderForumQuestions();
+      })
+      .listForumQuestions(payload);
+  }
+
+  function renderForumNotifications() {
+    if (!forumNotificationListEl) return;
+    forumNotificationListEl.innerHTML = '';
+    const items = Array.isArray(forumState.notifications) ? forumState.notifications : [];
+    const unread = Number(forumState.notificationsUnread || 0);
+    if (forumNotificationBadgeEl) {
+      forumNotificationBadgeEl.textContent = `${unread} nova${unread === 1 ? '' : 's'}`;
+    }
+    if (!items.length) {
+      if (forumNotificationEmptyEl) forumNotificationEmptyEl.classList.remove('hidden');
+      return;
+    }
+    if (forumNotificationEmptyEl) forumNotificationEmptyEl.classList.add('hidden');
+    items.forEach(item => {
+      const card = document.createElement('div');
+      card.className = 'notification-item' + (item && item.readAt ? '' : ' notification-item-unread');
+      const message = document.createElement('p');
+      message.className = 'text-sm';
+      message.textContent = item && item.message ? item.message : 'Atualização no fórum';
+      const meta = document.createElement('span');
+      meta.className = 'text-xs text-slate-500 dark:text-slate-400';
+      meta.textContent = formatCommunityDate(item && item.createdAt) || 'agora';
+      card.append(message, meta);
+      forumNotificationListEl.appendChild(card);
+    });
+  }
+
+  function loadForumNotifications() {
+    if (!currentUser || !forumNotificationListEl) {
+      forumState.notifications = [];
+      forumState.notificationsUnread = 0;
+      renderForumNotifications();
+      return;
+    }
+    const token = getSessionToken();
+    if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+      return;
+    }
+    google.script.run
+      .withFailureHandler(err => {
+        console.warn('Falha ao carregar notificações:', err);
+      })
+      .withSuccessHandler(res => {
+        forumState.notifications = res && Array.isArray(res.items) ? res.items : [];
+        forumState.notificationsUnread = Number(res && res.unreadCount || 0);
+        renderForumNotifications();
+      })
+      .listForumNotifications({ token });
+  }
+
+  function markForumNotificationsRead() {
+    if (!currentUser) {
+      showToast({ message: 'Entre com sua conta para gerenciar notificações.', type: 'warning' });
+      return;
+    }
+    const unreadIds = (forumState.notifications || []).filter(item => item && !item.readAt).map(item => item.id).filter(Boolean);
+    if (!unreadIds.length) {
+      showToast({ message: 'Você não possui notificações novas.', type: 'info' });
+      return;
+    }
+    const token = getSessionToken();
+    if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+      return;
+    }
+    google.script.run
+      .withFailureHandler(err => {
+        if (handleSessionExpiredError(err)) return;
+        showToast({ message: err?.message || 'Não foi possível atualizar as notificações.', type: 'error' });
+      })
+      .withSuccessHandler(() => {
+        loadForumNotifications();
+        showToast({ message: 'Notificações marcadas como lidas.', type: 'success' });
+      })
+      .markForumNotificationsRead({ token, ids: unreadIds });
+  }
+
+  function renderForumLatest() {
+    if (!forumLatestListEl) return;
+    forumLatestListEl.innerHTML = '';
+    const entries = Array.isArray(forumState.latestEntries) ? forumState.latestEntries : [];
+    if (!entries.length) {
+      if (forumLatestEmptyEl) forumLatestEmptyEl.classList.remove('hidden');
+      return;
+    }
+    if (forumLatestEmptyEl) forumLatestEmptyEl.classList.add('hidden');
+    entries.forEach(entry => {
+      const li = document.createElement('li');
+      li.className = 'rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2 bg-white/80 dark:bg-slate-900/50 shadow-sm';
+      const author = document.createElement('div');
+      author.className = 'text-sm font-semibold';
+      author.textContent = entry && entry.authorName ? entry.authorName : 'Participante';
+      const snippet = document.createElement('p');
+      snippet.className = 'text-xs text-slate-600 dark:text-slate-300 mt-1';
+      const text = (entry && entry.message ? entry.message.toString() : '').replace(/\s+/g, ' ').trim();
+      snippet.textContent = text.length > 120 ? text.slice(0, 117) + '…' : text;
+      const meta = document.createElement('div');
+      meta.className = 'text-[0.7rem] text-slate-500 dark:text-slate-400 mt-1 flex justify-between items-center';
+      const time = document.createElement('span');
+      time.textContent = formatCommunityDate(entry && entry.createdAt) || 'agora';
+      const privacy = document.createElement('span');
+      privacy.textContent = entry && entry.visibility === 'private' ? 'Privado' : 'Público';
+      meta.append(time, privacy);
+      li.append(author, snippet, meta);
+      forumLatestListEl.appendChild(li);
+    });
+  }
+
+  function updateLatestConversations(entries) {
+    const list = Array.isArray(entries) ? entries.slice(0, 5) : [];
+    const previousMax = Number(forumState.latestMaxTimestamp || 0);
+    let maxTimestamp = previousMax;
+    list.forEach(entry => {
+      const time = typeof entry.timestamp === 'number' ? entry.timestamp : Date.parse(entry.createdAt || '') || 0;
+      if (time > maxTimestamp) maxTimestamp = time;
+    });
+    const hasNew = previousMax && maxTimestamp > previousMax;
+    forumState.latestEntries = list;
+    if (maxTimestamp > forumState.latestMaxTimestamp) {
+      forumState.latestMaxTimestamp = maxTimestamp;
+    }
+    if (forumLatestBadgeEl) {
+      forumLatestBadgeEl.classList.toggle('hidden', !hasNew);
+    }
+    renderForumLatest();
+  }
+
+  function handleReactionToggle(button) {
+    if (!button) return;
+    if (!currentUser) {
+      showToast({ message: 'Faça login para reagir às publicações.', type: 'warning' });
+      return;
+    }
+    const token = getSessionToken();
+    if (!token) {
+      expireSession(SESSION_EXPIRED_FALLBACK);
+      return;
+    }
+    const postId = button.getAttribute('data-post-id') || button.getAttribute('data-postId') || '';
+    const reaction = button.getAttribute('data-reaction') || '';
+    if (!postId || !reaction) return;
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    google.script.run
+      .withFailureHandler(err => {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        if (handleSessionExpiredError(err)) return;
+        showToast({ message: err?.message || 'Não foi possível registrar a reação agora.', type: 'error' });
+      })
+      .withSuccessHandler(res => {
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        if (res && res.removed) {
+          showToast({ message: 'Reação removida.', type: 'success' });
+        } else {
+          showToast({ message: 'Reação registrada!', type: 'success' });
+        }
+        refreshCommunityWall();
+      })
+      .toggleCommunityReaction({ token, postId, reaction });
+  }
+
   function renderForumPage() {
     renderForumPolls();
+    renderForumIdeas();
+    renderForumQuestions();
+    renderForumNotifications();
+    renderForumLatest();
     renderCommunityAttachments();
     setCommunityPrivacy(communityState.privacy);
     renderCommunityTargetsOptions();
@@ -1236,6 +2058,10 @@
     if (currentUser) {
       loadShareableUsers();
     }
+    loadForumPolls();
+    loadForumIdeas();
+    loadForumQuestions();
+    loadForumNotifications();
   }
 
   function renderAchievementsShowcase(summary = achievementsState.summary, metrics = achievementsState.metrics) {
@@ -2816,6 +3642,33 @@
     updateCommunityPublishState();
   }
 
+  function renderForumTargetSelects() {
+    const selects = [forumIdeaTargetsSelect, forumPollTargetsSelect, forumQuestionTargetsSelect];
+    selects.forEach(select => {
+      if (!select) return;
+      const previouslySelected = new Set(
+        Array.from(select.selectedOptions || [])
+          .map(option => option.value)
+          .filter(Boolean)
+      );
+      select.innerHTML = '';
+      if (!communityState.shareableUsers.length) {
+        const empty = document.createElement('option');
+        empty.disabled = true;
+        empty.textContent = 'Nenhum participante disponível';
+        select.appendChild(empty);
+        return;
+      }
+      communityState.shareableUsers.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.name + (user.isAdmin ? ' • Coordenação' : '');
+        option.selected = previouslySelected.has(user.id);
+        select.appendChild(option);
+      });
+    });
+  }
+
   function loadShareableUsers() {
     if (!currentUser || communityState.loadedShareableUsers) return;
     const token = getSessionToken();
@@ -2830,6 +3683,7 @@
         communityState.loadedShareableUsers = true;
         renderCommunityTargetsOptions();
         renderCommunityMentionOptions();
+        renderForumTargetSelects();
         syncMentionsFromText();
       })
       .listShareableUsers({ token });
@@ -2971,6 +3825,7 @@
     if (!communityListEl) return;
     communityListEl.innerHTML = '';
     const list = Array.isArray(entries) ? entries : [];
+    updateLatestConversations(list);
     if (!list.length) {
       if (communityEmptyEl) communityEmptyEl.classList.remove('hidden');
       return;
@@ -3099,6 +3954,40 @@
         });
         card.appendChild(attachmentList);
       }
+
+      const reactionRow = document.createElement('div');
+      reactionRow.className = 'flex flex-wrap items-center gap-2';
+      const totalsMap = {};
+      const reactionTotals = entry && entry.reactions && Array.isArray(entry.reactions.totals) ? entry.reactions.totals : [];
+      reactionTotals.forEach(item => {
+        if (!item || !item.type) return;
+        totalsMap[item.type] = Number(item.count || 0);
+      });
+      const viewerReaction = entry && entry.reactions ? entry.reactions.viewerReaction : '';
+      Object.keys(reactionDefinitions).forEach(key => {
+        const def = reactionDefinitions[key];
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'reaction-button' + (viewerReaction === key ? ' reaction-button-active' : '');
+        button.dataset.action = 'toggle-reaction';
+        button.dataset.postId = entry && entry.id ? entry.id : '';
+        button.dataset.reaction = key;
+        button.disabled = !currentUser;
+        if (!currentUser) {
+          button.title = 'Faça login para reagir.';
+        }
+        const emoji = document.createElement('span');
+        emoji.textContent = def.emoji;
+        const label = document.createElement('span');
+        label.textContent = def.label;
+        const countBadge = document.createElement('span');
+        countBadge.className = 'text-xs text-slate-500 dark:text-slate-300';
+        const count = totalsMap[key] || 0;
+        countBadge.textContent = count > 0 ? `(${count})` : '';
+        button.append(emoji, label, countBadge);
+        reactionRow.appendChild(button);
+      });
+      card.appendChild(reactionRow);
 
       communityListEl.appendChild(card);
     });
@@ -4424,6 +5313,318 @@
     });
   }
 
+  if (communityModeButtons.length) {
+    communityModeButtons.forEach(button => {
+      if (!button) return;
+      button.addEventListener('click', () => {
+        const mode = button.getAttribute('data-community-mode');
+        setCommunityMode(mode);
+      });
+    });
+  }
+  setCommunityMode(forumState.mode);
+
+  if (forumInfoToggle && forumInfoPanel) {
+    forumInfoToggle.addEventListener('click', () => {
+      const expanded = forumInfoToggle.getAttribute('aria-expanded') === 'true';
+      forumInfoToggle.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+      forumInfoPanel.classList.toggle('hidden', expanded);
+    });
+  }
+
+  if (forumIdeaForm) {
+    forumIdeaForm.addEventListener('submit', event => {
+      event.preventDefault();
+      if (!currentUser) {
+        showToast({ message: 'Faça login para registrar uma ideia.', type: 'warning' });
+        return;
+      }
+      const token = getSessionToken();
+      if (!token) {
+        expireSession(SESSION_EXPIRED_FALLBACK);
+        return;
+      }
+      const title = forumIdeaTitleInput ? forumIdeaTitleInput.value.trim() : '';
+      const summary = forumIdeaSummaryInput ? forumIdeaSummaryInput.value.trim() : '';
+      const benefit = forumIdeaBenefitInput ? forumIdeaBenefitInput.value.trim() : '';
+      const impact = forumIdeaImpactSelect ? forumIdeaImpactSelect.value : 'Alto';
+      const tags = forumIdeaTagsInput ? forumIdeaTagsInput.value.trim() : '';
+      const visibility = forumIdeaVisibilitySelect ? forumIdeaVisibilitySelect.value : 'public';
+      const targetIds = forumIdeaTargetsSelect
+        ? Array.from(forumIdeaTargetsSelect.selectedOptions || []).map(option => option.value).filter(Boolean)
+        : [];
+      if (!title) {
+        showIdeaFormError('Informe o título da ideia.');
+        return;
+      }
+      if (!summary) {
+        showIdeaFormError('Descreva a ideia antes de enviar.');
+        return;
+      }
+      if (visibility === 'private' && !targetIds.length) {
+        showIdeaFormError('Selecione ao menos um convidado para ideias privadas.');
+        return;
+      }
+      showIdeaFormError('');
+      if (btnSubmitIdea) {
+        btnSubmitIdea.disabled = true;
+        btnSubmitIdea.setAttribute('aria-busy', 'true');
+      }
+      google.script.run
+        .withFailureHandler(err => {
+          if (btnSubmitIdea) {
+            btnSubmitIdea.disabled = false;
+            btnSubmitIdea.removeAttribute('aria-busy');
+          }
+          if (handleSessionExpiredError(err)) return;
+          showIdeaFormError(err?.message || 'Não foi possível registrar a ideia agora.');
+        })
+        .withSuccessHandler(() => {
+          if (btnSubmitIdea) {
+            btnSubmitIdea.disabled = false;
+            btnSubmitIdea.removeAttribute('aria-busy');
+          }
+          resetIdeaForm();
+          showToast({ message: 'Ideia registrada com sucesso!', type: 'success' });
+          loadForumIdeas();
+        })
+        .submitForumIdea({
+          token,
+          title,
+          summary,
+          benefit,
+          impact,
+          tags,
+          visibility,
+          targetUserIds: visibility === 'private' ? targetIds : []
+        });
+    });
+  }
+
+  if (forumIdeaTargetsSelect && forumIdeaVisibilitySelect) {
+    forumIdeaTargetsSelect.addEventListener('change', () => {
+      const hasSelection = Array.from(forumIdeaTargetsSelect.selectedOptions || []).some(option => option.value);
+      if (hasSelection) forumIdeaVisibilitySelect.value = 'private';
+    });
+    forumIdeaVisibilitySelect.addEventListener('change', () => {
+      if (forumIdeaVisibilitySelect.value !== 'private') {
+        Array.from(forumIdeaTargetsSelect.options || []).forEach(option => { option.selected = false; });
+      }
+    });
+  }
+
+  if (forumIdeaListEl) {
+    forumIdeaListEl.addEventListener('click', event => {
+      const button = event.target instanceof HTMLElement
+        ? event.target.closest('[data-action="idea-feedback"]')
+        : null;
+      if (!button) return;
+      event.preventDefault();
+      const ideaId = button.getAttribute('data-id') || '';
+      const type = button.getAttribute('data-type') || '';
+      if (!ideaId || !type) return;
+      handleIdeaFeedback(ideaId, type, { button });
+    });
+    forumIdeaListEl.addEventListener('submit', event => {
+      const form = event.target instanceof HTMLFormElement
+        ? event.target.closest('[data-action="idea-comment"]')
+        : null;
+      if (!form) return;
+      event.preventDefault();
+      const ideaId = form.getAttribute('data-id') || '';
+      if (!ideaId) return;
+      const textarea = form.querySelector('textarea');
+      const message = textarea ? textarea.value.trim() : '';
+      if (!message) {
+        showToast({ message: 'Escreva um comentário antes de enviar.', type: 'warning' });
+        return;
+      }
+      const submitBtn = form.querySelector('button[type="submit"]');
+      handleIdeaFeedback(ideaId, 'comment', { message, button: submitBtn, textarea });
+    });
+  }
+
+  resetIdeaForm();
+  resetPollForm();
+  resetQuestionForm();
+
+  if (btnAddPollOption) {
+    btnAddPollOption.addEventListener('click', event => {
+      event.preventDefault();
+      addPollOptionRow();
+    });
+  }
+
+  if (forumPollForm) {
+    forumPollForm.addEventListener('submit', event => {
+      event.preventDefault();
+      if (!currentUser) {
+        showToast({ message: 'Faça login para publicar enquetes.', type: 'warning' });
+        return;
+      }
+      const token = getSessionToken();
+      if (!token) {
+        expireSession(SESSION_EXPIRED_FALLBACK);
+        return;
+      }
+      const question = forumPollQuestionInput ? forumPollQuestionInput.value.trim() : '';
+      const description = forumPollDescriptionInput ? forumPollDescriptionInput.value.trim() : '';
+      const optionInputs = forumPollOptionsWrap
+        ? Array.from(forumPollOptionsWrap.querySelectorAll('input'))
+        : [];
+      const options = optionInputs.map(input => input.value.trim()).filter(Boolean);
+      if (!question) {
+        showPollFormError('Informe a pergunta da enquete.');
+        return;
+      }
+      if (options.length < 2) {
+        showPollFormError('A enquete precisa de pelo menos duas alternativas.');
+        return;
+      }
+      const audience = forumPollAudienceSelect ? forumPollAudienceSelect.value : 'all';
+      const closesAt = forumPollClosingInput ? forumPollClosingInput.value : '';
+      const allowMultiple = forumPollAllowMultiple ? !!forumPollAllowMultiple.checked : false;
+      const allowUpdates = forumPollAllowUpdate ? !!forumPollAllowUpdate.checked : true;
+      const visibility = forumPollVisibilitySelect ? forumPollVisibilitySelect.value : 'public';
+      const targetIds = forumPollTargetsSelect
+        ? Array.from(forumPollTargetsSelect.selectedOptions || []).map(option => option.value).filter(Boolean)
+        : [];
+      if (visibility === 'private' && !targetIds.length) {
+        showPollFormError('Selecione participantes para enquetes privadas.');
+        return;
+      }
+      showPollFormError('');
+      if (btnSubmitPoll) {
+        btnSubmitPoll.disabled = true;
+        btnSubmitPoll.setAttribute('aria-busy', 'true');
+      }
+      google.script.run
+        .withFailureHandler(err => {
+          if (btnSubmitPoll) {
+            btnSubmitPoll.disabled = false;
+            btnSubmitPoll.removeAttribute('aria-busy');
+          }
+          if (handleSessionExpiredError(err)) return;
+          showPollFormError(err?.message || 'Não foi possível publicar a enquete agora.');
+        })
+        .withSuccessHandler(() => {
+          if (btnSubmitPoll) {
+            btnSubmitPoll.disabled = false;
+            btnSubmitPoll.removeAttribute('aria-busy');
+          }
+          resetPollForm();
+          showToast({ message: 'Enquete publicada para a turma!', type: 'success' });
+          loadForumPolls();
+        })
+        .createForumPoll({
+          token,
+          question,
+          description,
+          options,
+          audience,
+          closesAt,
+          allowMultiple,
+          allowUpdates,
+          visibility,
+          targetUserIds: visibility === 'private' ? targetIds : []
+        });
+    });
+  }
+
+  if (forumPollTargetsSelect && forumPollVisibilitySelect) {
+    forumPollTargetsSelect.addEventListener('change', () => {
+      const hasSelection = Array.from(forumPollTargetsSelect.selectedOptions || []).some(option => option.value);
+      if (hasSelection) forumPollVisibilitySelect.value = 'private';
+    });
+    forumPollVisibilitySelect.addEventListener('change', () => {
+      if (forumPollVisibilitySelect.value !== 'private') {
+        Array.from(forumPollTargetsSelect.options || []).forEach(option => { option.selected = false; });
+      }
+    });
+  }
+
+  if (forumQuestionForm) {
+    forumQuestionForm.addEventListener('submit', event => {
+      event.preventDefault();
+      if (!currentUser) {
+        showToast({ message: 'Faça login para enviar dúvidas.', type: 'warning' });
+        return;
+      }
+      const token = getSessionToken();
+      if (!token) {
+        expireSession(SESSION_EXPIRED_FALLBACK);
+        return;
+      }
+      const subject = forumQuestionSubjectInput ? forumQuestionSubjectInput.value.trim() : '';
+      const details = forumQuestionDetailsInput ? forumQuestionDetailsInput.value.trim() : '';
+      const scopeRadio = forumQuestionScopeRadios.find(radio => radio && radio.checked);
+      const scope = scopeRadio ? scopeRadio.value : 'community';
+      const visibility = forumQuestionVisibilitySelect ? forumQuestionVisibilitySelect.value : 'public';
+      const targetIds = forumQuestionTargetsSelect
+        ? Array.from(forumQuestionTargetsSelect.selectedOptions || []).map(option => option.value).filter(Boolean)
+        : [];
+      if (!subject) {
+        showQuestionFormError('Informe o assunto da dúvida.');
+        return;
+      }
+      if (!details) {
+        showQuestionFormError('Descreva a dúvida com mais detalhes.');
+        return;
+      }
+      if (visibility === 'private' && scope !== 'admin' && !targetIds.length) {
+        showQuestionFormError('Convide pessoas para dúvidas privadas destinadas à comunidade.');
+        return;
+      }
+      showQuestionFormError('');
+      if (btnSubmitQuestion) {
+        btnSubmitQuestion.disabled = true;
+        btnSubmitQuestion.setAttribute('aria-busy', 'true');
+      }
+      google.script.run
+        .withFailureHandler(err => {
+          if (btnSubmitQuestion) {
+            btnSubmitQuestion.disabled = false;
+            btnSubmitQuestion.removeAttribute('aria-busy');
+          }
+          if (handleSessionExpiredError(err)) return;
+          showQuestionFormError(err?.message || 'Não foi possível registrar a dúvida agora.');
+        })
+        .withSuccessHandler(() => {
+          if (btnSubmitQuestion) {
+            btnSubmitQuestion.disabled = false;
+            btnSubmitQuestion.removeAttribute('aria-busy');
+          }
+          resetQuestionForm();
+          showToast({ message: 'Dúvida enviada com sucesso!', type: 'success' });
+          loadForumQuestions();
+        })
+        .submitForumQuestion({
+          token,
+          subject,
+          details,
+          scope,
+          visibility,
+          targetUserIds: visibility === 'private' ? targetIds : []
+        });
+    });
+  }
+
+  if (forumQuestionTargetsSelect && forumQuestionVisibilitySelect) {
+    forumQuestionTargetsSelect.addEventListener('change', () => {
+      const hasSelection = Array.from(forumQuestionTargetsSelect.selectedOptions || []).some(option => option.value);
+      if (hasSelection) forumQuestionVisibilitySelect.value = 'private';
+    });
+    forumQuestionVisibilitySelect.addEventListener('change', () => {
+      if (forumQuestionVisibilitySelect.value !== 'private') {
+        Array.from(forumQuestionTargetsSelect.options || []).forEach(option => { option.selected = false; });
+      }
+    });
+  }
+
+  if (btnForumNotificationsRead) {
+    btnForumNotificationsRead.addEventListener('click', () => markForumNotificationsRead());
+  }
+
   if (communityMentionSearch) {
     communityMentionSearch.addEventListener('input', event => {
       const value = event && event.target ? event.target.value : '';
@@ -4573,6 +5774,14 @@
 
   if (communityListEl) {
     communityListEl.addEventListener('click', event => {
+      const reactionBtn = event.target instanceof HTMLElement
+        ? event.target.closest('[data-action="toggle-reaction"]')
+        : null;
+      if (reactionBtn) {
+        event.preventDefault();
+        handleReactionToggle(reactionBtn);
+        return;
+      }
       const target = event.target instanceof HTMLElement
         ? event.target.closest('[data-action="remove-wall-entry"]')
         : null;
@@ -4634,10 +5843,7 @@
     const activeUserId = currentUser?.id ?? null;
     const hasUserChanged = activeUserId !== lastPanelPollUserId;
     if (!currentUser || hasUserChanged) {
-      forumPollState.forEach(poll => {
-        poll.userChoice = null;
-        poll.pendingChoice = null;
-      });
+      forumState.pollSelections = {};
     }
     lastPanelPollUserId = activeUserId;
 
@@ -4687,6 +5893,20 @@
         communityEmptyEl.textContent = 'Faça login com sua conta corporativa para visualizar o mural da turma.';
         communityEmptyEl.classList.remove('hidden');
       }
+      forumState.polls = [];
+      forumState.pollSelections = {};
+      forumState.pollRespondedCount = 0;
+      forumState.ideas = [];
+      forumState.questions = [];
+      forumState.notifications = [];
+      forumState.notificationsUnread = 0;
+      forumState.latestEntries = [];
+      forumState.latestMaxTimestamp = 0;
+      renderForumPolls();
+      renderForumIdeas();
+      renderForumQuestions();
+      renderForumNotifications();
+      renderForumLatest();
       resetStudentStoryState();
       openStudentSubPage('home');
       resetHistorySection();
@@ -4785,6 +6005,12 @@
     renderAdminMissionList();
     updateCommunityAccess();
     if (!skipCommunity) refreshCommunityWall();
+    if (currentAppRoute === 'forum') {
+      loadForumPolls();
+      loadForumIdeas();
+      loadForumQuestions();
+      loadForumNotifications();
+    }
   }
 
   function refreshRanking() {
