@@ -211,6 +211,239 @@
     embeds: createCacheBucket(['materials'])
   };
 
+  const performanceLogListEl = document.getElementById('forumPerformanceLog');
+  const performanceLogEmptyEl = document.getElementById('forumPerformanceLogEmpty');
+  const performanceLogClearBtn = document.getElementById('btnClearPerformanceLog');
+  const performanceLogState = {
+    entries: [],
+    maxEntries: 60,
+    listEl: performanceLogListEl,
+    emptyEl: performanceLogEmptyEl
+  };
+
+  function resolvePerformanceListEl() {
+    if (!performanceLogState.listEl) {
+      performanceLogState.listEl = document.getElementById('forumPerformanceLog');
+    }
+    if (!performanceLogState.emptyEl) {
+      performanceLogState.emptyEl = document.getElementById('forumPerformanceLogEmpty');
+    }
+  }
+
+  function escapeHtml(value) {
+    return (value ?? '')
+      .toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function formatLogDuration(ms) {
+    if (!Number.isFinite(ms) || ms < 0) return '—';
+    if (ms >= 1000) {
+      const seconds = ms / 1000;
+      return seconds >= 10 ? `${seconds.toFixed(1)}s` : `${seconds.toFixed(2)}s`;
+    }
+    return `${Math.round(ms)}ms`;
+  }
+
+  function formatLogTimestamp(ts) {
+    if (!Number.isFinite(ts)) return '—';
+    try {
+      return new Intl.DateTimeFormat('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }).format(new Date(ts));
+    } catch (err) {
+      return new Date(ts).toLocaleTimeString('pt-BR');
+    }
+  }
+
+  function formatLogMetaValue(value) {
+    if (Array.isArray(value)) {
+      return value.length ? value.join(', ') : '—';
+    }
+    if (value === null || value === undefined) return '—';
+    if (typeof value === 'boolean') return value ? 'sim' : 'não';
+    if (typeof value === 'number' && !Number.isFinite(value)) return '—';
+    return value.toString();
+  }
+
+  function formatLogMetaLabel(key) {
+    const labels = {
+      sections: 'Seções',
+      missing: 'Pendentes',
+      loaded: 'Carregadas',
+      priority: 'Prioridade',
+      forced: 'Forçado',
+      source: 'Origem',
+      message: 'Mensagem',
+      entries: 'Registros',
+      shareable: 'Compartilháveis',
+      polls: 'Enquetes',
+      ideas: 'Ideias',
+      questions: 'Dúvidas',
+      notifications: 'Notificações',
+      resources: 'Recursos',
+      events: 'Eventos',
+      checkins: 'Check-ins',
+      activities: 'Atividades',
+      achievements: 'Conquistas',
+      ranking: 'Ranking',
+      remember: 'Lembrar acesso',
+      userId: 'Usuário',
+      route: 'Rota',
+      mode: 'Modo',
+      fromCache: 'Cache'
+    };
+    return labels[key] || key;
+  }
+
+  function describeLogStatus(status) {
+    switch (status) {
+      case 'success':
+        return 'Concluído';
+      case 'error':
+        return 'Erro';
+      case 'cache':
+        return 'Cache';
+      case 'info':
+        return 'Info';
+      default:
+        return status || '—';
+    }
+  }
+
+  function statusClassName(status) {
+    switch (status) {
+      case 'success':
+        return 'text-emerald-600 dark:text-emerald-300';
+      case 'error':
+        return 'text-rose-600 dark:text-rose-300';
+      case 'cache':
+        return 'text-amber-600 dark:text-amber-300';
+      default:
+        return 'text-slate-500 dark:text-slate-300';
+    }
+  }
+
+  function renderPerformanceLog() {
+    resolvePerformanceListEl();
+    const listEl = performanceLogState.listEl;
+    const emptyEl = performanceLogState.emptyEl;
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const entries = performanceLogState.entries;
+    if (!entries.length) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+    if (emptyEl) emptyEl.classList.add('hidden');
+    entries.forEach(entry => {
+      const item = document.createElement('li');
+      item.className = 'p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 shadow-sm';
+      const statusLabel = describeLogStatus(entry.status);
+      const statusClass = statusClassName(entry.status);
+      const waitLabel = entry.waitMs > 5 ? `<span>Fila: <strong>${escapeHtml(formatLogDuration(entry.waitMs))}</strong></span>` : '';
+      const metaEntries = Object.entries(entry.meta || {}).filter(([, value]) => value !== undefined && value !== '' && value !== null);
+      const metaHtml = metaEntries.length
+        ? `<div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[0.7rem] text-slate-600 dark:text-slate-300">${metaEntries.map(([key, value]) => {
+            const formatted = escapeHtml(formatLogMetaValue(value));
+            const label = escapeHtml(formatLogMetaLabel(key));
+            const isMessage = key === 'message';
+            const valueClass = isMessage ? 'text-rose-600 dark:text-rose-300 font-medium' : 'font-semibold';
+            return `<span>${label}: <span class="${valueClass}">${formatted}</span></span>`;
+          }).join('')}</div>`
+        : '';
+      item.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-3 text-[0.68rem] uppercase tracking-wide">
+          <span class="font-semibold text-slate-500 dark:text-slate-300">${escapeHtml(entry.label)}</span>
+          <span class="${statusClass}">${escapeHtml(statusLabel)}</span>
+        </div>
+        <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.7rem] text-slate-600 dark:text-slate-300">
+          <span>Duração: <strong>${escapeHtml(formatLogDuration(entry.durationMs))}</strong></span>
+          ${waitLabel}
+          <span>Concluído às <strong>${escapeHtml(formatLogTimestamp(entry.endedAtTs))}</strong></span>
+        </div>
+        ${metaHtml}
+      `;
+      listEl.appendChild(item);
+    });
+  }
+
+  function pushPerformanceEntry(entry) {
+    const clone = {
+      id: entry.id,
+      label: entry.label,
+      status: entry.status,
+      durationMs: entry.durationMs,
+      waitMs: entry.waitMs,
+      endedAtTs: entry.endedAtTs,
+      meta: { ...(entry.meta || {}) }
+    };
+    performanceLogState.entries.unshift(clone);
+    if (performanceLogState.entries.length > performanceLogState.maxEntries) {
+      performanceLogState.entries.length = performanceLogState.maxEntries;
+    }
+    renderPerformanceLog();
+  }
+
+  function clearPerformanceLog() {
+    performanceLogState.entries = [];
+    renderPerformanceLog();
+  }
+
+  function createPerformanceTask(label, meta = {}) {
+    const base = {
+      id: `perf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      label: label || 'Tarefa',
+      meta: { ...meta },
+      queuedAtMs: performance.now(),
+      status: 'info'
+    };
+    let started = false;
+    return {
+      start(extraMeta = {}) {
+        if (!started) {
+          started = true;
+          base.startedAtMs = performance.now();
+          base.meta = { ...base.meta, ...extraMeta };
+        }
+        return this;
+      },
+      update(extraMeta = {}) {
+        base.meta = { ...base.meta, ...extraMeta };
+      },
+      finish(status = 'success', extraMeta = {}) {
+        base.status = status;
+        base.meta = { ...base.meta, ...extraMeta };
+        base.endedAtMs = performance.now();
+        base.endedAtTs = Date.now();
+        base.durationMs = started ? base.endedAtMs - base.startedAtMs : 0;
+        base.waitMs = started ? base.startedAtMs - base.queuedAtMs : 0;
+        pushPerformanceEntry(base);
+      }
+    };
+  }
+
+  function logPerformanceEvent(label, meta = {}, status = 'info') {
+    const entry = {
+      id: `perf-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      label: label || 'Evento',
+      status,
+      durationMs: 0,
+      waitMs: 0,
+      endedAtTs: Date.now(),
+      meta: { ...meta }
+    };
+    pushPerformanceEntry(entry);
+  }
+
+  renderPerformanceLog();
+
   const datasetRefreshTimers = {};
   const scriptTaskQueue = [];
   let scriptTaskActive = false;
@@ -628,16 +861,25 @@
     const bucket = datasetCache.dashboard;
     if (!bucket) return Promise.resolve(null);
     const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_TTL;
+    const logTask = createPerformanceTask('Painel · Snapshot', {
+      sections: normalized,
+      priority: options && options.priority ? options.priority : 'normal'
+    });
     const missing = normalized.filter(section => !isSectionFresh(bucket, section, ttl));
+    if (missing.length) {
+      logTask.update({ missing });
+    }
     if (!missing.length) {
       const cached = pickDashboardSections(bucket.data, normalized);
       if (Object.keys(cached).length) {
         applyDashboardSnapshot(cached, options);
       }
+      logTask.finish('cache', { source: 'cache', loaded: [] });
       return Promise.resolve(bucket.data);
     }
     const token = getSessionToken();
     if (!token) {
+      logTask.finish('error', { message: 'Sessão expirada', missing });
       expireSession(SESSION_EXPIRED_FALLBACK);
       return Promise.reject(new Error('Sessão expirada.'));
     }
@@ -648,20 +890,30 @@
       historyLimit: options && options.historyLimit,
       activityLimit: options && options.activityLimit
     };
+    logTask.start();
     return enqueueScriptTask(
       () => executeScriptMethod('getDashboardBootstrap', payload),
       { priority: options && options.priority === 'high' ? 'high' : 'normal' }
     ).then(response => {
       if (!response || response.ok === false) {
         const message = response && response.message ? response.message : 'Não foi possível carregar o painel agora.';
+        logTask.finish('error', { message, missing });
         throw new Error(message);
       }
+      const summary = {};
+      if (Array.isArray(response?.history?.checkins)) summary.checkins = response.history.checkins.length;
+      if (Array.isArray(response?.history?.activities)) summary.activities = response.history.activities.length;
+      if (Array.isArray(response?.ranking)) summary.ranking = response.ranking.length;
+      if (Array.isArray(response?.achievements?.achievements)) summary.achievements = response.achievements.achievements.length;
+      logTask.finish('success', { loaded: missing, ...summary });
       applyDashboardSnapshot(response, options);
       return response;
     }).catch(err => {
       if (handleSessionExpiredError(err, { onHandled: options && options.onSessionExpired })) {
+        logTask.finish('error', { message: extractErrorMessage(err), missing });
         return Promise.reject(err);
       }
+      logTask.finish('error', { message: extractErrorMessage(err), missing });
       if (typeof options.onError === 'function') {
         try { options.onError(err); } catch (callbackErr) { console.error(callbackErr); }
       }
@@ -2408,15 +2660,26 @@
     const missing = options.force
       ? sections
       : sections.filter(section => !isSectionFresh(bucket, section, ttl));
+    const logTask = createPerformanceTask('Fórum · Snapshot', {
+      sections,
+      priority: options && options.priority ? options.priority : 'normal',
+      forced: !!options.force
+    });
+    if (missing.length) {
+      logTask.update({ missing });
+    }
     if (!missing.length) {
       if (bucket && bucket.data) {
         applyForumSnapshot(pickForumSections(bucket.data, sections), options);
+        logTask.finish('cache', { source: 'cache', loaded: [] });
         return Promise.resolve(bucket.data);
       }
+      logTask.finish('cache', { source: 'cache', loaded: [] });
       return Promise.resolve(null);
     }
     const token = getSessionToken();
     if (!token) {
+      logTask.finish('error', { message: 'Sessão expirada', missing });
       expireSession(SESSION_EXPIRED_FALLBACK);
       return Promise.reject(new Error('Sessão expirada.'));
     }
@@ -2425,17 +2688,26 @@
       userId: currentUser.id,
       sections: missing
     };
+    logTask.start();
     return enqueueScriptTask(
       () => executeScriptMethod('getForumSnapshot', payload),
       { priority: options && options.priority === 'high' ? 'high' : 'normal' }
     ).then(response => {
       if (!response || response.ok === false) {
         const message = response && response.message ? response.message : 'Não foi possível carregar o fórum agora.';
+        logTask.finish('error', { message, missing });
         throw new Error(message);
       }
+      const summary = {};
+      if (Array.isArray(response?.polls)) summary.polls = response.polls.length;
+      if (Array.isArray(response?.ideas)) summary.ideas = response.ideas.length;
+      if (Array.isArray(response?.questions)) summary.questions = response.questions.length;
+      if (Array.isArray(response?.notifications)) summary.notifications = response.notifications.length;
+      logTask.finish('success', { loaded: missing, ...summary });
       applyForumSnapshot(response, options);
       return response;
     }).catch(err => {
+      logTask.finish('error', { message: extractErrorMessage(err), missing });
       if (handleSessionExpiredError(err)) return Promise.reject(err);
       if (!options || !options.silent) {
         console.warn('Falha ao carregar dados do fórum:', err);
@@ -4505,12 +4777,23 @@
     const sectionsToFetch = [];
     if (needsEntries && !isSectionFresh(bucket, 'entries', ttl)) sectionsToFetch.push('entries');
     if (needsShareable && currentUser && !isSectionFresh(bucket, 'shareable', ttl)) sectionsToFetch.push('shareable');
+    const logTask = createPerformanceTask('Comunidade · Snapshot', {
+      sections: sectionsToFetch.length
+        ? sectionsToFetch.slice()
+        : (needsShareable ? ['entries', 'shareable'] : ['entries']),
+      priority: options && options.priority ? options.priority : 'normal',
+      forced: !!options.force
+    });
     if (!options.force && sectionsToFetch.length === 0) {
       if (bucket && bucket.data) {
         applyCommunitySnapshot(bucket.data, options);
+        logTask.finish('cache', { source: 'cache', loaded: [] });
         return Promise.resolve(bucket.data);
       }
-      if (!communityListEl) return Promise.resolve(null);
+      if (!communityListEl) {
+        logTask.finish('info', { message: 'Sem destino para renderizar', source: 'cache' });
+        return Promise.resolve(null);
+      }
     }
     const token = getSessionToken();
     const payload = {
@@ -4518,17 +4801,24 @@
       userId: currentUser ? currentUser.id : null
     };
     if (options && options.limit) payload.limit = options.limit;
+    logTask.start({ missing: sectionsToFetch });
     return enqueueScriptTask(
       () => executeScriptMethod('getCommunitySnapshot', payload),
       { priority: options && options.priority === 'high' ? 'high' : 'normal' }
     ).then(response => {
       if (!response || response.ok === false) {
         const message = response && response.message ? response.message : 'Não foi possível carregar o mural agora.';
+        logTask.finish('error', { message, missing: sectionsToFetch });
         throw new Error(message);
       }
+      const summary = {};
+      if (Array.isArray(response?.entries)) summary.entries = response.entries.length;
+      if (Array.isArray(response?.shareableUsers)) summary.shareable = response.shareableUsers.length;
+      logTask.finish('success', { loaded: sectionsToFetch, ...summary });
       applyCommunitySnapshot(response, options);
       return response;
     }).catch(err => {
+      logTask.finish('error', { message: extractErrorMessage(err), missing: sectionsToFetch });
       if (handleSessionExpiredError(err)) return Promise.reject(err);
       if (!options || !options.silent) {
         console.warn('Falha ao carregar mural:', err);
@@ -6180,6 +6470,13 @@
   }
   setCommunityMode(forumState.mode);
 
+  if (performanceLogClearBtn) {
+    performanceLogClearBtn.addEventListener('click', () => {
+      clearPerformanceLog();
+      showToast({ message: 'Log de desempenho limpo.', type: 'info' });
+    });
+  }
+
   if (forumInfoToggle && forumInfoPanel) {
     forumInfoToggle.addEventListener('click', () => {
       const expanded = forumInfoToggle.getAttribute('aria-expanded') === 'true';
@@ -7423,31 +7720,47 @@
   }
 
   function loadEmbeds(options = {}) {
-    if (!currentUser) return Promise.resolve(null);
+    const logTask = createPerformanceTask('Materiais · Snapshot', {
+      priority: options && options.priority ? options.priority : 'normal',
+      forced: !!options.force
+    });
+    if (!currentUser) {
+      logTask.finish('info', { message: 'Sem usuário autenticado', source: 'cache' });
+      return Promise.resolve(null);
+    }
     const bucket = datasetCache.embeds;
     const ttl = Number.isFinite(Number(options && options.ttl)) ? Number(options.ttl) : DATA_CACHE_LONG_TTL;
     const force = !!(options && options.force);
     const shouldFetch = force || !isSectionFresh(bucket, 'materials', ttl);
     if (!shouldFetch && bucket && bucket.data && bucket.data.materials) {
       applyEmbedsData(bucket.data.materials);
+      logTask.finish('cache', { source: 'cache', loaded: [] });
       return Promise.resolve(bucket.data.materials);
     }
     const token = getSessionToken();
     if (!token) {
+      logTask.finish('error', { message: 'Sessão expirada' });
       expireSession(SESSION_EXPIRED_FALLBACK);
       return Promise.resolve(null);
     }
     const loader = options && options.showLoader ? createActionLoader('Carregando materiais...') : null;
     const payload = { token, userId: currentUser.id };
+    logTask.start({ sections: ['materials'] });
     return enqueueScriptTask(
       () => executeScriptMethod('getEmbeds', payload),
       { priority: options && options.priority === 'high' ? 'high' : 'normal' }
     ).then(data => {
       if (loader) loader.finish();
+      const materials = data || {};
+      const summary = {};
+      if (Array.isArray(materials.recommendedResources)) summary.resources = materials.recommendedResources.length;
+      if (Array.isArray(materials.upcomingEvents)) summary.events = materials.upcomingEvents.length;
+      logTask.finish('success', { loaded: ['materials'], ...summary });
       applyEmbedsData(data || {});
       return data;
     }).catch(err => {
       if (loader) loader.finish();
+      logTask.finish('error', { message: extractErrorMessage(err) });
       if (!handleSessionExpiredError(err)) {
         if (!(options && options.silent)) {
           console.error('Falha ao carregar materiais compartilhados:', err);
@@ -7556,8 +7869,13 @@
       enterSessionWarmup('Validando sua sessão, isso deve levar apenas alguns segundos...', {
         title: 'Restaurando sessão'
       });
+      const resumeTask = createPerformanceTask('Sessão · Restaurar', {
+        remember: rememberPreference
+      });
+      resumeTask.start({ source: 'armazenado' });
       google.script.run
         .withFailureHandler(() => {
+          resumeTask.finish('error', { message: 'Falha ao restaurar sessão' });
           clearStoredSession();
           leaveSessionWarmup({ showLogin: true });
           updateUI();
@@ -7568,7 +7886,9 @@
             persistSession(stored.token, user, { remember: rememberPreference });
             const firstName = (user.name || '').split(' ')[0] || 'aluno';
             updateSessionWarmupMessage(`Bem-vindo de volta, ${firstName}! Carregando seu painel personalizado...`);
+            resumeTask.finish('success', { userId: user.id });
           } else {
+            resumeTask.finish('info', { message: 'Sessão inválida', source: 'armazenado' });
             clearStoredSession();
             leaveSessionWarmup({ showLogin: true });
           }

@@ -312,6 +312,19 @@
           <p id="forumPollSummary" class="text-xs text-slate-500 dark:text-slate-400">Entre para votar nas enquetes da turma.</p>
           <div id="forumPollList" class="space-y-4"></div>
         </div>
+
+        <div class="card space-y-4" id="forumPerformanceCard">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 class="text-lg font-semibold">Registro de desempenho</h3>
+              <p class="text-sm text-slate-600 dark:text-slate-300">Monitore o tempo de carregamento das tarefas do fórum.</p>
+            </div>
+            <button type="button" id="btnClearPerformanceLog" class="btn btn-ghost text-xs">Limpar</button>
+          </div>
+          <p class="text-xs text-slate-500 dark:text-slate-400">Cada registro mostra duração, fila de execução e origem dos dados.</p>
+          <ul id="forumPerformanceLog" class="space-y-2 text-xs text-slate-600 dark:text-slate-300"></ul>
+          <p id="forumPerformanceLogEmpty" class="history-empty text-xs">Nenhuma medição registrada ainda.</p>
+        </div>
       </div>
     </div>
   </section>
