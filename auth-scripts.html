@@ -1,0 +1,804 @@
+<script>
+(function () {
+  'use strict';
+
+  const ExcelPlatform = (window.ExcelPlatform = window.ExcelPlatform || {});
+  const events =
+    ExcelPlatform.events ||
+    (ExcelPlatform.events = {
+      sessionReady: 'excel-auth:session-ready',
+      logout: 'excel-auth:logout',
+      requireLogin: 'excel-auth:require-login'
+    });
+
+  const utils = ExcelPlatform.utils || {};
+  ExcelPlatform.utils = utils;
+
+  const emitEvent =
+    typeof utils.emitEvent === 'function'
+      ? utils.emitEvent
+      : (utils.emitEvent = function emitEvent(name, detail) {
+          if (!name) return;
+          try {
+            window.dispatchEvent(new CustomEvent(name, { detail }));
+          } catch (err) {
+            console.warn('Falha ao emitir evento', name, err);
+          }
+        });
+
+  const getErrorMessage =
+    typeof utils.getErrorMessage === 'function'
+      ? utils.getErrorMessage
+      : (utils.getErrorMessage = function getErrorMessage(err, fallback) {
+          if (!err) return fallback || 'Não foi possível concluir a operação.';
+          if (typeof err === 'string') return err;
+          if (err.message) return err.message;
+          if (err.details && err.details.message) return err.details.message;
+          return fallback || 'Não foi possível concluir a operação.';
+        });
+
+  const messages = ExcelPlatform.messages || {};
+  ExcelPlatform.messages = messages;
+  const SESSION_INVALID_MESSAGE =
+    messages.sessionInvalid || 'Sessão inválida ou expirada. Faça login novamente.';
+  messages.sessionInvalid = SESSION_INVALID_MESSAGE;
+
+  const views = {
+    loading: document.getElementById('loadingOverlay'),
+    login: document.getElementById('authCards')
+  };
+
+  const cards = {
+    login: document.getElementById('loginCard'),
+    register: document.getElementById('registerCard'),
+    confirm: document.getElementById('confirmCard'),
+    recovery: document.getElementById('recoveryCard'),
+    reset: document.getElementById('resetCard')
+  };
+
+  const feedback = {
+    login: document.getElementById('loginFeedback'),
+    register: document.getElementById('registerFeedback'),
+    confirm: document.getElementById('confirmFeedback'),
+    recovery: document.getElementById('recoveryFeedback'),
+    reset: document.getElementById('resetFeedback')
+  };
+
+  const forms = {
+    login: document.getElementById('loginForm'),
+    register: document.getElementById('registerForm'),
+    confirm: document.getElementById('confirmForm'),
+    recovery: document.getElementById('recoveryForm'),
+    reset: document.getElementById('resetForm')
+  };
+
+  const inputs = {
+    loginEmail: document.getElementById('loginEmail'),
+    loginPassword: document.getElementById('loginPassword'),
+    rememberMe: document.getElementById('rememberMe'),
+    registerName: document.getElementById('registerName'),
+    registerEmail: document.getElementById('registerEmail'),
+    registerPassword: document.getElementById('registerPassword'),
+    registerAdminCode: document.getElementById('registerAdminCode'),
+    confirmEmail: document.getElementById('confirmEmail'),
+    confirmCode: document.getElementById('confirmCode'),
+    recoveryEmail: document.getElementById('recoveryEmail'),
+    resetEmail: document.getElementById('resetEmail'),
+    resetCode: document.getElementById('resetCode'),
+    resetPassword: document.getElementById('resetPassword')
+  };
+
+  const hints = {
+    registerName: document.getElementById('registerNameHint'),
+    registerEmail: document.getElementById('registerEmailHint'),
+    registerPassword: document.getElementById('registerPasswordHint'),
+    registerAdminCode: document.getElementById('registerAdminCodeHint'),
+    resetPassword: document.getElementById('resetPasswordHint')
+  };
+
+  const buttons = {
+    login: document.getElementById('btnLogin'),
+    register: document.getElementById('btnRegister'),
+    confirm: document.getElementById('btnConfirm'),
+    resendConfirmation: document.getElementById('btnResendConfirmation'),
+    recovery: document.getElementById('btnRecovery'),
+    reset: document.getElementById('btnReset')
+  };
+
+  const fieldGroups = {
+    register: {
+      name: { input: inputs.registerName, hint: hints.registerName },
+      email: { input: inputs.registerEmail, hint: hints.registerEmail },
+      password: { input: inputs.registerPassword, hint: hints.registerPassword },
+      adminCode: { input: inputs.registerAdminCode, hint: hints.registerAdminCode }
+    },
+    reset: {
+      email: { input: inputs.resetEmail, hint: null },
+      code: { input: inputs.resetCode, hint: null },
+      password: { input: inputs.resetPassword, hint: hints.resetPassword }
+    }
+  };
+
+  let activeAuthCard = 'login';
+  const authState = {
+    confirmation: { email: '', expiresAt: '' },
+    recovery: { email: '' }
+  };
+
+  const loadingElements = {
+    message: document.getElementById('loadingMessage'),
+    fact: document.getElementById('loadingFact')
+  };
+
+  function clearFieldErrors(group) {
+    const fields = fieldGroups[group];
+    if (!fields) return;
+    Object.values(fields).forEach(({ input, hint }) => {
+      if (input) {
+        input.classList.remove('has-error');
+        input.removeAttribute('aria-invalid');
+        input.removeAttribute('aria-describedby');
+        input.removeAttribute('title');
+      }
+      if (hint) {
+        const defaultText = hint.dataset.default || '';
+        hint.textContent = defaultText;
+        hint.classList.remove('error');
+      }
+    });
+  }
+
+  function applyFieldErrors(group, errors) {
+    if (!errors) return;
+    const fields = fieldGroups[group];
+    if (!fields) return;
+    Object.entries(errors).forEach(([key, message]) => {
+      const field = fields[key];
+      if (!field) return;
+      const hintMessage = message || '';
+      if (field.input) {
+        field.input.classList.add('has-error');
+        field.input.setAttribute('aria-invalid', 'true');
+        if (field.hint) {
+          field.input.setAttribute('aria-describedby', field.hint.id);
+        }
+      }
+      if (field.hint) {
+        field.hint.textContent = hintMessage;
+        field.hint.classList.add('error');
+      } else if (field.input) {
+        field.input.setAttribute('title', hintMessage);
+      }
+    });
+  }
+
+  function updateConfirmationEmail(email) {
+    if (!inputs.confirmEmail) return;
+    if (email) {
+      inputs.confirmEmail.value = email;
+    }
+  }
+
+  function updateResetEmail(email) {
+    if (!inputs.resetEmail) return;
+    if (email) {
+      inputs.resetEmail.value = email;
+    }
+  }
+
+  function updateConfirmationState(data) {
+    const email = data && data.email ? data.email : authState.confirmation.email;
+    authState.confirmation.email = email || '';
+    authState.confirmation.expiresAt = data && data.expiresAt ? data.expiresAt : authState.confirmation.expiresAt || '';
+    if (email) {
+      updateConfirmationEmail(email);
+    }
+  }
+
+  function updateRecoveryState(email) {
+    authState.recovery.email = email || '';
+    if (email) {
+      updateResetEmail(email);
+    }
+  }
+
+  function setActiveAuthCard(target, options) {
+    const normalized = cards[target] ? target : 'login';
+    activeAuthCard = normalized;
+    Object.entries(cards).forEach(([key, node]) => {
+      if (!node) return;
+      if (key === normalized) {
+        node.classList.remove('hidden');
+        node.removeAttribute('aria-hidden');
+      } else {
+        node.classList.add('hidden');
+        node.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    if (normalized === 'register') {
+      clearFieldErrors('register');
+      hideFeedback('register');
+    } else if (normalized === 'reset') {
+      clearFieldErrors('reset');
+    }
+
+    const focusDelay = 60;
+    if (normalized === 'login' && inputs.loginEmail) {
+      window.setTimeout(() => inputs.loginEmail.focus(), focusDelay);
+    } else if (normalized === 'register' && inputs.registerName) {
+      window.setTimeout(() => inputs.registerName.focus(), focusDelay);
+    } else if (normalized === 'confirm' && inputs.confirmCode) {
+      const emailPrefill = options && options.prefillEmail ? options.prefillEmail : authState.confirmation.email;
+      if (emailPrefill) {
+        updateConfirmationEmail(emailPrefill);
+      }
+      window.setTimeout(() => inputs.confirmCode.focus(), focusDelay);
+    } else if (normalized === 'recovery' && inputs.recoveryEmail) {
+      const emailPrefill = options && options.prefillEmail ? options.prefillEmail : authState.recovery.email;
+      if (emailPrefill) {
+        inputs.recoveryEmail.value = emailPrefill;
+      }
+      window.setTimeout(() => inputs.recoveryEmail.focus(), focusDelay);
+    } else if (normalized === 'reset' && inputs.resetCode) {
+      const emailPrefill = options && options.prefillEmail ? options.prefillEmail : authState.recovery.email;
+      if (emailPrefill) {
+        updateResetEmail(emailPrefill);
+      }
+      window.setTimeout(() => inputs.resetCode.focus(), focusDelay);
+    }
+  }
+
+  function setupCardSwitchers() {
+    const nodes = document.querySelectorAll('[data-auth-target]');
+    nodes.forEach(node => {
+      if (node.dataset.bound === 'true') return;
+      node.dataset.bound = 'true';
+      node.addEventListener('click', event => {
+        event.preventDefault();
+        const target = node.dataset.authTarget;
+        if (!target) {
+          setActiveAuthCard('login');
+          return;
+        }
+        const options = {};
+        if (target === 'confirm') {
+          const emailCandidate =
+            authState.confirmation.email ||
+            (inputs.registerEmail && inputs.registerEmail.value.trim()) ||
+            (inputs.loginEmail && inputs.loginEmail.value.trim()) ||
+            '';
+          if (emailCandidate) {
+            updateConfirmationState({ email: emailCandidate });
+            options.prefillEmail = emailCandidate;
+          }
+        }
+        if (target === 'reset') {
+          const emailCandidate =
+            authState.recovery.email ||
+            (inputs.recoveryEmail && inputs.recoveryEmail.value.trim()) ||
+            (inputs.loginEmail && inputs.loginEmail.value.trim()) ||
+            '';
+          if (emailCandidate) {
+            updateRecoveryState(emailCandidate);
+            options.prefillEmail = emailCandidate;
+          }
+        }
+        setActiveAuthCard(target, options);
+      });
+    });
+  }
+
+  const FACT_STORAGE_KEY = 'excel-auth-last-fact';
+  const funFacts = [
+    'O Excel suporta mais de 16 mil colunas (da coluna A até a XFD) e mais de 1 milhão de linhas por planilha.',
+    'A função PROCV foi substituída pela PROCX, que permite procurar valores tanto à esquerda quanto à direita.',
+    'Você pode utilizar o atalho Ctrl + ; para inserir a data atual em uma célula imediatamente.',
+    'As Tabelas Dinâmicas foram introduzidas no Excel 5.0, lançado em 1993, e continuam sendo um dos recursos mais usados.',
+    'O Power Query permite combinar dados de diversas fontes diferentes com poucos cliques, sem precisar de VBA.'
+  ];
+
+  const STORAGE_KEY = 'excel-auth-session';
+  const SESSION_STORAGE_KEY = 'excel-auth-session-temp';
+  let currentView = 'login';
+  let rememberPreference = false;
+  let currentSession = null;
+  let factRotationTimer = null;
+
+  function getLastFactIndex() {
+    try {
+      const raw = localStorage.getItem(FACT_STORAGE_KEY);
+      if (raw === null || raw === undefined) return -1;
+      const parsed = Number.parseInt(raw, 10);
+      return Number.isNaN(parsed) ? -1 : parsed;
+    } catch (err) {
+      return -1;
+    }
+  }
+
+  function storeLastFactIndex(index) {
+    try {
+      localStorage.setItem(FACT_STORAGE_KEY, String(index));
+    } catch (err) {
+      /* ignore storage errors */
+    }
+  }
+
+  function pickRandomFact() {
+    if (!funFacts.length) return '';
+    const lastIndex = getLastFactIndex();
+    let index = Math.floor(Math.random() * funFacts.length);
+    if (funFacts.length > 1) {
+      let attempts = 0;
+      while (index === lastIndex && attempts < 6) {
+        index = Math.floor(Math.random() * funFacts.length);
+        attempts += 1;
+      }
+      if (index === lastIndex) {
+        index = (index + 1) % funFacts.length;
+      }
+    }
+    storeLastFactIndex(index);
+    return funFacts[index];
+  }
+
+  function updateLoadingFact() {
+    if (!loadingElements.fact) return;
+    loadingElements.fact.textContent = pickRandomFact();
+  }
+
+  function clearFactRotation() {
+    if (factRotationTimer === null) return;
+    clearInterval(factRotationTimer);
+    factRotationTimer = null;
+  }
+
+  function startFactRotation() {
+    clearFactRotation();
+    updateLoadingFact();
+    factRotationTimer = window.setInterval(updateLoadingFact, 3000);
+  }
+
+  function toggleView(view) {
+    if (!Object.prototype.hasOwnProperty.call(views, view)) {
+      return;
+    }
+    currentView = view;
+    Object.entries(views).forEach(([key, node]) => {
+      if (!node) return;
+      const isActive = key === view;
+      if (isActive) {
+        node.classList.remove('hidden');
+        node.removeAttribute('aria-hidden');
+        if (key === 'loading') {
+          node.style.removeProperty('display');
+        }
+      } else {
+        node.classList.add('hidden');
+        node.setAttribute('aria-hidden', 'true');
+      }
+    });
+    if (view === 'loading') {
+      startFactRotation();
+    } else {
+      clearFactRotation();
+    }
+    if (view === 'login') {
+      setActiveAuthCard(activeAuthCard || 'login');
+    }
+  }
+
+  function showLoadingView(message) {
+    if (loadingElements.message) {
+      loadingElements.message.textContent = message || 'Carregando sua sessão...';
+    }
+    toggleView('loading');
+  }
+
+  function hideFeedback(target) {
+    const node = feedback[target];
+    if (!node) return;
+    node.className = 'feedback';
+    node.textContent = '';
+  }
+
+  function renderFeedback(target, type, message) {
+    const node = feedback[target];
+    if (!node) return;
+    const normalizedType = ['error', 'success', 'info'].includes(type) ? type : 'info';
+    node.className = `feedback show ${normalizedType}`;
+    node.textContent = message || '';
+  }
+
+  function setButtonLoading(button, loading, label) {
+    if (!button) return;
+    if (loading) {
+      button.dataset.originalLabel = button.dataset.originalLabel || button.textContent;
+      button.textContent = label || 'Processando...';
+      button.disabled = true;
+    } else {
+      const original = button.dataset.originalLabel || button.textContent;
+      button.textContent = original;
+      button.disabled = false;
+      delete button.dataset.originalLabel;
+    }
+  }
+
+  function persistSession(token, user, remember, expiresAt) {
+    if (!token || !user) return;
+    rememberPreference = !!remember;
+    currentSession = { token, user, remember: rememberPreference, expiresAt };
+    const payload = JSON.stringify({ token, user, remember: rememberPreference, expiresAt });
+    try {
+      if (rememberPreference) {
+        localStorage.setItem(STORAGE_KEY, payload);
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      } else {
+        sessionStorage.setItem(SESSION_STORAGE_KEY, payload);
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (err) {
+      console.warn('Não foi possível armazenar a sessão.', err);
+    }
+  }
+
+  function clearStoredSession() {
+    currentSession = null;
+    rememberPreference = false;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch (err) {
+      /* ignore */
+    }
+  }
+
+  function loadStoredSession() {
+    let data = null;
+    try {
+      const rawTemp = sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (rawTemp) {
+        data = JSON.parse(rawTemp);
+      }
+    } catch (err) {
+      data = null;
+    }
+    if (!data) {
+      try {
+        const rawPersistent = localStorage.getItem(STORAGE_KEY);
+        if (rawPersistent) {
+          data = JSON.parse(rawPersistent);
+        }
+      } catch (err) {
+        data = null;
+      }
+    }
+    if (!data || !data.token) return null;
+    data.remember = !!data.remember;
+    return data;
+  }
+
+  function showLoginView() {
+    activeAuthCard = 'login';
+    toggleView('login');
+  }
+
+  function applySession(response, remember, source) {
+    if (!response || !response.user || !response.token) return;
+    persistSession(response.token, response.user, remember, response.expiresAt || '');
+    showLoadingView(source === 'restore' ? 'Recuperando ambiente principal...' : 'Carregando ambiente principal...');
+    emitEvent(events.sessionReady, {
+      session: currentSession,
+      source: source || 'login'
+    });
+  }
+
+  function handleSessionError(target, message) {
+    clearStoredSession();
+    showLoginView();
+    if (target) {
+      renderFeedback(target, 'error', message || 'Sessão expirada. Faça login novamente.');
+    }
+    emitEvent(events.requireLogin, { message: message || null });
+  }
+
+  function handleLogin(event) {
+    event.preventDefault();
+    hideFeedback('login');
+    const email = inputs.loginEmail ? inputs.loginEmail.value.trim() : '';
+    const password = inputs.loginPassword ? inputs.loginPassword.value.trim() : '';
+    rememberPreference = !!(inputs.rememberMe && inputs.rememberMe.checked);
+    if (!email || !password) {
+      renderFeedback('login', 'error', 'Informe e-mail e senha.');
+      return;
+    }
+    setButtonLoading(buttons.login, true, 'Entrando...');
+    google.script.run
+      .withFailureHandler(err => {
+        setButtonLoading(buttons.login, false);
+        renderFeedback('login', 'error', getErrorMessage(err, 'Não foi possível entrar agora.'));
+      })
+      .withSuccessHandler(res => {
+        setButtonLoading(buttons.login, false);
+        if (res && res.ok && res.user && res.token) {
+          applySession(res, rememberPreference, 'login');
+          return;
+        }
+        if (res && res.requiresConfirmation) {
+          const confirmationEmail =
+            (res.confirmation && res.confirmation.email) || email;
+          updateConfirmationState({
+            email: confirmationEmail,
+            expiresAt: res.confirmation && res.confirmation.expiresAt ? res.confirmation.expiresAt : ''
+          });
+          renderFeedback('confirm', 'info', res.message || 'Confirme o código enviado para continuar.');
+          setActiveAuthCard('confirm', { prefillEmail: confirmationEmail });
+          return;
+        }
+        renderFeedback('login', 'error', res && res.message ? res.message : 'Não foi possível entrar.');
+      })
+      .loginUser({ email, password });
+  }
+
+  function handleRegister(event) {
+    event.preventDefault();
+    hideFeedback('register');
+    hideFeedback('confirm');
+    clearFieldErrors('register');
+    const name = inputs.registerName ? inputs.registerName.value.trim() : '';
+    const email = inputs.registerEmail ? inputs.registerEmail.value.trim().toLowerCase() : '';
+    const password = inputs.registerPassword ? inputs.registerPassword.value.trim() : '';
+    const adminCode = inputs.registerAdminCode ? inputs.registerAdminCode.value.trim() : '';
+    if (!name || !email || !password) {
+      renderFeedback('register', 'error', 'Preencha todos os campos obrigatórios.');
+      return;
+    }
+    setButtonLoading(buttons.register, true, 'Enviando...');
+    google.script.run
+      .withFailureHandler(err => {
+        setButtonLoading(buttons.register, false);
+        renderFeedback('register', 'error', getErrorMessage(err, 'Não foi possível concluir o cadastro agora.'));
+      })
+      .withSuccessHandler(res => {
+        setButtonLoading(buttons.register, false);
+        if (res && res.ok) {
+          const confirmationEmail =
+            (res.confirmation && res.confirmation.email) || email;
+          updateConfirmationState({
+            email: confirmationEmail,
+            expiresAt: res.confirmation && res.confirmation.expiresAt ? res.confirmation.expiresAt : ''
+          });
+          renderFeedback('confirm', 'success', res.message || 'Enviamos um código para o seu e-mail.');
+          setActiveAuthCard('confirm', { prefillEmail: confirmationEmail });
+          return;
+        }
+        if (res && res.errors) {
+          applyFieldErrors('register', res.errors);
+        }
+        renderFeedback('register', 'error', res && res.message ? res.message : 'Não foi possível concluir o cadastro.');
+      })
+      .registerUser({ name, email, password, adminCode });
+  }
+
+  function handleConfirmSignup(event) {
+    event.preventDefault();
+    hideFeedback('confirm');
+    const email = inputs.confirmEmail ? inputs.confirmEmail.value.trim().toLowerCase() : '';
+    const code = inputs.confirmCode ? inputs.confirmCode.value.trim() : '';
+    if (!email || !code) {
+      renderFeedback('confirm', 'error', 'Informe e-mail e código de confirmação.');
+      return;
+    }
+    setButtonLoading(buttons.confirm, true, 'Confirmando...');
+    google.script.run
+      .withFailureHandler(err => {
+        setButtonLoading(buttons.confirm, false);
+        renderFeedback('confirm', 'error', getErrorMessage(err, 'Não foi possível confirmar agora.'));
+      })
+      .withSuccessHandler(res => {
+        setButtonLoading(buttons.confirm, false);
+        if (res && res.ok && res.user && res.token) {
+          updateConfirmationState({ email });
+          applySession(res, rememberPreference, 'confirmation');
+          return;
+        }
+        if (res && res.requiresConfirmation) {
+          const confirmationEmail =
+            (res.confirmation && res.confirmation.email) || email;
+          updateConfirmationState({
+            email: confirmationEmail,
+            expiresAt: res.confirmation && res.confirmation.expiresAt ? res.confirmation.expiresAt : ''
+          });
+          renderFeedback('confirm', 'info', res.message || 'O código informado expirou ou é inválido. Solicite um novo envio.');
+          return;
+        }
+        renderFeedback('confirm', 'error', res && res.message ? res.message : 'Não foi possível confirmar o cadastro.');
+      })
+      .confirmSignup({ email, code });
+  }
+
+  function handleResendConfirmation() {
+    hideFeedback('confirm');
+    const emailInput = inputs.confirmEmail ? inputs.confirmEmail.value.trim().toLowerCase() : '';
+    const email = emailInput || authState.confirmation.email;
+    if (!email) {
+      renderFeedback('confirm', 'error', 'Informe o e-mail para reenviar o código.');
+      return;
+    }
+    setButtonLoading(buttons.resendConfirmation, true, 'Reenviando...');
+    google.script.run
+      .withFailureHandler(err => {
+        setButtonLoading(buttons.resendConfirmation, false);
+        renderFeedback('confirm', 'error', getErrorMessage(err, 'Não foi possível reenviar o código agora.'));
+      })
+      .withSuccessHandler(res => {
+        setButtonLoading(buttons.resendConfirmation, false);
+        if (res && res.ok) {
+          const confirmationEmail =
+            (res.confirmation && res.confirmation.email) || email;
+          updateConfirmationState({
+            email: confirmationEmail,
+            expiresAt: res.confirmation && res.confirmation.expiresAt ? res.confirmation.expiresAt : ''
+          });
+          renderFeedback('confirm', 'success', res.message || 'Novo código enviado para o seu e-mail.');
+          setActiveAuthCard('confirm', { prefillEmail: confirmationEmail });
+          return;
+        }
+        renderFeedback('confirm', 'error', res && res.message ? res.message : 'Não foi possível reenviar o código.');
+      })
+      .resendConfirmationCode({ email });
+  }
+
+  function handleRecoveryRequest(event) {
+    event.preventDefault();
+    hideFeedback('recovery');
+    hideFeedback('reset');
+    const email = inputs.recoveryEmail ? inputs.recoveryEmail.value.trim().toLowerCase() : '';
+    if (!email) {
+      renderFeedback('recovery', 'error', 'Informe o e-mail cadastrado.');
+      return;
+    }
+    setButtonLoading(buttons.recovery, true, 'Enviando...');
+    google.script.run
+      .withFailureHandler(err => {
+        setButtonLoading(buttons.recovery, false);
+        renderFeedback('recovery', 'error', getErrorMessage(err, 'Não foi possível enviar o código agora.'));
+      })
+      .withSuccessHandler(res => {
+        setButtonLoading(buttons.recovery, false);
+        updateRecoveryState(email);
+        if (res && res.ok) {
+          const message =
+            res.message || 'Se o e-mail estiver cadastrado, você receberá o código em instantes.';
+          renderFeedback('reset', 'info', message);
+          setActiveAuthCard('reset', { prefillEmail: email });
+          return;
+        }
+        renderFeedback('recovery', 'error', res && res.message ? res.message : 'Não foi possível enviar o código.');
+      })
+      .requestPasswordReset({ email });
+  }
+
+  function handlePasswordReset(event) {
+    event.preventDefault();
+    hideFeedback('reset');
+    clearFieldErrors('reset');
+    const email = inputs.resetEmail ? inputs.resetEmail.value.trim().toLowerCase() : '';
+    const code = inputs.resetCode ? inputs.resetCode.value.trim() : '';
+    const password = inputs.resetPassword ? inputs.resetPassword.value.trim() : '';
+    if (!email || !code || !password) {
+      renderFeedback('reset', 'error', 'Informe e-mail, código e a nova senha.');
+      return;
+    }
+    setButtonLoading(buttons.reset, true, 'Atualizando...');
+    google.script.run
+      .withFailureHandler(err => {
+        setButtonLoading(buttons.reset, false);
+        renderFeedback('reset', 'error', getErrorMessage(err, 'Não foi possível redefinir a senha agora.'));
+      })
+      .withSuccessHandler(res => {
+        setButtonLoading(buttons.reset, false);
+        if (res && res.ok) {
+          renderFeedback('login', 'success', res.message || 'Senha redefinida com sucesso. Faça login com a nova senha.');
+          setActiveAuthCard('login');
+          return;
+        }
+        if (res && res.errors) {
+          applyFieldErrors('reset', res.errors);
+        }
+        renderFeedback('reset', 'error', res && res.message ? res.message : 'Não foi possível redefinir a senha.');
+      })
+      .completePasswordReset({ email, code, password });
+  }
+
+  function handleLogout() {
+    if (!currentSession || !currentSession.token) {
+      clearStoredSession();
+      showLoginView();
+      emitEvent(events.logout, { reason: 'no-session' });
+      return;
+    }
+    const token = currentSession.token;
+    showLoadingView('Encerrando sessão...');
+    google.script.run
+      .withFailureHandler(() => {
+        clearStoredSession();
+        showLoginView();
+        renderFeedback('login', 'info', 'Sessão finalizada.');
+        emitEvent(events.logout, { reason: 'remote-error' });
+      })
+      .withSuccessHandler(() => {
+        clearStoredSession();
+        showLoginView();
+        hideFeedback('login');
+        renderFeedback('login', 'info', 'Sessão encerrada com sucesso.');
+        emitEvent(events.logout, { reason: 'user-action' });
+      })
+      .logoutSession({ token });
+  }
+
+  function restoreSessionFromStorage() {
+    const stored = loadStoredSession();
+    if (!stored || !stored.token) {
+      showLoginView();
+      return;
+    }
+    rememberPreference = !!stored.remember;
+    showLoadingView('Restaurando sua sessão segura...');
+    google.script.run
+      .withFailureHandler(err => {
+        console.warn('Falha ao restaurar sessão:', err);
+        handleSessionError('login', SESSION_INVALID_MESSAGE || 'Sessão expirada. Faça login novamente.');
+      })
+      .withSuccessHandler(res => {
+        if (res && res.ok && res.user && res.token) {
+          applySession(res, rememberPreference, 'restore');
+          return;
+        }
+        handleSessionError('login', res && res.message ? res.message : 'Sessão expirada. Faça login novamente.');
+      })
+      .restoreSession({ token: stored.token });
+  }
+
+  function getCurrentSessionSnapshot() {
+    if (!currentSession) return null;
+    return {
+      token: currentSession.token,
+      remember: !!currentSession.remember,
+      expiresAt: currentSession.expiresAt || '',
+      user: currentSession.user ? { ...currentSession.user } : null
+    };
+  }
+
+  function setupEventListeners() {
+    if (forms.login) forms.login.addEventListener('submit', handleLogin);
+    if (forms.register) forms.register.addEventListener('submit', handleRegister);
+    if (forms.confirm) forms.confirm.addEventListener('submit', handleConfirmSignup);
+    if (buttons.resendConfirmation)
+      buttons.resendConfirmation.addEventListener('click', handleResendConfirmation);
+    if (forms.recovery) forms.recovery.addEventListener('submit', handleRecoveryRequest);
+    if (forms.reset) forms.reset.addEventListener('submit', handlePasswordReset);
+    setupCardSwitchers();
+    setActiveAuthCard('login');
+  }
+
+  window.ExcelAuth = Object.freeze({
+    logout: () => handleLogout(),
+    getSession: () => getCurrentSessionSnapshot()
+  });
+
+  ExcelPlatform.auth = Object.assign({}, ExcelPlatform.auth, {
+    logout: () => handleLogout(),
+    restoreSession: restoreSessionFromStorage,
+    clearSession: () => clearStoredSession(),
+    getSession: () => getCurrentSessionSnapshot()
+  });
+
+  setupEventListeners();
+  restoreSessionFromStorage();
+})();
+</script>
