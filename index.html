@@ -8,876 +8,453 @@
     :root {
       color-scheme: light dark;
     }
+
     * {
       box-sizing: border-box;
     }
+
     body {
       margin: 0;
       min-height: 100vh;
       font-family: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
-      background: radial-gradient(circle at top, #e0f2f1, #f1f5f9 55%, #e2e8f0);
-      color: #0f172a;
-      transition: background 0.3s ease, color 0.3s ease;
+      background: #f3f4f6;
+      color: #1f2937;
     }
+
     body.dark {
-      background: radial-gradient(circle at top, #0f172a, #0b1120 65%, #020617);
+      background: #020617;
       color: #e2e8f0;
     }
+
     body.auth-mode {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
-      padding: 24px 16px;
     }
+
     body.workspace-mode {
-      display: flex;
-      flex-direction: column;
-      background: linear-gradient(135deg, rgba(226, 232, 240, 0.6), rgba(209, 250, 229, 0.8));
-      color: #0f172a;
-      padding: 0;
-      align-items: stretch;
+      display: block;
     }
-    body.dark.workspace-mode {
-      background: linear-gradient(135deg, rgba(2, 6, 23, 0.92), rgba(15, 118, 110, 0.35));
-      color: #e2e8f0;
-      align-items: stretch;
+
+    .hidden {
+      display: none !important;
     }
-    h1, h2, h3 {
-      margin: 0;
-      font-weight: 700;
-      letter-spacing: -0.01em;
-    }
-    p {
-      margin: 0;
-    }
-    .app-shell {
-      width: min(960px, 100%);
-      display: grid;
-      gap: 24px;
-    }
-    .app-header {
-      text-align: center;
-      display: grid;
-      gap: 12px;
-    }
-    .app-header h1 {
-      font-size: clamp(1.75rem, 3vw, 2.3rem);
-      color: #14532d;
-    }
-    body.dark .app-header h1 {
-      color: #86efac;
-    }
-    .app-header p {
-      color: #334155;
-      font-size: 0.95rem;
-    }
-    body.dark .app-header p {
-      color: #cbd5f5;
-    }
-    .pill {
-      display: inline-block;
-      font-size: 0.75rem;
-      font-weight: 600;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #0f172a;
-      background: rgba(15, 118, 110, 0.15);
-      padding: 0.35rem 0.85rem;
-      border-radius: 999px;
-    }
-    body.dark .pill {
-      color: #e2f3f5;
-      background: rgba(56, 189, 248, 0.2);
-    }
-    .cards {
-      display: grid;
-      gap: 16px;
-    }
-    .card {
-      position: relative;
-      padding: clamp(20px, 4vw, 28px);
-      border-radius: 18px;
-      background: rgba(255, 255, 255, 0.92);
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
-      display: grid;
-      gap: 16px;
-    }
+
     .loading-overlay {
       position: fixed;
       inset: 0;
       display: grid;
       place-items: center;
-      background: linear-gradient(135deg, rgba(15, 118, 110, 0.92), rgba(15, 23, 42, 0.9));
-      color: #f8fafc;
-      z-index: 999;
-      padding: 24px;
-      overflow: hidden;
-    }
-    .loading-overlay .loading-content {
-      max-width: min(520px, 90vw);
-      display: grid;
-      gap: 20px;
-      text-align: center;
-      background: rgba(15, 23, 42, 0.3);
-      border-radius: 24px;
-      padding: clamp(24px, 6vw, 40px);
-      box-shadow: 0 30px 60px rgba(2, 6, 23, 0.45);
-      backdrop-filter: blur(8px);
-    }
-    .loading-overlay .loading-content::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: inherit;
-      border: 1px solid rgba(226, 232, 240, 0.16);
-      pointer-events: none;
-    }
-    .loading-overlay .loading-content {
-      position: relative;
-    }
-    .loading-overlay .pill {
-      color: #e2f3f5;
-      background: rgba(226, 232, 240, 0.16);
-    }
-    .excel-icons {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-    }
-    .excel-icon {
-      position: absolute;
-      width: clamp(56px, 8vw, 88px);
-      height: clamp(56px, 8vw, 88px);
-      border-radius: 24px;
-      display: grid;
-      place-items: center;
-      background: rgba(34, 197, 94, 0.15);
-      border: 1px solid rgba(134, 239, 172, 0.5);
-      color: #bbf7d0;
-      font-size: clamp(28px, 4vw, 44px);
-      font-weight: 700;
-      text-shadow: 0 6px 18px rgba(15, 23, 42, 0.35);
-      animation: float 9s ease-in-out infinite;
-    }
-    .excel-icon::after {
-      content: "";
-      position: absolute;
-      inset: 10%;
-      border-radius: 18px;
-      border: 1px solid rgba(226, 232, 240, 0.25);
-    }
-    .excel-icon--1 {
-      top: 12%;
-      left: 14%;
-      animation-delay: -1s;
-    }
-    .excel-icon--2 {
-      top: 68%;
-      left: 22%;
-      animation-delay: -3s;
-    }
-    .excel-icon--3 {
-      top: 20%;
-      right: 18%;
-      animation-delay: -5s;
-    }
-    .excel-icon--4 {
-      bottom: 12%;
-      right: 8%;
-      animation-delay: -7s;
-    }
-    @keyframes float {
-      0%,
-      100% {
-        transform: translate3d(0, 0, 0) rotate(-4deg);
-      }
-      50% {
-        transform: translate3d(0, -12px, 0) rotate(6deg);
-      }
-    }
-    body.dark .card {
-      background: rgba(15, 23, 42, 0.78);
-      border-color: rgba(148, 163, 184, 0.35);
-      box-shadow: 0 24px 52px rgba(2, 6, 23, 0.45);
-    }
-    .card header {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .card header p {
-      color: #475569;
-      font-size: 0.9rem;
-    }
-    body.dark .card header p {
-      color: #cbd5f5;
-    }
-    label {
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #64748b;
-    }
-    body.dark label {
-      color: #94a3b8;
-    }
-    input[type="text"],
-    input[type="email"],
-    input[type="password"] {
-      width: 100%;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      background: rgba(248, 250, 252, 0.92);
-      color: inherit;
-      font-size: 0.95rem;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    input:focus {
-      outline: none;
-      border-color: #217346;
-      box-shadow: 0 0 0 3px rgba(33, 115, 70, 0.2);
-    }
-    body.dark input {
       background: rgba(15, 23, 42, 0.85);
-      border-color: rgba(148, 163, 184, 0.4);
+      color: #f8fafc;
+      padding: 24px;
+      z-index: 1000;
     }
-    body.dark input:focus {
-      border-color: #38bdf8;
-      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25);
+
+    .loading-overlay header {
+      display: grid;
+      gap: 8px;
+      text-align: center;
+      margin-bottom: 16px;
     }
-    button {
-      font: inherit;
-      cursor: pointer;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.35rem;
-      border-radius: 12px;
-      padding: 0.75rem 1.1rem;
-      border: 1px solid transparent;
-      font-weight: 600;
-      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, #217346, #38a169);
-      color: #ffffff;
-      box-shadow: 0 18px 36px rgba(33, 115, 70, 0.25);
-    }
-    .btn-primary:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 20px 44px rgba(33, 115, 70, 0.28);
-    }
-    .btn-ghost {
-      background: transparent;
-      color: #14532d;
-    }
-    .btn-ghost:hover {
-      color: #0f172a;
-      text-decoration: underline;
-    }
-    body.dark .btn-ghost {
-      color: #93c5fd;
-    }
-    body.dark .btn-ghost:hover {
-      color: #bfdbfe;
-    }
-    .btn[disabled] {
-      opacity: 0.65;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-    .loading-spinner {
-      width: 64px;
-      height: 64px;
+
+    .loading-overlay .loading-spinner {
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
-      border: 6px solid rgba(20, 83, 45, 0.18);
-      border-top-color: #217346;
-      animation: loading-spin 1s linear infinite;
+      border: 4px solid rgba(226, 232, 240, 0.35);
+      border-top-color: #22c55e;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 16px auto;
     }
-    body.dark .loading-spinner {
-      border: 6px solid rgba(148, 163, 184, 0.25);
-      border-top-color: #22d3ee;
-    }
-    @keyframes loading-spin {
+
+    @keyframes spin {
       to {
         transform: rotate(360deg);
       }
     }
-    .loading-overlay h2 {
-      font-size: clamp(1.6rem, 3vw, 2.1rem);
-      font-weight: 700;
+
+    .auth-shell {
+      width: 100%;
+      max-width: 520px;
+      padding: 64px 16px 96px;
+      display: grid;
+      gap: 32px;
+    }
+
+    .auth-header {
+      text-align: center;
+      display: grid;
+      gap: 8px;
+    }
+
+    .auth-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.4rem);
       margin: 0;
     }
-    .loading-message {
-      font-size: 1.05rem;
-      font-weight: 600;
+
+    .auth-header p {
+      margin: 0;
+      color: #475569;
     }
-    .fun-fact-label {
-      font-size: 0.85rem;
-      font-weight: 700;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: rgba(226, 232, 240, 0.75);
+
+    body.dark .auth-header p {
+      color: #cbd5f5;
     }
-    .fun-fact {
-      margin-top: 12px;
-      font-size: clamp(1.15rem, 2.8vw, 1.5rem);
-      line-height: 1.6;
-      font-weight: 700;
-      color: #f8fafc;
-      background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(21, 128, 61, 0.3));
-      border-radius: 18px;
-      padding: clamp(16px, 4vw, 22px);
-      box-shadow: 0 20px 45px rgba(2, 6, 23, 0.25);
+
+    .auth-forms {
+      display: grid;
+      gap: 32px;
     }
+
+    .auth-card {
+      display: grid;
+      gap: 20px;
+    }
+
+    .auth-card header {
+      display: grid;
+      gap: 6px;
+    }
+
+    .auth-card h2 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
     .field {
       display: grid;
       gap: 6px;
     }
-    .field small {
-      font-size: 0.75rem;
-      color: #64748b;
+
+    label {
+      font-weight: 600;
+      font-size: 0.9rem;
     }
-    body.dark .field small {
-      color: #94a3b8;
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      border-radius: 8px;
+      background: #ffffff;
+      color: inherit;
     }
-    .field small.error {
-      color: #dc2626;
-      font-weight: 500;
+
+    body.dark input[type="text"],
+    body.dark input[type="email"],
+    body.dark input[type="password"] {
+      background: rgba(15, 23, 42, 0.6);
+      border-color: rgba(148, 163, 184, 0.5);
     }
-    body.dark .field small.error {
-      color: #fca5a5;
+
+    input:focus {
+      outline: 2px solid #22c55e;
+      outline-offset: 1px;
     }
-    input.has-error,
-    input[aria-invalid='true'] {
-      border-color: #dc2626;
-      box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.18);
-    }
-    body.dark input.has-error,
-    body.dark input[aria-invalid='true'] {
-      border-color: rgba(248, 113, 113, 0.65);
-      box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.25);
-    }
+
     .feedback {
       display: none;
-      border-radius: 12px;
-      padding: 10px 14px;
-      font-size: 0.88rem;
-      line-height: 1.4;
-      border: 1px solid transparent;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 0.9rem;
     }
+
     .feedback.show {
       display: block;
     }
+
     .feedback.error {
-      background: rgba(248, 113, 113, 0.15);
-      border-color: rgba(248, 113, 113, 0.35);
+      background: rgba(248, 113, 113, 0.16);
       color: #b91c1c;
     }
+
     .feedback.success {
-      background: rgba(34, 197, 94, 0.15);
-      border-color: rgba(34, 197, 94, 0.3);
+      background: rgba(34, 197, 94, 0.18);
       color: #166534;
     }
+
     .feedback.info {
-      background: rgba(59, 130, 246, 0.12);
-      border-color: rgba(59, 130, 246, 0.3);
+      background: rgba(59, 130, 246, 0.18);
       color: #1d4ed8;
     }
-    body.dark .feedback.error {
-      background: rgba(248, 113, 113, 0.2);
-      border-color: rgba(248, 113, 113, 0.4);
-      color: #fecaca;
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
     }
-    body.dark .feedback.success {
-      background: rgba(34, 197, 94, 0.18);
-      border-color: rgba(34, 197, 94, 0.35);
-      color: #bbf7d0;
+
+    button {
+      font: inherit;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      padding: 10px 18px;
+      background: #16a34a;
+      color: #ffffff;
+      font-weight: 600;
     }
-    body.dark .feedback.info {
-      background: rgba(59, 130, 246, 0.18);
-      border-color: rgba(59, 130, 246, 0.4);
-      color: #bfdbfe;
+
+    button[disabled] {
+      opacity: 0.7;
+      cursor: not-allowed;
     }
-    .card-footer {
-      display: grid;
-      gap: 6px;
-      font-size: 0.85rem;
-      color: #475569;
-    }
-    body.dark .card-footer {
-      color: #cbd5f5;
-    }
-    .link-button {
+
+    .btn-secondary {
       background: transparent;
+      color: #166534;
+      border-color: rgba(22, 101, 52, 0.4);
+    }
+
+    body.dark .btn-secondary {
+      color: #bbf7d0;
+      border-color: rgba(187, 247, 208, 0.4);
+    }
+
+    .link-button {
+      background: none;
       border: none;
       padding: 0;
-      color: #14532d;
+      color: #166534;
       font-weight: 600;
       text-align: left;
-      cursor: pointer;
     }
+
     .link-button:hover,
     .link-button:focus {
       text-decoration: underline;
     }
+
     body.dark .link-button {
-      color: #86efac;
+      color: #4ade80;
     }
-    .card-divider {
-      height: 1px;
-      background: rgba(148, 163, 184, 0.25);
-      margin: 8px 0;
-    }
-    .toggle-line {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      font-size: 0.85rem;
+
+    small {
       color: #475569;
+      font-size: 0.8rem;
     }
-    body.dark .toggle-line {
-      color: #cbd5f5;
-    }
-    .toggle-line label {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.85rem;
-      letter-spacing: 0;
-      text-transform: none;
-      color: inherit;
-    }
-    input[type="checkbox"] {
-      width: 18px;
-      height: 18px;
-      border-radius: 6px;
-      border: 1px solid rgba(148, 163, 184, 0.6);
-      accent-color: #217346;
-    }
-    footer {
-      text-align: center;
-      font-size: 0.75rem;
-      color: #64748b;
-    }
-    body.dark footer {
+
+    body.dark small {
       color: #94a3b8;
     }
-    .hidden {
-      display: none !important;
+
+    input.has-error,
+    input[aria-invalid='true'] {
+      border-color: #dc2626;
+    }
+
+    body.dark input.has-error,
+    body.dark input[aria-invalid='true'] {
+      border-color: rgba(248, 113, 113, 0.7);
+    }
+
+    .auth-footer {
+      font-size: 0.85rem;
+      text-align: center;
+      color: #64748b;
+    }
+
+    body.dark .auth-footer {
+      color: #cbd5f5;
     }
 
     .workspace-shell {
-      flex: 1;
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      width: 100%;
-      box-sizing: border-box;
     }
-    .workspace-header {
+
+    .workspace-topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 24px;
+      background: rgba(255, 255, 255, 0.9);
+      border-bottom: 1px solid rgba(148, 163, 184, 0.4);
       position: sticky;
       top: 0;
-      z-index: 20;
-      display: grid;
-      grid-template-columns: minmax(220px, auto) minmax(0, 1fr) auto;
-      grid-template-areas: 'intro nav user';
-      align-items: center;
-      gap: clamp(10px, 1.6vw, 20px);
-      padding: clamp(12px, 2.4vw, 20px);
-      background: rgba(248, 250, 252, 0.92);
-      backdrop-filter: blur(18px);
-      border-bottom: 1px solid rgba(148, 163, 184, 0.18);
-      box-shadow: 0 6px 24px rgba(15, 23, 42, 0.08);
+      backdrop-filter: blur(6px);
+      z-index: 10;
     }
-    body.dark .workspace-header {
-      background: rgba(15, 23, 42, 0.72);
-      border-bottom-color: rgba(148, 163, 184, 0.35);
-      box-shadow: 0 10px 30px rgba(2, 6, 23, 0.65);
+
+    body.dark .workspace-topbar {
+      background: rgba(15, 23, 42, 0.88);
+      border-color: rgba(148, 163, 184, 0.35);
     }
-    .workspace-intro {
-      display: grid;
+
+    .workspace-brand {
+      font-weight: 700;
+      font-size: 1.1rem;
+      letter-spacing: -0.01em;
+    }
+
+    .workspace-menu {
+      display: flex;
       gap: 8px;
-      min-width: 0;
-      grid-area: intro;
+      flex: 1;
+      justify-content: center;
+      flex-wrap: wrap;
     }
-    .workspace-header h1 {
-      font-size: clamp(1.5rem, 2.6vw, 2.05rem);
-      color: #14532d;
+
+    .workspace-menu button {
+      border: none;
+      background: transparent;
+      color: inherit;
+      padding: 8px 16px;
+      border-radius: 999px;
     }
-    body.dark .workspace-header h1 {
-      color: #86efac;
+
+    .workspace-menu button:hover,
+    .workspace-menu button:focus-visible {
+      background: rgba(22, 163, 74, 0.12);
     }
-    .workspace-header p {
-      color: #475569;
-      font-size: 0.95rem;
+
+    .workspace-menu button[aria-current='page'] {
+      background: #16a34a;
+      color: #ffffff;
     }
-    body.dark .workspace-header p {
-      color: #cbd5f5;
+
+    body.dark .workspace-menu button[aria-current='page'] {
+      background: #4ade80;
+      color: #022c22;
     }
+
     .workspace-user {
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
-      gap: 10px;
-      padding: 10px 14px;
-      border-radius: 12px;
-      background: rgba(15, 118, 110, 0.08);
-      border: 1px solid rgba(15, 118, 110, 0.18);
-      grid-area: user;
-      justify-self: end;
+      gap: 12px;
     }
-    body.dark .workspace-user {
-      background: rgba(15, 118, 110, 0.24);
-      border-color: rgba(45, 212, 191, 0.4);
-    }
+
     .workspace-user .user-meta {
       display: grid;
       gap: 2px;
-      min-width: 0;
-      flex: 1 1 auto;
+      font-size: 0.9rem;
     }
-    .workspace-user .user-meta strong {
-      font-weight: 600;
-      letter-spacing: -0.01em;
-    }
-    .workspace-user .user-meta span {
-      font-size: 0.8rem;
-      color: #475569;
-    }
-    body.dark .workspace-user .user-meta span {
-      color: #cbd5f5;
-    }
-    .workspace-nav {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-      padding: 8px 12px;
-      border-radius: 999px;
-      background: rgba(15, 23, 42, 0.05);
-      overflow-x: auto;
-      scrollbar-width: thin;
-      scroll-behavior: smooth;
-      grid-area: nav;
-      justify-self: center;
-    }
-    .workspace-nav:empty {
-      display: none;
-    }
-    .workspace-nav::-webkit-scrollbar {
-      height: 6px;
-    }
-    .workspace-nav::-webkit-scrollbar-thumb {
-      background: rgba(15, 23, 42, 0.2);
-      border-radius: 999px;
-    }
-    body.dark .workspace-nav::-webkit-scrollbar-thumb {
-      background: rgba(148, 163, 184, 0.35);
-    }
-    body.dark .workspace-nav {
-      background: rgba(148, 163, 184, 0.18);
-    }
-    .workspace-nav button {
-      border: 0;
-      border-radius: 999px;
-      padding: 8px 18px;
+
+    #workspaceLogout {
       background: transparent;
-      color: inherit;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      transition: background 0.2s ease, transform 0.2s ease, color 0.2s ease;
+      color: #166534;
+      border-color: rgba(22, 101, 52, 0.4);
+      padding: 8px 14px;
     }
-    .workspace-nav button:hover,
-    .workspace-nav button:focus-visible {
-      transform: translateY(-1px);
-      background: rgba(15, 23, 42, 0.12);
+
+    body.dark #workspaceLogout {
+      color: #bbf7d0;
+      border-color: rgba(187, 247, 208, 0.4);
     }
-    body.dark .workspace-nav button:hover,
-    body.dark .workspace-nav button:focus-visible {
-      background: rgba(148, 163, 184, 0.28);
-    }
-    .workspace-nav button[aria-current='page'] {
-      background: #15803d;
-      color: #f8fafc;
-      box-shadow: 0 12px 30px rgba(21, 128, 61, 0.35);
-    }
-    body.dark .workspace-nav button[aria-current='page'] {
-      background: #4ade80;
-      color: #022c22;
-      box-shadow: 0 12px 28px rgba(74, 222, 128, 0.45);
-    }
-    @media (max-width: 960px) {
-      .workspace-header {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-areas:
-          'intro'
-          'nav'
-          'user';
-        justify-items: stretch;
-        gap: 16px;
-      }
-      .workspace-nav {
-        width: 100%;
-        justify-content: flex-start;
-        justify-self: stretch;
-      }
-      .workspace-user {
-        width: 100%;
-        justify-content: space-between;
-        justify-self: stretch;
-      }
-    }
-    @media (max-width: 640px) {
-      .workspace-nav {
-        padding: 6px 8px;
-        gap: 8px;
-      }
-      .workspace-nav button {
-        padding: 8px 14px;
-      }
-      .workspace-user {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-      }
-    }
-    .workspace-main {
+
+    .workspace-body {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: clamp(16px, 3vw, 28px);
-      padding: clamp(20px, 4vw, 40px);
-      width: 100%;
-      margin: 0;
-      box-sizing: border-box;
-      align-self: stretch;
     }
-    .workspace-content {
-      flex: 1;
-      background: rgba(255, 255, 255, 0.92);
-      border-radius: 24px;
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      padding: clamp(24px, 4vw, 40px);
-      min-height: 360px;
-      box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12);
-      overflow: auto;
-    }
-    body.dark .workspace-content {
-      background: rgba(15, 23, 42, 0.65);
-      border-color: rgba(148, 163, 184, 0.3);
-      box-shadow: 0 24px 48px rgba(2, 6, 23, 0.65);
-    }
-    .workspace-page {
-      display: grid;
-      gap: clamp(18px, 3vw, 28px);
-    }
-    .workspace-page > header {
-      display: grid;
-      gap: 8px;
-    }
-    .workspace-page h2 {
-      font-size: clamp(1.35rem, 2.6vw, 1.9rem);
-      margin: 0;
-      color: #0f172a;
-    }
-    body.dark .workspace-page h2 {
-      color: #f1f5f9;
-    }
-    .workspace-page h3 {
-      margin-top: 0;
-      color: inherit;
-    }
-    .workspace-page p {
-      margin: 0;
-      line-height: 1.6;
-    }
-    .page-grid {
-      display: grid;
-      gap: clamp(14px, 2.4vw, 22px);
-    }
-    .page-grid.two-columns {
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    }
-    .insight-card {
-      border-radius: 18px;
-      padding: clamp(16px, 2.4vw, 22px);
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(16, 185, 129, 0.18));
-      border: 1px solid rgba(59, 130, 246, 0.25);
-      display: grid;
-      gap: 8px;
-    }
-    body.dark .insight-card {
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(16, 185, 129, 0.22));
-      border-color: rgba(96, 165, 250, 0.35);
-    }
-    .insight-card h3 {
-      font-size: clamp(1.05rem, 2vw, 1.25rem);
-      font-weight: 600;
-    }
-    .insight-card p {
-      font-size: 0.95rem;
-    }
-    .quick-actions {
-      margin-top: 16px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .data-table {
-      width: 100%;
-      border-collapse: collapse;
-      border-radius: 14px;
-      overflow: hidden;
-      background: rgba(255, 255, 255, 0.86);
-    }
-    .data-table thead {
-      background: rgba(15, 118, 110, 0.12);
-    }
-    .data-table th,
-    .data-table td {
-      padding: 12px 16px;
-      text-align: left;
-      border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-    }
-    .data-table tbody tr:last-child td {
-      border-bottom: none;
-    }
-    body.dark .data-table {
-      background: rgba(15, 23, 42, 0.5);
-    }
-    body.dark .data-table thead {
-      background: rgba(45, 212, 191, 0.18);
-    }
-    body.dark .data-table th,
-    body.dark .data-table td {
-      border-color: rgba(148, 163, 184, 0.25);
-    }
-    .workspace-empty {
-      text-align: center;
-      display: grid;
-      gap: 12px;
-      max-width: 420px;
-      margin: 0 auto;
-    }
-    .workspace-empty h2 {
-      font-size: clamp(1.2rem, 2vw, 1.6rem);
-    }
-    .workspace-empty p {
-      color: #475569;
-    }
-    body.dark .workspace-empty p {
-      color: #cbd5f5;
-    }
-    .workspace-footer {
-      padding: 24px;
-      text-align: center;
-      font-size: 0.85rem;
-      color: #64748b;
-      width: 100%;
-      margin: 0;
-      box-sizing: border-box;
-    }
-    body.dark .workspace-footer {
-      color: #cbd5f5;
-    }
+
     .workspace-status {
-      padding: 16px;
-      border-radius: 12px;
-      background: rgba(15, 23, 42, 0.05);
-      border: 1px dashed rgba(15, 23, 42, 0.25);
+      padding: 12px 24px;
+      font-weight: 600;
+      background: rgba(59, 130, 246, 0.18);
+      color: #1d4ed8;
+    }
+
+    .workspace-status[data-status-type='success'] {
+      background: rgba(34, 197, 94, 0.18);
+      color: #166534;
+    }
+
+    .workspace-status[data-status-type='error'] {
+      background: rgba(248, 113, 113, 0.18);
+      color: #b91c1c;
+    }
+
+    .workspace-display {
+      flex: 1;
+      padding: 32px 24px 48px;
+    }
+
+    .workspace-display .workspace-empty {
       display: grid;
       gap: 8px;
-      max-width: 100%;
+      max-width: 640px;
     }
-    body.dark .workspace-status {
-      background: rgba(15, 23, 42, 0.45);
-      border-color: rgba(148, 163, 184, 0.35);
-    }
-    .workspace-status p {
-      color: inherit;
-      margin: 0;
-    }
+
+    .page-loading,
     .page-error {
-      border-radius: 16px;
-      padding: 20px;
-      background: rgba(239, 68, 68, 0.12);
-      border: 1px solid rgba(239, 68, 68, 0.35);
-      color: #7f1d1d;
-    }
-    body.dark .page-error {
-      background: rgba(239, 68, 68, 0.18);
-      border-color: rgba(248, 113, 113, 0.4);
-      color: #fecaca;
-    }
-    .page-loading {
       display: grid;
       gap: 12px;
-      justify-items: center;
-      text-align: center;
-      color: #0f172a;
+      align-content: start;
+      max-width: 640px;
     }
-    body.dark .page-loading {
-      color: #e2e8f0;
-    }
+
     .page-loading .spinner {
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      border: 4px solid rgba(148, 163, 184, 0.35);
-      border-top-color: #0f766e;
-      animation: page-spin 0.9s linear infinite;
+      border: 4px solid rgba(148, 163, 184, 0.4);
+      border-top-color: #16a34a;
+      animation: spin 1s linear infinite;
     }
-    @keyframes page-spin {
-      to {
-        transform: rotate(360deg);
+
+    footer {
+      padding: 24px 16px;
+      font-size: 0.85rem;
+      text-align: center;
+      color: #64748b;
+    }
+
+    body.dark footer {
+      color: #94a3b8;
+    }
+
+    @media (max-width: 640px) {
+      body.auth-mode {
+        align-items: stretch;
+      }
+
+      .workspace-topbar {
+        justify-content: center;
+      }
+
+      .workspace-user {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .workspace-display {
+        padding: 24px 16px 40px;
       }
     }
   </style>
 </head>
 <body class="auth-mode">
   <div class="loading-overlay hidden" id="loadingOverlay" role="alert" aria-live="polite">
-    <div class="excel-icons" aria-hidden="true">
-      <span class="excel-icon excel-icon--1">X</span>
-      <span class="excel-icon excel-icon--2">X</span>
-      <span class="excel-icon excel-icon--3">X</span>
-      <span class="excel-icon excel-icon--4">X</span>
-    </div>
-    <div class="loading-content">
+    <div>
       <header>
-        <p class="pill">Plataforma Excel</p>
+        <p>Plataforma Excel</p>
         <h2>Carregando sua experiência</h2>
         <p>Estamos preparando tudo para o seu próximo passo.</p>
       </header>
       <div class="loading-spinner" aria-hidden="true"></div>
       <p id="loadingMessage" class="loading-message">Validando sua sessão...</p>
-      <div>
-        <p class="fun-fact-label">Curiosidade sobre o Excel</p>
-        <p id="loadingFact" class="fun-fact"></p>
-      </div>
+      <p id="loadingFact"></p>
     </div>
   </div>
 
-  <main class="app-shell" id="authApp">
-    <header class="app-header">
-      <p class="pill">Plataforma Excel</p>
-      <h1>Portal de acesso seguro</h1>
-      <p>Faça login para acessar a área principal e acompanhar seus recursos no Excel.</p>
+  <main class="auth-shell" id="authApp">
+    <header class="auth-header">
+      <p>Plataforma Excel</p>
+      <h1>Acesse sua conta</h1>
+      <p>Use suas credenciais para entrar e abrir as páginas internas.</p>
     </header>
 
-    <section class="cards" id="authCards" aria-live="polite">
-      <article class="card" id="loginCard" data-auth-card="login">
+    <section class="auth-forms" id="authCards" aria-live="polite">
+      <article class="auth-card" id="loginCard" data-auth-card="login">
         <header>
           <h2>Bem-vindo de volta</h2>
-          <p>Entre com suas credenciais para iniciar a experiência.</p>
+          <p>Entre com suas credenciais.</p>
         </header>
         <div id="loginFeedback" class="feedback" role="alert"></div>
         <form id="loginForm" class="form" autocomplete="on">
@@ -889,30 +466,28 @@
             <label for="loginPassword">Senha</label>
             <input id="loginPassword" type="password" autocomplete="current-password" placeholder="Sua senha" required />
           </div>
-          <div class="toggle-line">
-            <label>
-              <input id="rememberMe" type="checkbox" />
-              Lembrar acesso neste dispositivo
-            </label>
-          </div>
-          <button id="btnLogin" type="submit" class="btn btn-primary">Entrar</button>
+          <label>
+            <input id="rememberMe" type="checkbox" />
+            Lembrar acesso neste dispositivo
+          </label>
+          <button id="btnLogin" type="submit">Entrar</button>
         </form>
-        <footer class="card-footer">
-          <span>
+        <footer class="auth-footer">
+          <p>
             Esqueceu a senha?
             <button class="link-button" type="button" data-auth-target="recovery">Recuperar acesso</button>
-          </span>
-          <span>
+          </p>
+          <p>
             É novo por aqui?
-            <button class="link-button" type="button" data-auth-target="register">Criar conta gratuita</button>
-          </span>
+            <button class="link-button" type="button" data-auth-target="register">Criar conta</button>
+          </p>
         </footer>
       </article>
 
-      <article class="card hidden" id="registerCard" data-auth-card="register" aria-hidden="true">
+      <article class="auth-card hidden" id="registerCard" data-auth-card="register" aria-hidden="true">
         <header>
           <h2>Crie sua conta</h2>
-          <p>Cadastre-se para liberar o acesso gamificado da Plataforma Excel.</p>
+          <p>Cadastre-se para liberar o acesso à plataforma.</p>
         </header>
         <div id="registerFeedback" class="feedback" role="alert"></div>
         <form id="registerForm" class="form" autocomplete="on">
@@ -936,17 +511,17 @@
             <input id="registerAdminCode" type="text" autocomplete="off" placeholder="Somente se recebido da equipe" />
             <small id="registerAdminCodeHint" data-default="Opcional — reservado à equipe administrativa.">Opcional — reservado à equipe administrativa.</small>
           </div>
-          <button id="btnRegister" type="submit" class="btn btn-primary">Prosseguir com o cadastro</button>
+          <button id="btnRegister" type="submit">Prosseguir com o cadastro</button>
         </form>
-        <footer class="card-footer">
-          <span>
+        <footer class="auth-footer">
+          <p>
             Já tem conta?
             <button class="link-button" type="button" data-auth-target="login">Fazer login</button>
-          </span>
+          </p>
         </footer>
       </article>
 
-      <article class="card hidden" id="confirmCard" data-auth-card="confirm" aria-hidden="true">
+      <article class="auth-card hidden" id="confirmCard" data-auth-card="confirm" aria-hidden="true">
         <header>
           <h2>Confirme seu acesso</h2>
           <p>Insira o código enviado por e-mail para liberar a conta.</p>
@@ -959,53 +534,46 @@
           </div>
           <div class="field">
             <label for="confirmCode">Código de confirmação</label>
-            <input id="confirmCode" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" required />
+            <input id="confirmCode" type="text" autocomplete="one-time-code" placeholder="Código recebido" required />
           </div>
-          <button id="btnConfirm" type="submit" class="btn btn-primary">Confirmar cadastro</button>
+          <div class="actions">
+            <button id="btnConfirm" type="submit">Confirmar conta</button>
+            <button id="btnResendConfirmation" type="button" class="btn-secondary">Reenviar código</button>
+          </div>
         </form>
-        <div class="card-footer">
-          <button id="btnResendConfirmation" class="link-button" type="button">Reenviar código</button>
-          <div class="card-divider" role="presentation"></div>
-          <span>
-            Já confirmou?
-            <button class="link-button" type="button" data-auth-target="login">Entrar agora</button>
-          </span>
-          <span>
-            Precisa ajustar dados?
-            <button class="link-button" type="button" data-auth-target="register">Refazer cadastro</button>
-          </span>
-        </div>
+        <footer class="auth-footer">
+          <p>
+            Recebeu o código agora?
+            <button class="link-button" type="button" data-auth-target="login">Voltar ao login</button>
+          </p>
+        </footer>
       </article>
 
-      <article class="card hidden" id="recoveryCard" data-auth-card="recovery" aria-hidden="true">
+      <article class="auth-card hidden" id="recoveryCard" data-auth-card="recovery" aria-hidden="true">
         <header>
-          <h2>Recupere sua senha</h2>
-          <p>Informe o e-mail cadastrado para receber um código de redefinição.</p>
+          <h2>Recuperar acesso</h2>
+          <p>Informe seu e-mail para receber o link de redefinição.</p>
         </header>
         <div id="recoveryFeedback" class="feedback" role="alert"></div>
         <form id="recoveryForm" class="form" autocomplete="on">
           <div class="field">
-            <label for="recoveryEmail">E-mail cadastrado</label>
+            <label for="recoveryEmail">E-mail</label>
             <input id="recoveryEmail" type="email" autocomplete="email" placeholder="nome@empresa.com" required />
           </div>
-          <button id="btnRecovery" type="submit" class="btn btn-primary">Enviar código por e-mail</button>
+          <button id="btnRecovery" type="submit">Enviar instruções</button>
         </form>
-        <footer class="card-footer">
-          <span>
-            Já recebeu o código?
-            <button class="link-button" type="button" data-auth-target="reset">Informar código e redefinir</button>
-          </span>
-          <span>
+        <footer class="auth-footer">
+          <p>
             Lembrou a senha?
             <button class="link-button" type="button" data-auth-target="login">Voltar ao login</button>
-          </span>
+          </p>
         </footer>
       </article>
 
-      <article class="card hidden" id="resetCard" data-auth-card="reset" aria-hidden="true">
+      <article class="auth-card hidden" id="resetCard" data-auth-card="reset" aria-hidden="true">
         <header>
-          <h2>Redefinir senha</h2>
-          <p>Use o código recebido para criar uma nova senha segura.</p>
+          <h2>Definir nova senha</h2>
+          <p>Use o código recebido para concluir a redefinição.</p>
         </header>
         <div id="resetFeedback" class="feedback" role="alert"></div>
         <form id="resetForm" class="form" autocomplete="off">
@@ -1014,60 +582,52 @@
             <input id="resetEmail" type="email" autocomplete="email" placeholder="nome@empresa.com" required />
           </div>
           <div class="field">
-            <label for="resetCode">Código recebido</label>
-            <input id="resetCode" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="000000" required />
+            <label for="resetCode">Código de redefinição</label>
+            <input id="resetCode" type="text" autocomplete="one-time-code" placeholder="Código recebido" required />
           </div>
           <div class="field">
             <label for="resetPassword">Nova senha</label>
-            <input id="resetPassword" type="password" autocomplete="new-password" placeholder="Defina uma nova senha" required />
-            <small id="resetPasswordHint" data-default="Mínimo de 8 caracteres com letras maiúsculas, minúsculas, números e símbolos.">Mínimo de 8 caracteres com letras maiúsculas, minúsculas, números e símbolos.</small>
+            <input id="resetPassword" type="password" autocomplete="new-password" placeholder="Crie uma nova senha" required />
+            <small id="resetPasswordHint" data-default="Use ao menos 8 caracteres.">Use ao menos 8 caracteres.</small>
           </div>
-          <button id="btnReset" type="submit" class="btn btn-primary">Atualizar senha</button>
+          <button id="btnReset" type="submit">Atualizar senha</button>
         </form>
-        <footer class="card-footer">
-          <span>
-            Não recebeu o código?
-            <button class="link-button" type="button" data-auth-target="recovery">Solicitar novo envio</button>
-          </span>
-          <span>
-            Tudo certo?
+        <footer class="auth-footer">
+          <p>
+            Já possui acesso?
             <button class="link-button" type="button" data-auth-target="login">Voltar ao login</button>
-          </span>
+          </p>
         </footer>
       </article>
     </section>
 
-    <footer>
-      © <?= new Date().getFullYear() ?> Plataforma Excel — ambiente dedicado ao módulo de autenticação.
+    <footer class="auth-footer">
+      © <?= new Date().getFullYear() ?> Plataforma Excel — módulo de autenticação.
     </footer>
   </main>
 
   <section id="workspaceShell" class="workspace-shell hidden" aria-live="polite">
-    <header class="workspace-header">
-      <div class="workspace-intro">
-        <p class="pill">Plataforma Excel</p>
-        <h1>Central de operações</h1>
-        <p>Acesse as páginas internas da plataforma após concluir o login seguro.</p>
-      </div>
-      <nav id="workspaceNav" class="workspace-nav" aria-label="Navegação da plataforma"></nav>
+    <header class="workspace-topbar">
+      <span class="workspace-brand">Plataforma Excel</span>
+      <nav id="workspaceNav" class="workspace-menu" aria-label="Páginas da plataforma"></nav>
       <div class="workspace-user">
         <div class="user-meta">
           <strong id="workspaceUserName">—</strong>
           <span id="workspaceUserEmail">—</span>
         </div>
-        <button id="workspaceLogout" type="button" class="btn btn-ghost">Sair</button>
+        <button id="workspaceLogout" type="button" class="btn-secondary">Sair</button>
       </div>
     </header>
-    <main class="workspace-main">
+    <div class="workspace-body">
       <div id="workspaceStatus" class="workspace-status hidden" role="status" aria-live="polite"></div>
-      <section id="workspaceContent" class="workspace-content">
+      <section id="workspaceContent" class="workspace-display">
         <div class="workspace-empty">
           <h2>Ambiente pronto</h2>
           <p>Assim que o login for confirmado, o conteúdo principal será carregado automaticamente.</p>
         </div>
       </section>
-    </main>
-    <footer class="workspace-footer">
+    </div>
+    <footer>
       © <?= new Date().getFullYear() ?> Plataforma Excel — ambiente principal da aplicação.
     </footer>
   </section>
