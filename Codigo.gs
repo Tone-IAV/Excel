@@ -18,8 +18,8 @@ const APP_SHELL_FILE = 'index';
 
 const APP_PAGE_REGISTRY = (function buildAppPageRegistry_() {
   const definitions = [
-    { id: 'home', title: 'Visão geral', file: 'pages/home' },
-    { id: 'conta', title: 'Minha conta', file: 'pages/conta' }
+    { id: 'home', title: 'Visão geral', file: 'home' },
+    { id: 'conta', title: 'Minha conta', file: 'conta' }
   ];
   return createAppPageRegistry_(definitions);
 })();
@@ -46,20 +46,7 @@ function renderPartial_(filename) {
   }
   const loadFile = name =>
     HtmlService.createTemplateFromFile(name).evaluate().getContent();
-  try {
-    return loadFile(safeName);
-  } catch (err) {
-    const baseName = safeName.includes('/') ? safeName.split('/').pop() : safeName;
-    const fallbackName = !safeName.startsWith('pages/') && baseName ? `pages/${baseName}` : '';
-    if (fallbackName && fallbackName !== safeName) {
-      try {
-        return loadFile(fallbackName);
-      } catch (fallbackErr) {
-        throw err;
-      }
-    }
-    throw err;
-  }
+  return loadFile(safeName);
 }
 
 function createAppPageRegistry_(definitions) {
@@ -90,7 +77,7 @@ function normalizeAppPageDefinition_(definition, order) {
   const rawTitle = definition.title !== undefined ? definition.title : 'Página';
   const title = rawTitle === null ? 'Página' : rawTitle.toString();
   const rawFile = definition.file !== undefined ? definition.file : '';
-  const file = (rawFile || '').toString().trim() || 'pages/' + id;
+  const file = (rawFile || '').toString().trim() || id;
   const pageOrder = Number.isFinite(order) ? Number(order) : 0;
   return Object.freeze({ id, title, file, order: pageOrder });
 }
