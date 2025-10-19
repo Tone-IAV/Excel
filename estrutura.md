@@ -1,3 +1,9 @@
+# Diretrizes de atualização da base de dados
+
+Sempre que qualquer alteração for feita na base de dados (planilhas, abas ou estruturas de JSON utilizadas pela plataforma), atualize este arquivo imediatamente. Documente os novos campos, remova os que deixarem de existir e mantenha a representação JSON sincronizada com o Apps Script para evitar inconsistências.
+
+---
+
 Guia,Estrutura (JSON)
 Estrutura,"{""Guia"":"""",""Estrutura (JSON)"""":""""}"
 CURIOSIDADES,"{""A planilha “padrão” tem 1.048.576 linhas × 16.384 colunas (até a coluna XFD)."":""""}"
