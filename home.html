@@ -1,0 +1,50 @@
+<section class="workspace-page" aria-labelledby="workspace-home-title">
+  <header>
+    <h2 id="workspace-home-title">Bem-vindo à área principal</h2>
+    <p>Veja o status do seu login confirmado e utilize o menu superior para acessar os recursos essenciais da plataforma.</p>
+  </header>
+
+  <div class="page-grid two-columns">
+    <article class="insight-card">
+      <h3>Status da sessão</h3>
+      <p>Confirme seus dados autenticados na barra superior e acompanhe a duração da sessão ativa para manter o ambiente seguro.</p>
+    </article>
+    <article class="insight-card">
+      <h3>Atalhos principais</h3>
+      <p>Utilize o menu da direita para abrir os módulos disponibilizados. Cada página mantém o visual consistente da experiência principal.</p>
+      <div class="quick-actions" role="group" aria-label="Atalhos rápidos">
+        <button type="button" class="btn btn-primary" data-open-page="conta">Abrir página “Minha conta”</button>
+      </div>
+    </article>
+  </div>
+
+  <div class="workspace-status">
+    <strong>Pronto para começar</strong>
+    <p>Seu acesso está liberado. Explore o conteúdo pelo menu principal e use o botão “Sair” sempre que precisar encerrar a sessão com segurança.</p>
+  </div>
+</section>
+<script>
+  (function () {
+    const button = document.querySelector('[data-open-page="conta"]');
+    if (!button || button.dataset.bound === 'true') {
+      return;
+    }
+
+    button.dataset.bound = 'true';
+    button.addEventListener('click', function handleOpenConta(event) {
+      event.preventDefault();
+      if (
+        window.ExcelPlatform &&
+        window.ExcelPlatform.shell &&
+        typeof window.ExcelPlatform.shell.openPage === 'function'
+      ) {
+        window.ExcelPlatform.shell.openPage('conta');
+        return;
+      }
+      const navButton = document.querySelector('[data-page-id="conta"]');
+      if (navButton && typeof navButton.click === 'function') {
+        navButton.click();
+      }
+    });
+  })();
+</script>
