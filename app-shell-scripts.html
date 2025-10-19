@@ -1,0 +1,337 @@
+<script>
+(function () {
+  'use strict';
+
+  const ExcelPlatform = (window.ExcelPlatform = window.ExcelPlatform || {});
+
+  const defaultEvents = {
+    sessionReady: 'excel-auth:session-ready',
+    logout: 'excel-auth:logout',
+    requireLogin: 'excel-auth:require-login'
+  };
+  const events = ExcelPlatform.events
+    ? Object.assign({}, defaultEvents, ExcelPlatform.events)
+    : { ...defaultEvents };
+  ExcelPlatform.events = events;
+
+  const utils = ExcelPlatform.utils || {};
+  ExcelPlatform.utils = utils;
+
+  const hasServerBridge =
+    typeof utils.hasServerBridge === 'function'
+      ? utils.hasServerBridge
+      : (utils.hasServerBridge = function hasServerBridge() {
+          return typeof google !== 'undefined' && google.script && google.script.run;
+        });
+
+  const getErrorMessage =
+    typeof utils.getErrorMessage === 'function'
+      ? utils.getErrorMessage
+      : (utils.getErrorMessage = function getErrorMessage(err, fallback) {
+          if (!err) return fallback;
+          if (typeof err === 'string') return err;
+          if (err.message) return err.message;
+          if (err.details && err.details.message) return err.details.message;
+          return fallback;
+        });
+
+  const emitEvent =
+    typeof utils.emitEvent === 'function'
+      ? utils.emitEvent
+      : (utils.emitEvent = function emitEvent(name, detail) {
+          if (!name) return;
+          try {
+            window.dispatchEvent(new CustomEvent(name, { detail }));
+          } catch (err) {
+            console.warn('Falha ao emitir evento', name, err);
+          }
+        });
+
+  const dom = {
+    root: document.body,
+    authShell: document.getElementById('authApp'),
+    workspaceShell: document.getElementById('workspaceShell'),
+    workspaceNav: document.getElementById('workspaceNav'),
+    workspaceContent: document.getElementById('workspaceContent'),
+    workspaceUserName: document.getElementById('workspaceUserName'),
+    workspaceUserEmail: document.getElementById('workspaceUserEmail'),
+    workspaceLogout: document.getElementById('workspaceLogout'),
+    workspaceStatus: document.getElementById('workspaceStatus'),
+    loadingOverlay: document.getElementById('loadingOverlay')
+  };
+
+  const state = {
+    availablePages: [],
+    activePageId: '',
+    isLoadingPage: false
+  };
+
+  function hideLoadingOverlay() {
+    const overlay = dom.loadingOverlay;
+    if (!overlay) return;
+    overlay.classList.add('hidden');
+    overlay.style.removeProperty('display');
+    overlay.setAttribute('aria-hidden', 'true');
+  }
+
+  function renderWorkspaceMessage(message, type) {
+    const container = dom.workspaceStatus;
+    if (!container) return;
+    if (!message) {
+      container.classList.add('hidden');
+      container.textContent = '';
+      container.removeAttribute('data-status-type');
+      return;
+    }
+    container.textContent = message;
+    container.dataset.statusType = type || 'info';
+    container.classList.remove('hidden');
+  }
+
+  function showWorkspaceShell() {
+    hideLoadingOverlay();
+    if (dom.root) {
+      dom.root.classList.add('workspace-mode');
+      dom.root.classList.remove('auth-mode');
+    }
+    if (dom.authShell) dom.authShell.classList.add('hidden');
+    if (dom.workspaceShell) dom.workspaceShell.classList.remove('hidden');
+  }
+
+  function showAuthShell() {
+    if (dom.root) {
+      dom.root.classList.add('auth-mode');
+      dom.root.classList.remove('workspace-mode');
+    }
+    if (dom.workspaceShell) dom.workspaceShell.classList.add('hidden');
+    if (dom.authShell) dom.authShell.classList.remove('hidden');
+  }
+
+  function resetWorkspace(message) {
+    state.availablePages = [];
+    state.activePageId = '';
+    state.isLoadingPage = false;
+    if (dom.workspaceNav) {
+      dom.workspaceNav.innerHTML = '';
+    }
+    if (dom.workspaceContent) {
+      dom.workspaceContent.innerHTML = '';
+      dom.workspaceContent.removeAttribute('data-page-id');
+      const emptyState = document.createElement('div');
+      emptyState.className = 'workspace-empty';
+      const title = document.createElement('h2');
+      title.textContent = 'Ambiente pronto';
+      const paragraph = document.createElement('p');
+      paragraph.textContent = message || 'Faça login para acessar as páginas da plataforma.';
+      emptyState.appendChild(title);
+      emptyState.appendChild(paragraph);
+      dom.workspaceContent.appendChild(emptyState);
+    }
+    renderWorkspaceMessage('');
+  }
+
+  function updateUserInfo(session) {
+    const user = session && session.user ? session.user : null;
+    let displayName = '—';
+    let email = '—';
+    if (user) {
+      displayName = user.name ? user.name : user.email ? user.email : 'Usuário autenticado';
+      email = user.email ? user.email : '—';
+    }
+    if (dom.workspaceUserName) dom.workspaceUserName.textContent = displayName;
+    if (dom.workspaceUserEmail) dom.workspaceUserEmail.textContent = email;
+  }
+
+  function setupLogoutBinding() {
+    const button = dom.workspaceLogout;
+    if (!button || button.dataset.bound === 'true') return;
+    button.dataset.bound = 'true';
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      if (window.ExcelAuth && typeof window.ExcelAuth.logout === 'function') {
+        window.ExcelAuth.logout();
+        return;
+      }
+      emitEvent(events.requireLogin, { reason: 'logout-request' });
+    });
+  }
+
+  function setContentLoading(message) {
+    if (!dom.workspaceContent) return;
+    dom.workspaceContent.innerHTML = '';
+    dom.workspaceContent.removeAttribute('data-page-id');
+    const wrapper = document.createElement('div');
+    wrapper.className = 'page-loading';
+    const spinner = document.createElement('div');
+    spinner.className = 'spinner';
+    spinner.setAttribute('aria-hidden', 'true');
+    const text = document.createElement('p');
+    text.textContent = message || 'Carregando conteúdo...';
+    wrapper.appendChild(spinner);
+    wrapper.appendChild(text);
+    dom.workspaceContent.appendChild(wrapper);
+  }
+
+  function renderError(message, detail) {
+    if (!dom.workspaceContent) return;
+    dom.workspaceContent.innerHTML = '';
+    dom.workspaceContent.removeAttribute('data-page-id');
+    const container = document.createElement('div');
+    container.className = 'page-error';
+    const strong = document.createElement('strong');
+    strong.textContent = message || 'Não foi possível carregar o conteúdo.';
+    container.appendChild(strong);
+    if (detail) {
+      const paragraph = document.createElement('p');
+      paragraph.textContent = detail;
+      container.appendChild(paragraph);
+    }
+    dom.workspaceContent.appendChild(container);
+  }
+
+  function renderEmptyPages() {
+    resetWorkspace('Nenhuma página disponível no momento.');
+  }
+
+  function markActive(pageId) {
+    if (!dom.workspaceNav) return;
+    const buttons = dom.workspaceNav.querySelectorAll('button[data-page-id]');
+    buttons.forEach(button => {
+      if (button.dataset.pageId === pageId) {
+        button.setAttribute('aria-current', 'page');
+      } else {
+        button.removeAttribute('aria-current');
+      }
+    });
+  }
+
+  function openPage(pageId) {
+    if (!pageId || !hasServerBridge()) {
+      return;
+    }
+    if (state.isLoadingPage) return;
+    state.isLoadingPage = true;
+    state.activePageId = pageId;
+    markActive(pageId);
+    setContentLoading('Carregando página selecionada...');
+    google.script.run
+      .withFailureHandler(err => {
+        state.isLoadingPage = false;
+        renderError('Não foi possível carregar a página selecionada.', getErrorMessage(err, 'Tente novamente em instantes.'));
+      })
+      .withSuccessHandler(html => {
+        state.isLoadingPage = false;
+        if (!dom.workspaceContent) return;
+        dom.workspaceContent.dataset.pageId = pageId;
+        dom.workspaceContent.innerHTML = html || '';
+      })
+      .getAppPageContent(pageId);
+  }
+
+  function renderNav() {
+    if (!dom.workspaceNav) return;
+    dom.workspaceNav.innerHTML = '';
+    state.availablePages.forEach(page => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'workspace-nav-link';
+      button.dataset.pageId = page.id;
+      button.textContent = page.title || page.id;
+      if (page.id === state.activePageId) {
+        button.setAttribute('aria-current', 'page');
+      }
+      button.addEventListener('click', () => {
+        if (page.id !== state.activePageId) {
+          openPage(page.id);
+        }
+      });
+      dom.workspaceNav.appendChild(button);
+    });
+  }
+
+  function loadPages() {
+    if (!hasServerBridge()) {
+      renderError('Ambiente indisponível.', 'Não foi possível conectar ao Apps Script.');
+      return;
+    }
+    setContentLoading('Carregando páginas disponíveis...');
+    google.script.run
+      .withFailureHandler(err => {
+        state.availablePages = [];
+        state.activePageId = '';
+        state.isLoadingPage = false;
+        if (dom.workspaceNav) {
+          dom.workspaceNav.innerHTML = '';
+        }
+        renderError('Não foi possível carregar as páginas.', getErrorMessage(err, 'Tente novamente em instantes.'));
+      })
+      .withSuccessHandler(list => {
+        state.availablePages = Array.isArray(list) ? list.filter(item => item && item.id) : [];
+        if (!state.availablePages.length) {
+          renderEmptyPages();
+          return;
+        }
+        const prioritizedPageId = 'conta';
+        const prioritizedPages = state.availablePages.filter(page => page.id === prioritizedPageId);
+        const otherPages = state.availablePages.filter(page => page.id !== prioritizedPageId);
+        state.availablePages = [...prioritizedPages, ...otherPages];
+        renderNav();
+        const defaultPage = state.availablePages.find(page => page.id === prioritizedPageId) || state.availablePages[0];
+        if (defaultPage) {
+          openPage(defaultPage.id);
+        }
+      })
+      .getAppPages();
+  }
+
+  function handleSessionReady(event) {
+    const session = event && event.detail ? event.detail.session : null;
+    updateUserInfo(session);
+    setupLogoutBinding();
+    showWorkspaceShell();
+    const source = event && event.detail && event.detail.source ? event.detail.source : 'login';
+    if (source === 'restore') {
+      renderWorkspaceMessage('Sessão restaurada com sucesso.');
+    } else {
+      renderWorkspaceMessage('Login confirmado com sucesso.');
+    }
+    state.availablePages = [];
+    state.activePageId = '';
+    state.isLoadingPage = false;
+    if (dom.workspaceNav) {
+      dom.workspaceNav.innerHTML = '';
+    }
+    loadPages();
+  }
+
+  function handleRequireLogin() {
+    showAuthShell();
+    resetWorkspace('Faça login para acessar as páginas da plataforma.');
+    updateUserInfo(null);
+    renderWorkspaceMessage('');
+  }
+
+  window.addEventListener(events.sessionReady, handleSessionReady);
+  window.addEventListener(events.logout, handleRequireLogin);
+  window.addEventListener(events.requireLogin, handleRequireLogin);
+
+  document.addEventListener('DOMContentLoaded', () => {
+    setupLogoutBinding();
+  });
+
+  ExcelPlatform.dom = Object.assign({}, ExcelPlatform.dom, dom);
+  ExcelPlatform.shell = Object.assign({}, ExcelPlatform.shell, {
+    openPage,
+    reloadPages: loadPages,
+    reset: resetWorkspace,
+    showWorkspaceShell,
+    showAuthShell,
+    showMessage: renderWorkspaceMessage,
+    getState: () => ({
+      availablePages: [...state.availablePages],
+      activePageId: state.activePageId,
+      isLoading: state.isLoadingPage
+    })
+  });
+})();
+</script>
