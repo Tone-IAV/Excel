@@ -1,0 +1,42 @@
+Guia	Estrutura (JSON)
+Estrutura	{"Guia":"","Estrutura (JSON)":""}
+CURIOSIDADES	{"A planilha “padrão” tem 1.048.576 linhas × 16.384 colunas (até a coluna XFD).":""}
+UserProfiles	{"userId":"","phone":"","role":"","bio":"","photoFileId":"","photoUrl":"","folderId":"","updatedAt":""}
+PasswordResets	{"userId":"","email":"","codeHash":"","createdAt":"","expiresAt":"","usedAt":"","lastSentAt":"","attempts":""}
+QuestionBank	{"id":"","courseId":"","cohortId":"","moduleId":"","lessonId":"","question":"","questionType":"","optionsJSON":"","correctAnswer":"","points":"","explanation":"","status":"","createdBy":"","createdAt":"","updatedAt":""}
+QuestionResponses	{"id":"","questionId":"","userId":"","selectedOption":"","isCorrect":"","pointsAwarded":"","answeredAt":"","metaJSON":""}
+FaqEntries	{"id":"","title":"","body":"","tags":"","status":"","createdAt":"","updatedAt":"","authorId":""}
+HelpRequests	{"id":"","userId":"","question":"","status":"","faqId":"","createdAt":"","updatedAt":""}
+AdminTasks	{"id":"","title":"","description":"","priority":"","status":"","order":"","ownerId":"","createdAt":"","updatedAt":""}
+Courses	{"id":"","title":"","slug":"","description":"","coverFileId":"","category":"","totalHours":"","xpTotal":"","isPublished":"","createdAt":"","updatedAt":""}
+Enrollments	{"id":"","userId":"","courseId":"","cohortId":"","enrolledAt":"","status":""}
+Cohorts	{"id":"","courseId":"","title":"","startAt":"","endAt":"","accessKey":""}
+Lessons	{"id":"","moduleId":"","title":"","order":"","type":"","resource":"","durationMin":"","xp":"","isPublished":""}
+LessonProgress	{"id":"","userId":"","lessonId":"","completedAt":"","timeSpentSec":""}
+XPEvents	{"id":"","userId":"","source":"","sourceId":"","delta":"","createdAt":"","metaJSON":""}
+DailyCheckins	{"id":"","userId":"","dateISO":"","streakCount":"","xpAwarded":""}
+Notifications	{"id":"","userId":"","type":"","title":"","body":"","link":"","readAt":"","createdAt":""}
+Announcements	{"id":"","scope":"","courseId":"","cohortId":"","title":"","body":"","publishAt":"","expiresAt":"","authorId":"","createdAt":""}
+Sessions	{"userId":"","tokenHash":"","expiresAt":"","createdAt":""}
+ChangeLog	{"timestamp":"","type":"","sheet":"","range":"","user":"","preview":""}
+ForumIdeas	{"id":"","userId":"","authorName":"","title":"","summary":"","impact":"","benefit":"","visibility":"","targetUserIds":"","tags":"","createdAt":"","status":""}
+ForumIdeaFeedback	{"id":"","ideaId":"","userId":"","type":"","message":"","createdAt":""}
+ForumPolls	{"id":"","creatorId":"","question":"","description":"","allowMultiple":"","allowUpdates":"","visibility":"","audience":"","closesAt":"","createdAt":"","targetUserIds":"","metadata":""}
+ForumPollOptions	{"id":"","pollId":"","label":"","order":"","createdAt":""}
+ForumPollVotes	{"id":"","pollId":"","userId":"","choiceIds":"","createdAt":"","updatedAt":""}
+ForumQuestions	{"id":"","userId":"","authorName":"","subject":"","details":"","scope":"","visibility":"","targetUserIds":"","createdAt":"","status":"","metadata":""}
+ForumNotifications	{"id":"","userId":"","type":"","entityId":"","message":"","link":"","createdAt":"","readAt":"","metadata":""}
+ForumReactions	{"id":"","postId":"","userId":"","reaction":"","createdAt":"","updatedAt":""}
+UserConfirmations	{"userId":"","email":"","codeHash":"","createdAt":"","expiresAt":"","confirmedAt":"","lastSentAt":"","pendingName":"","pendingPassHash":"","pendingIsAdmin":""}
+WallAttachments	{"attachmentId":"","postId":"","uploaderId":"","fileId":"","fileName":"","mimeType":"","fileUrl":"","sizeBytes":"","uploadedAt":"","linkedAt":"","folderId":""}
+Wall	{"id":"","userId":"","authorName":"","message":"","createdAt":"","visibility":"","targetUserIds":"","mentionUserIds":"","attachmentIds":"","removedAt":"","removedBy":""}
+UserAchievements	{"userId":"","achievementId":"","unlockedAt":"","rewardXP":""}
+Users	{"id":"","name":"","email":"","passHash":"","isAdmin":"","createdAt":"","avatarUrl":"","bio":"","updatedAt":""}
+Tokens	{"Token":"","UserID":"","ExpiresAt":"","CriadoEm":""}
+Modules	{"id":"","courseId":"","title":"","order":"","description":"","xp":"","isPublished":"","Ativo":""}
+Questions	{"ModuleID":"","QuestionID":"","Tipo":"","Enunciado":"","OpcoesJSON":"","Correta":"","Peso":"","MinCaracteres":"","Feedback":""}
+Progress	{"userId":"","moduleId":"","scorePct":"","earnedXP":"","completedAt":"","AnswersJSON":"","AtualizadoEm":""}
+Checkins	{"userId":"","dateISO":"","xp":"","streak":""}
+Config	{"key":"","value":""}
+Embeds	{"key":"","url":"","AtualizadoPor":"","AtualizadoEm":""}
+AuditLog	{"Timestamp":"","Action":"","UserID":"","Payload":""}
